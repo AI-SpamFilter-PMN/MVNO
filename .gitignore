@@ -1,0 +1,39 @@
+# Databases & HLR Stores (Local state)
+*.db
+*.sqlite
+hlr.db
+sms.db
+/state/
+
+# Environment Secrets
+.env
+.env.*
+.secrets/
+
+# Large Binary Presentation Assets (Graduation Project files)
+Documentation-sample.rar
+GP_Project_Rules.pdf
+Project Architecture.png
+Ziads-Part-MVNO.png
+GP_46.drawio
+
+# Python Runtime Caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+env/
+venv/
+
+# Telemetry Logs & Metrics
+/logs/
+*.log
+
+# OS & IDE Files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
