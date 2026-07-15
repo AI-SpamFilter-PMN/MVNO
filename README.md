@@ -84,7 +84,24 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ---
 
-## 📖 5. Documentation Directory
+## 🔧 5. Implemented Features
+
+| # | Feature | Description |
+|---|---------|-------------|
+| 1 | **Prepaid OCS Interception** | Balance check before allowing calls/SMS. Zero-balance subscribers are blocked. |
+| 2 | **STIR/SHAKEN Anti-Spoofing** | SIP `From` header verified against authenticated MSISDN. Mismatch → `407 Proxy Auth Required`. |
+| 3 | **LAC/CellID Geofencing** | Location metadata extracted by Vector from OsmoSMSC logs and forwarded for zone-based AI filtering. |
+| 4 | **EIR Device Binding** | IMEI-IMSI pairs tracked in FastAPI. Rapid SIM swaps (>3 in 10min) blocked as spam boxes. |
+| 5 | **DTMF Interception** | rtpengine logs dial tones to JSON metadata. Vosk worker parses and appends to API requests. |
+| 6 | **Voice Biometrics** | WAV analysis for silence ratio + spectral flatness to detect robocalls and TTS synthesis. |
+| 7 | **SLA Fallback HTable** | If AI filter API is unreachable, Kamailio falls back to local in-memory whitelist/blacklist cache. |
+
+---
+
+## 📖 6. Documentation Directory
 
 All setup guides are stored locally inside the repository:
-*   [docs/deployment_guide.md](docs/deployment_guide.md): Details the step-by-step configuration runbook, ports, and configuration scripts for Kamailio, rtpengine, and Osmocom.
+*   [docs/implementation_guide.md](docs/implementation_guide.md): **Complete implementation guide** with all configuration files, code, build steps, and rationale.
+*   [docs/deployment_guide.md](docs/deployment_guide.md): Step-by-step configuration runbook, ports, and integration scripts for Kamailio, rtpengine, and Osmocom.
+*   [docs/implementation_plan.md](docs/implementation_plan.md): Original design planning document.
+*   [docs/best_practices.md](docs/best_practices.md): SOTA best practices and architectural decisions.
