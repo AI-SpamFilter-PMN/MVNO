@@ -65,16 +65,22 @@ A comprehensive guide to building a rootless containerized MVNO core network tha
 
 ### Required Tools
 
+Choose your distro:
+
 ```bash
-# Podman (daemonless, rootless container engine)
-sudo pacman -S --needed podman podman-compose
+# ─── Debian / Ubuntu (apt) ──────────────────────────────
+sudo apt update && sudo apt install -y podman podman-compose python3 python3-pip sqlite3
+# (Optional) sipp: sudo apt install -y sipp
 
-# Python + SQLite for FastAPI and Vosk worker scripts
-sudo pacman -S --needed python python-pip sqlite3
+# ─── Arch / CachyOS (pacman) ────────────────────────────
+sudo pacman -S --needed podman podman-compose python python-pip sqlite3
+# (Optional) sipp — available in AUR: yay -S sipp
 
-# (Optional) sipp for SIP call testing — available in AUR
-# yay -S sipp
+# ─── Fedora / RHEL (dnf / yum) ──────────────────────────
+sudo dnf install -y podman podman-compose python3 python3-pip sqlite3
+# (Optional) sipp: sudo dnf install -y sipp
 
+# ─── Common (all distros) ────────────────────────────────
 # Verify rootless mode
 podman info | grep rootless
 # Expected: rootless: true
@@ -1212,7 +1218,7 @@ print('Sent — expect allow:false in FastAPI logs')
 | No WAV in spool | rtpengine socket config wrong | Check Kamailio → rtpengine `rtpengine_sock` parameter. |
 | Vosk idle (no transcription) | Model not yet downloaded | First run downloads ~40MB model via HTTP. Wait 30-60s. |
 | SELinux volume errors | Missing `:z` flag | Add `:z` to volume definition in docker-compose.yml. |
-| `podman-compose` not found | Not installed | `sudo pacman -S podman-compose` or `pip install podman-compose`. |
+| `podman-compose` not found | Not installed | Debian: `sudo apt install podman-compose` · Arch: `sudo pacman -S podman-compose` · Fedora: `sudo dnf install podman-compose` · Or: `pip install podman-compose` |
 | MongoDB connection refused | Container still starting | Wait 10-15s for first boot. Check `podman logs mvno-mongodb`. |
 | Vector not parsing logs | Wrong log path | Verify Kamailio/OsmoSMSC write logs to paths in vector.toml. |
 | FastAPI returns `allow:true` for everything | AI filter unreachable | Expected in sandbox — SLA fallback allows when filter is down. |
