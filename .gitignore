@@ -37,3 +37,7 @@ venv/
 .idea/
 *.swp
 *.swo
+
+# Local-Only Agent and Best Practice Rules
+.agents/
+docs/best_practices.md

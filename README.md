@@ -2,8 +2,8 @@
 ### Core Network Interception & Observability for the AI Spam Filter Platform
 
 [![Orchestration](https://img.shields.io/badge/Orchestration-Podman--Compose_%7C_Docker-orange?style=for-the-badge&logo=podman)](docs/deployment_guide.md)
-[![Database](https://img.shields.io/badge/Database-SQLite_WAL_%7C_MongoDB-green?style=for-the-badge&logo=sqlite)](docs/best_practices.md)
-[![Observability](https://img.shields.io/badge/Observability-VictoriaMetrics_%7C_Grafana-purple?style=for-the-badge&logo=grafana)](docs/best_practices.md)
+[![Database](https://img.shields.io/badge/Database-SQLite_WAL_%7C_MongoDB-green?style=for-the-badge&logo=sqlite)](docs/deployment_guide.md)
+[![Observability](https://img.shields.io/badge/Observability-VictoriaMetrics_%7C_Grafana-purple?style=for-the-badge&logo=grafana)](docs/deployment_guide.md)
 [![Business](https://img.shields.io/badge/eTOM-Fulfilment_Assurance_Billing-blue?style=for-the-badge)](docs/deployment_guide.md)
 
 This repository contains the **Mobile Virtual Network Operator (MVNO) / Private Mobile Network** core infrastructure simulation. It is designed to act as the traffic interception node and media processing engine for the companion [AI-SpamFilter-PMN/MVNO](https://github.com/AI-SpamFilter-PMN/MVNO) filtration platform.
@@ -86,6 +86,5 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ## 📖 5. Documentation Directory
 
-All setup guides and best practices are stored locally inside the repository:
+All setup guides are stored locally inside the repository:
 *   [docs/deployment_guide.md](docs/deployment_guide.md): Details the step-by-step configuration runbook, ports, and configuration scripts for Kamailio, rtpengine, and Osmocom.
-*   [docs/best_practices.md](docs/best_practices.md): Lists advanced telecom security practices, including PIKE rate limiting, Caller ID spoofing prevention (STIR/SHAKEN), WebRTC transcoding, and SQLite WAL tuning.
