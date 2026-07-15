@@ -84,12 +84,3 @@ make test-call   # SIP call → rtpengine → Vosk STT → FastAPI
 | [implementation_guide.md](docs/implementation_guide.md) | Full 1876-line guide: critical thinking methodology, all configs, code, troubleshooting, 5G SA |
 | [deployment_guide.md](docs/deployment_guide.md) | Original apt-based deployment runbook |
 | [best_practices.md](docs/best_practices.md) | SOTA architectural decisions |
-
-
-## eTOM Alignment
-
-| Domain | Our Implementation |
-|--------|-------------------|
-| **Fulfilment** | SIP routing, SMS store-and-forward, media anchoring, 5G PDU sessions |
-| **Assurance** | Real-time interception, AI classification, STT, voice biometrics, DTMF, geofencing, EIR |
-| **Billing / OCS** | Prepaid balance checks before allowing calls/SMS/data |
