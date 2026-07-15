@@ -5,27 +5,168 @@ A comprehensive guide to building a rootless containerized MVNO core network tha
 ---
 
 ## Table of Contents
-1. [Architecture Overview](#1-architecture-overview)
-2. [Prerequisites](#2-prerequisites)
-3. [Project Scaffolding](#3-project-scaffolding)
-4. [Core Network Configs](#4-core-network-configurations)
-   - [4A. Kamailio SIP Server](#4a-kamailio-configskamailiokamailiocfg)
-   - [4B. OsmoSMSC](#4b-osmosmsc-configsosmocomosmo-smsccfg)
-   - [4C. rtpengine Media Proxy](#4c-rtpengine-configsrtpenginertpengineconf)
-   - [4D. VictoriaMetrics Scrape](#4d-victoriametrics-scrape-configsvictoria-metricsscrapeyml)
-5. [FastAPI Interception Gateway](#5-fastapi-interception-gateway)
-6. [Data Pipeline](#6-data-pipeline)
-   - [6A. Vosk Worker](#6a-vosk-worker)
-   - [6B. Vector Log Shipper](#6b-vector-log-shipper)
-7. [Docker Compose](#7-docker-compose-orchestration)
-8. [Makefile](#8-makefile)
-9. [Feature Integration Map](#9-feature-integration-map)
+1. [Critical Thinking & Problem-Solving](#1-critical-thinking--problem-solving-methodology)
+2. [Architecture Overview](#2-architecture-overview)
+3. [Prerequisites](#3-prerequisites)
+4. [Project Scaffolding](#4-project-scaffolding)
+5. [Docker Compose Orchestration](#5-docker-compose-orchestration)
+   - [5A. docker-compose.yml](#5a-docker-composeyml)
+   - [5B. Osmocom Dockerfile](#5b-osmocom-dockerfile)
+6. [Core Network Configs](#6-core-network-configurations)
+   - [6A. rtpengine.conf](#6a-rtpengine-configsrtpenginertpengineconf)
+   - [6B. kamailio.cfg](#6b-kamailio-configskamailiokamailiocfg)
+   - [6C. osmo-smsc.cfg](#6c-osmo-smsc-configsosmocomosmo-smsccfg)
+   - [6D. scrape.yml](#6d-victoriametrics-scrape-configsvictoria-metricsscrapeyml)
+7. [FastAPI Interception Gateway](#7-fastapi-interception-gateway)
+8. [Data Pipeline](#8-data-pipeline)
+   - [8A. Vosk Worker](#8a-vosk-worker)
+   - [8B. Vector Log Shipper](#8b-vector-log-shipper)
+9. [Makefile](#9-makefile)
 10. [Building & Testing](#10-building--testing)
 11. [Troubleshooting](#11-troubleshooting)
+12. [Appendix](#12-appendix)
 
 ---
 
-## 1. Architecture Overview
+## 1. Critical Thinking & Problem-Solving Methodology
+
+This section is the most important one in the guide. The config files and code will be obsolete in a year — but the way you *think* about complex systems will serve you for your entire career.
+
+### The Core Telecom Mental Model: Trace the Data Flow
+
+Before writing a single line of config or code, ask yourself:
+
+> **"If I'm a packet/message entering this system, what happens to me step by step?"**
+
+For this project, there are exactly two data flows. Internalize them:
+
+**Flow A — SMS:**
+```
+SMPP Client → OsmoSMSC (port 2775) → FastAPI /intercept/sms → AI Filter → allow:true/false → deliver or drop
+```
+
+**Flow B — Voice Call:**
+```
+SIP Phone (port 5060) → Kamailio → FastAPI /intercept/call → AI Filter → allow → rtpengine (media proxy + WAV recording) → Vosk Worker (STT transcript) → FastAPI /transcript → AI Filter
+```
+
+Every single config line you write serves one of these two flows. If you can't explain which flow a line belongs to, you don't understand why you're writing it.
+
+### The 5-Step Problem-Solving Loop
+
+Apply this to every component you implement:
+
+| Step | Question to Ask | Example (Kamailio) |
+|------|----------------|-------------------|
+| **1. Purpose** | What does this component do in one sentence? | "Kamailio is the SIP registrar — it authenticates users and routes calls." |
+| **2. Input** | What data does it receive, from where, on what port/protocol? | "SIP INVITE on UDP 5060 from a phone." |
+| **3. Output** | What data does it send, to where? | "RTP media to rtpengine, HTTP POST to FastAPI." |
+| **4. Failure mode** | What happens if this component is down? | "No calls can be made. SMS still works (separate path)." |
+| **5. Verify** | How do I know it's working? | "SIP registration shows in `kamctl`, logs show no errors." |
+
+### Critical Thinking Techniques for Telecom Systems
+
+#### 1. Think in Layers (OSI Model)
+
+Every telecom system maps to OSI layers. When debugging, identify which layer is failing:
+
+| OSI Layer | In This Project | Where to Debug |
+|-----------|----------------|----------------|
+| L7 Application | FastAPI, AI Filter | `/api/v1/intercept/sms` response, FastAPI logs |
+| L6 Presentation | SIP/SDP bodies, SMPP PDUs | Kamailio xlog, tcpdump on port 5060/2775 |
+| L5 Session | SIP dialog (INVITE→200→ACK→BYE) | Kamailio `tm` module, `ngrep` on SIP traffic |
+| L4 Transport | TCP/UDP ports | `podman logs`, `ss -tlnp` |
+| L3 Network | Container bridge `mvno_net` | `podman network inspect mvno_net` |
+| L1-2 Cabling/Containers | Podman, host OS | `podman ps`, `make logs` |
+
+**Rule of thumb:** 80% of bugs are at L4 (port not listening) or L7 (wrong API payload). Start there.
+
+#### 2. Practice Failure Mode Analysis
+
+Before every `make up`, predict what will fail. This trains your intuition:
+
+```
+"If MongoDB isn't ready when Kamailio starts → Kamailio might crash on DB init."
+"If FastAPI times out → Kamailio's SLA fallback whitelists the call."
+"If rtpengine isn't running → Kamailio can't anchor media, call fails."
+```
+
+Write these predictions down. After running, check which were right. Over time, you'll predict 90% of failures before they happen.
+
+#### 3. The "Why Not?" Reframe
+
+Whenever you see a technology choice in this guide, ask:
+
+> **"Why not use X instead?"**
+
+| Choice | Alternative | Answer in This Project |
+|--------|------------|----------------------|
+| SQLite | PostgreSQL | "Zero server process. 2MB RAM vs 100MB. WAL mode handles concurrent reads/writes at sandbox scale." |
+| Vosk | Whisper AI | "40MB model vs 1.5GB. Runs on CPU without GPU. No cloud dependency." |
+| Podman | Docker | "Rootless by default, daemonless, 0MB idle. Compose syntax is identical." |
+| Vector | Filebeat | "Single Rust binary (5MB). No GC pauses. Built-in backpressure to disk." |
+
+When you can answer "why not" for every choice, you've internalized the architecture.
+
+#### 4. Incremental Verification (The Most Important Skill)
+
+**Never run `make up` and hope everything works.** That's guessing, not engineering. Instead:
+
+```
+Step 1: Can I build each container image individually?
+  → podman build -f telecom-api/Dockerfile -t mvno-api .
+  → podman build -f configs/osmocom/Dockerfile -t mvno-osmo .
+
+Step 2: Can each container start alone?
+  → podman run --rm mvno-api curl localhost:8080/live
+  → podman run --rm mvno-osmo osmo-msc --version
+
+Step 3: Can two containers talk to each other?
+  → Run them on the same podman network, test with a simple curl
+
+Step 4: Can the full stack start?
+  → make up
+```
+
+Each step takes 30 seconds. If something fails, you know *exactly* which step it broke — not "something in docker-compose failed."
+
+#### 5. Log-Driven Debugging
+
+Before running any component, know where its logs go:
+
+| Component | Log Location | How to Read |
+|-----------|-------------|-------------|
+| Kamailio | `podman logs mvno-kamailio` or syslog | Search for "ERROR", "WARN", "BLOCKED" |
+| OsmoSMSC | `podman logs mvno-osmosmsc` | Search for "SMPP", "delivery", "error" |
+| rtpengine | `podman logs mvno-rtpengine` | Search for "media", "port", "error" |
+| FastAPI | `podman logs mvno-api` | Search for "POST", "allow", "error" |
+| Vosk | `podman logs mvno-vosk` | Search for "Processing", "Transcribed", "Failed" |
+| Vector | `podman logs mvno-vmagent` | Search for "parse", "error" |
+| VictoriaMetrics | `podman logs mvno-victoriametrics` | Search for "error" |
+
+**Pro tip:** In a separate terminal, run `make logs` (which runs `podman-compose logs -f`) before issuing any test command. You see failures in real-time as they happen.
+
+### How to Use This Guide for Maximum Learning
+
+Don't copy-paste. Do this instead:
+
+1. **Read a section** (e.g., §4B Docker Compose)
+2. **Close the file** or cover the code block
+3. **Write it from memory** — then check against the guide
+4. **For every mistake** you make, ask "Why did I write that wrong?"
+   - Was it a typo? (slow down)
+   - Was it a misunderstanding of the config format? (read the docs)
+   - Was it a conceptual gap? (re-read the architecture)
+
+This is called **active recall** and it's the fastest way to build deep understanding. The mistakes you make while learning are *more valuable* than getting it right the first time.
+
+---
+
+Now proceed to the architecture overview, then apply these techniques to each section.
+
+---
+
+## 2. Architecture Overview
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────────┐
@@ -50,7 +191,7 @@ A comprehensive guide to building a rootless containerized MVNO core network tha
                      └─────────────┘      └──────────────────┘
 ```
 
-**Four Layers:**
+### Four Layers
 
 | Layer | Components | Purpose |
 |-------|-----------|---------|
@@ -59,9 +200,21 @@ A comprehensive guide to building a rootless containerized MVNO core network tha
 | Integration | FastAPI, Vosk Worker, Vector | AI filter gateway, speech-to-text, log shipping |
 | Observability | VictoriaMetrics, vmagent, Grafana | Metrics collection and dashboards |
 
+### eTOM Alignment
+
+**eTOM** (Enhanced Telecom Operations Map) is the TM Forum's industry-standard business process framework for telecom operators. This project maps to three eTOM domains:
+
+| eTOM Domain | Our Implementation |
+|-------------|-------------------|
+| **Fulfilment** | SMS routing via OsmoSMSC, SIP call routing via Kamailio, media anchoring via rtpengine |
+| **Assurance** | Real-time interception, AI spam classification, offline STT transcription, voice biometrics, DTMF logging, geofencing, EIR device binding |
+| **Billing / OCS** | Prepaid balance check before allowing calls/SMS via FastAPI SQLite queries |
+
+These are the three badges shown in the README header. Mapping to eTOM demonstrates alignment with real telecom industry standards, not just ad-hoc software engineering.
+
 ---
 
-## 2. Prerequisites
+## 3. Prerequisites
 
 ### Required Tools
 
@@ -102,7 +255,7 @@ sudo loginctl enable-linger $(whoami)
 
 ---
 
-## 3. Project Scaffolding
+## 4. Project Scaffolding
 
 ```bash
 cd /home/zkhattab/MVNO
@@ -128,7 +281,8 @@ find . -type d | sort
 │   ├── kamailio/
 │   │   └── kamailio.cfg          # SIP routing + security + rtpengine
 │   ├── osmocom/
-│   │   └── osmo-smsc.cfg         # SMSC SMPP + rate limits
+│   │   ├── osmo-smsc.cfg         # SMSC SMPP + rate limits
+│   │   └── Dockerfile            # Osmocom image (debian + apt install)
 │   ├── rtpengine/
 │   │   └── rtpengine.conf        # Media ports + recording + DTMF
 │   └── victoria-metrics/
@@ -158,11 +312,246 @@ find . -type d | sort
 
 ---
 
-## 4. Core Network Configurations
+## 5. Docker Compose Orchestration
 
-### 4A. Kamailio — `configs/kamailio/kamailio.cfg`
+**Why read this first?** Before writing any config file, you need to know:
+- Container hostnames (`rtpengine`, `telecom-api`, `kamailio`) — these appear in every config
+- Port mappings (`22222`, `8080`, `5060`) — used in module parameters
+- Volume mount paths (`/etc/kamailio`, `/var/spool/rtpengine`) — where configs and data live
+- Network topology — which containers can talk to each other
 
-The SIP signaling engine. Handles registration, authentication, routing, and hooks rtpengine for media. Implements PIKE rate limiting, STIR/SHAKEN anti-spoofing, and SLA fallback via HTable.
+### 5A. `docker-compose.yml`
+
+Rootless-compliant container stack. All services use `restart: "no"` for zero idle resource consumption. Ports above 1024. SELinux `:z` volume labels. Healthcheck-based dependency ordering.
+
+Osmocom uses a custom build (see §4B) because no pre-built `osmo-msc-latest` image exists on any registry.
+
+```yaml
+version: "3.8"
+
+networks:
+  mvno_net:
+    driver: bridge
+
+services:
+  mongodb:
+    image: mongo:8.0
+    container_name: mvno-mongodb
+    command: mongod --wiredTigerCacheSizeGB 0.25
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./state/mongodb:/data/db:z
+    networks:
+      - mvno_net
+    restart: "no"
+    healthcheck:
+      test: mongosh --eval 'db.runCommand({ping:1})' --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  rtpengine:
+    image: ngcp/rtpengine:latest
+    container_name: mvno-rtpengine
+    ports:
+      - "30000-30100:30000-30100/udp"
+    volumes:
+      - ./configs/rtpengine:/etc/rtpengine:z
+      - ./state/spool:/var/spool/rtpengine:z
+    networks:
+      - mvno_net
+    restart: "no"
+
+  kamailio:
+    image: kamailio/kamailio:5.7-alpine
+    container_name: mvno-kamailio
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+    volumes:
+      - ./configs/kamailio:/etc/kamailio:z
+      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
+    depends_on:
+      rtpengine:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  osmo-smsc:
+    build:
+      context: ./configs/osmocom
+    container_name: mvno-osmosmsc
+    ports:
+      - "2775:2775"
+    volumes:
+      - ./configs/osmocom:/etc/osmocom:z
+      - ./state/hlr:/var/lib/osmocom:z
+    networks:
+      - mvno_net
+    restart: "no"
+
+  telecom-api:
+    build:
+      context: ./telecom-api
+    container_name: mvno-api
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
+    networks:
+      - mvno_net
+    restart: "no"
+
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: mvno-victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - ./state/vm-data:/victoria-metrics-data:z
+    networks:
+      - mvno_net
+    restart: "no"
+
+  vmagent:
+    image: victoriametrics/vmagent:latest
+    container_name: mvno-vmagent
+    volumes:
+      - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
+    depends_on:
+      victoria-metrics:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: mvno-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./state/grafana:/var/lib/grafana:z
+    depends_on:
+      victoria-metrics:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  vosk-worker:
+    build:
+      context: ./telecom-data-pipeline
+      dockerfile: Dockerfile.vosk
+    container_name: mvno-vosk
+    volumes:
+      - ./state/spool:/var/spool/rtpengine:z
+      - ./state/vosk-model:/opt:z
+    depends_on:
+      telecom-api:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+```
+
+### Container Hostname Reference
+
+When writing configs, use these container service names as DNS hostnames (Docker/Podman internal DNS resolves them automatically on the `mvno_net` bridge):
+
+| Container | Hostname (internal) | Purpose |
+|-----------|-------------------|---------|
+| `mvno-rtpengine` | `rtpengine` | Kamailio's rtpengine module connects here port 22222 |
+| `mvno-kamailio` | `kamailio` | SIP signaling, port 5060 |
+| `mvno-osmosmsc` | `osmo-smsc` | SMPP on port 2775 |
+| `mvno-api` | `telecom-api` | FastAPI on port 8080 — Kamailio/Vector POST here |
+| `mvno-victoriametrics` | `victoria-metrics` | TSDB on port 8428 |
+| `mvno-vmagent` | `vmagent` | Scrapes metrics from other containers |
+| `mvno-grafana` | `grafana` | Dashboard on port 3000 |
+| `mvno-vosk` | `vosk-worker` | STT pipeline — no exposed ports |
+| `mvno-mongodb` | `mongodb` | Metadata store on port 27017 |
+
+### 5B. Osmocom Dockerfile
+
+**Why is this needed?** There is no pre-built `osmocom/osmo-msc-latest` image on Docker Hub or any other registry. The official Osmocom [docker-playground](https://github.com/osmocom/docker-playground) builds from source and is designed for CI/testing, not lightweight deployment. Instead, we build our own image using Debian's official `osmo-msc` and `osmo-hlr` packages — this is faster, smaller, and simpler.
+
+#### `configs/osmocom/Dockerfile`
+
+```dockerfile
+# Builds a lightweight Osmocom image with osmo-msc + osmo-hlr
+# from Debian Bookworm's binary packages (no source compilation).
+
+FROM debian:bookworm-slim
+
+# Osmocom package archive signing key
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Osmocom's latest stable repository for Debian Bookworm
+RUN wget -q -O /usr/share/keyrings/osmocom.asc \
+    https://downloads.osmocom.org/packages/osmocom:/latest/Debian_12/Release.key \
+    && echo "deb [signed-by=/usr/share/keyrings/osmocom.asc] \
+    https://downloads.osmocom.org/packages/osmocom:/latest/Debian_12 ./" \
+    > /etc/apt/sources.list.d/osmocom.list
+
+# Install osmo-msc (includes SMSC/SMPP) and osmo-hlr
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    osmo-msc \
+    osmo-hlr \
+    osmocom-sccp \
+    && rm -rf /var/lib/apt/lists/*
+
+# Config directory (mounted as volume from host)
+VOLUME ["/etc/osmocom", "/var/lib/osmocom"]
+
+# Default config path (override via -c flag)
+ENV OSMO_MSC_CONFIG=/etc/osmocom/osmo-smsc.cfg
+
+EXPOSE 2775
+
+CMD ["osmo-msc", "-c", "/etc/osmocom/osmo-smsc.cfg"]
+```
+
+---
+
+## 6. Core Network Configurations
+
+Now that you know the container hostnames and port mappings from §4, you can write the config files that reference them.
+
+### 6A. rtpengine — `configs/rtpengine/rtpengine.conf`
+
+**Why rtpengine over rtpproxy?** rtpengine runs its forwarding plane in the Linux kernel via a DKMS module. During active calls, RTP packets bypass userspace entirely — near-zero CPU usage. It also natively supports call recording, DTMF logging, and SRTP-to-cleartext transcoding.
+
+```ini
+listen-ng = 0.0.0.0:22222
+
+port-min = 30000
+port-max = 30100
+
+recording-dir = /var/spool/rtpengine
+recording-method = pcap
+recording-format = wav
+
+dtmf-log = yes
+
+transcription-dir = /var/spool/rtpengine
+transcription-format = json
+
+media-timeout = 1800
+max-sessions = 1000
+log-level = 3
+```
+
+### 6B. Kamailio — `configs/kamailio/kamailio.cfg`
+
+**Why Kamailio?** It's the most performant open-source SIP server. Handles registration, authentication, routing, and hooks rtpengine for media anchoring. We load modules only when needed to keep RAM low (~15MB idle). Implements PIKE rate limiting, STIR/SHAKEN anti-spoofing, and SLA fallback via HTable.
+
+Note the hostnames: `rtpengine:22222` and `telecom-api:8080` — these are the container names defined in `docker-compose.yml` (see §4A).
 
 ```c
 // ==========================================================
@@ -200,10 +589,12 @@ modparam("auth_db", "calculate_ha1", 1)
 modparam("auth_db", "password_column", "password")
 
 // ─── Media Plane (rtpengine) ────────────────────────────
+// Hostname "rtpengine" = container name from docker-compose.yml
 loadmodule "rtpengine.so"
 modparam("rtpengine", "rtpengine_sock", "udp:rtpengine:22222")
 
 // ─── HTTP Client (FastAPI integration) ──────────────────
+// Hostname "telecom-api" = container name from docker-compose.yml
 loadmodule "http_client.so"
 modparam("http_client", "httpcon", "api_gw=>http://telecom-api:8080/api/v1")
 
@@ -307,9 +698,9 @@ route[FORWARD] {
 }
 ```
 
-### 4B. OsmoSMSC — `configs/osmocom/osmo-smsc.cfg`
+### 6C. OsmoSMSC — `configs/osmocom/osmo-smsc.cfg`
 
-The SMS center. Routes messages through the FastAPI gateway for AI classification before delivery.
+The SMS center. Routes messages through the FastAPI gateway for AI classification before delivery. Note: the ESME route `mvno-api-route` points to the FastAPI container.
 
 ```
 line-vty
@@ -338,33 +729,9 @@ subscriber create imsi 001010000000001 msisdn 15551234567
 subscriber create imsi 001010000000002 msisdn 15557654321
 ```
 
-### 4C. rtpengine — `configs/rtpengine/rtpengine.conf`
+### 6D. VictoriaMetrics Scrape — `configs/victoria-metrics/scrape.yml`
 
-In-kernel media proxy. Forks audio to disk as WAV + JSON metadata (including DTMF tones).
-
-```ini
-listen-ng = 0.0.0.0:22222
-
-port-min = 30000
-port-max = 30100
-
-recording-dir = /var/spool/rtpengine
-recording-method = pcap
-recording-format = wav
-
-dtmf-log = yes
-
-transcription-dir = /var/spool/rtpengine
-transcription-format = json
-
-media-timeout = 1800
-max-sessions = 1000
-log-level = 3
-```
-
-### 4D. VictoriaMetrics Scrape — `configs/victoria-metrics/scrape.yml`
-
-vmagent scrape targets for metrics collection.
+vmagent scrape targets for metrics collection. Note the hostnames match container names from docker-compose.yml.
 
 ```yaml
 scrape_configs:
@@ -387,11 +754,11 @@ scrape_configs:
 
 ---
 
-## 5. FastAPI Interception Gateway
+## 7. FastAPI Interception Gateway
 
 ### `telecom-api/main.py`
 
-The policy decision point. Every SMS and call passes through this API for allow/block decisions. Implements OCS balance check, EIR device binding, and forwards transcripts to the AI filter.
+The policy decision point. Every SMS and call passes through this API for allow/block decisions. Implements OCS balance check (Feature #1) and EIR device binding (Feature #4).
 
 ```python
 """
@@ -523,12 +890,10 @@ async def readiness():
 @app.post("/api/v1/intercept/sms", response_model=InterceptResponse)
 async def intercept_sms(req: SMSInterceptRequest):
     """SMS interception: OCS check + AI classification."""
-    # OCS check
     balance = get_subscriber_balance(req.sender)
     if balance == 0:
         return InterceptResponse(allow=False, reason="Prepaid balance exhausted")
 
-    # AI filter classification
     payload = {
         "type": "sms",
         "sender": req.sender,
@@ -610,13 +975,13 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
 
 ---
 
-## 6. Data Pipeline
+## 8. Data Pipeline
 
-### 6A. Vosk Worker
+### 8A. Vosk Worker
 
 #### `telecom-data-pipeline/vosk_worker.py`
 
-Monitors rtpengine's WAV spool, transcribes with Vosk, extracts voice biometrics (silence ratio, spectral flatness), parses DTMF from companion JSON, and posts to FastAPI.
+Monitors rtpengine's WAV spool, transcribes with Vosk, extracts voice biometrics (Feature #6: silence ratio, spectral flatness), parses DTMF from companion JSON (Feature #5), and posts to FastAPI.
 
 ```python
 #!/usr/bin/env python3
@@ -785,7 +1150,7 @@ USER mvno
 CMD ["python", "vosk_worker.py"]
 ```
 
-### 6B. Vector Log Shipper
+### 8B. Vector Log Shipper
 
 #### `telecom-data-pipeline/vector.toml`
 
@@ -856,145 +1221,7 @@ data_dir = "/var/lib/vector"
 
 ---
 
-## 7. Docker Compose Orchestration
-
-### `docker-compose.yml`
-
-Rootless-compliant container stack. All services use `restart: "no"` for zero idle resource consumption. Ports above 1024. SELinux `:z` volume labels. Healthcheck-based dependency ordering.
-
-```yaml
-version: "3.8"
-
-networks:
-  mvno_net:
-    driver: bridge
-
-services:
-  mongodb:
-    image: mongo:8.0
-    container_name: mvno-mongodb
-    command: mongod --wiredTigerCacheSizeGB 0.25
-    ports:
-      - "27017:27017"
-    volumes:
-      - ./state/mongodb:/data/db:z
-    networks:
-      - mvno_net
-    restart: "no"
-    healthcheck:
-      test: mongosh --eval 'db.runCommand({ping:1})' --quiet
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  rtpengine:
-    image: ngcp/rtpengine:latest
-    container_name: mvno-rtpengine
-    ports:
-      - "30000-30100:30000-30100/udp"
-    volumes:
-      - ./configs/rtpengine:/etc/rtpengine:z
-      - ./state/spool:/var/spool/rtpengine:z
-    networks:
-      - mvno_net
-    restart: "no"
-
-  kamailio:
-    image: kamailio/kamailio:5.7-alpine
-    container_name: mvno-kamailio
-    ports:
-      - "5060:5060/udp"
-      - "5060:5060/tcp"
-    volumes:
-      - ./configs/kamailio:/etc/kamailio:z
-      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
-    depends_on:
-      rtpengine:
-        condition: service_started
-    networks:
-      - mvno_net
-    restart: "no"
-
-  osmo-smsc:
-    image: osmocom/osmo-msc-latest
-    container_name: mvno-osmosmsc
-    ports:
-      - "2775:2775"
-    volumes:
-      - ./configs/osmocom:/etc/osmocom:z
-      - ./state/hlr:/var/lib/osmocom:z
-    networks:
-      - mvno_net
-    restart: "no"
-
-  telecom-api:
-    build:
-      context: ./telecom-api
-    container_name: mvno-api
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
-    networks:
-      - mvno_net
-    restart: "no"
-
-  victoria-metrics:
-    image: victoriametrics/victoria-metrics:latest
-    container_name: mvno-victoriametrics
-    ports:
-      - "8428:8428"
-    volumes:
-      - ./state/vm-data:/victoria-metrics-data:z
-    networks:
-      - mvno_net
-    restart: "no"
-
-  vmagent:
-    image: victoriametrics/vmagent:latest
-    container_name: mvno-vmagent
-    volumes:
-      - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
-    depends_on:
-      victoria-metrics:
-        condition: service_started
-    networks:
-      - mvno_net
-    restart: "no"
-
-  grafana:
-    image: grafana/grafana-oss:latest
-    container_name: mvno-grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./state/grafana:/var/lib/grafana:z
-    depends_on:
-      victoria-metrics:
-        condition: service_started
-    networks:
-      - mvno_net
-    restart: "no"
-
-  vosk-worker:
-    build:
-      context: ./telecom-data-pipeline
-      dockerfile: Dockerfile.vosk
-    container_name: mvno-vosk
-    volumes:
-      - ./state/spool:/var/spool/rtpengine:z
-      - ./state/vosk-model:/opt:z
-    depends_on:
-      telecom-api:
-        condition: service_started
-    networks:
-      - mvno_net
-    restart: "no"
-```
-
----
-
-## 8. Makefile
+## 9. Makefile
 
 ### `Makefile`
 
@@ -1134,20 +1361,6 @@ rebuild: clean init-db up
 
 ---
 
-## 9. Feature Integration Map
-
-| # | Feature | Location | Mechanism |
-|---|---------|----------|-----------|
-| 1 | **Prepaid OCS Interception** | `telecom-api/main.py` + Kamailio HTTP call | Kamailio calls `POST /api/v1/intercept/call` or `/sms`. FastAPI queries subscriber SQLite balance. If 0 → `allow: false`. |
-| 2 | **STIR/SHAKEN Anti-Spoofing** | `kamailio.cfg` request_route | Compares SIP `From` header (`$fU`) to authenticated username (`$au`). Mismatch → `407 Proxy Auth Required`. |
-| 3 | **LAC/CellID Geofencing** | `vector.toml` → FastAPI → AI Filter | Vector parses Cell ID from OsmoSMSC delivery report logs. Forwards to FastAPI `/api/v1/events`. AI filter applies zone policies. |
-| 4 | **EIR Device Binding** | `telecom-api/main.py:check_eir_binding()` | In-memory tracker maps IMEI→MSISDN. >3 swaps in 10min = spam box → `allow: false`. |
-| 5 | **DTMF Interception** | `rtpengine.conf` + `vosk_worker.py` | rtpengine logs DTMF tones to companion JSON. Vosk worker parses and includes in API POST. |
-| 6 | **Voice Biometrics** | `vosk_worker.py:extract_voice_biometrics()` | numpy FFT analysis. High silence ratio = robocall. Low spectral flatness = TTS synthesis. |
-| 7 | **SLA Fallback HTable** | `kamailio.cfg` htable + http_client 1s timeout | If FastAPI times out, Kamailio checks local HTable whitelist/blacklist before routing. |
-
----
-
 ## 10. Building & Testing
 
 ### Step-by-Step
@@ -1156,7 +1369,7 @@ rebuild: clean init-db up
 # 1. Initialize databases
 make init-db
 
-# 2. Start the stack
+# 2. Start the stack (builds all images including Osmocom)
 make up
 
 # 3. Verify containers
@@ -1213,12 +1426,54 @@ print('Sent — expect allow:false in FastAPI logs')
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Containers exit immediately | Port conflict | `sudo lsof -i :5060` or `:8080`. Kill conflicting process. |
+| Osmocom build fails | Missing `Dockerfile` in osmocom dir | Check `configs/osmocom/Dockerfile` exists (see §4B). |
 | Kamailio won't start | Missing SQLite DB | Run `make init-db` before `make up`. |
 | SMS not routing | Wrong SMPP password | Check `osmo-smsc.cfg` password matches client credentials. |
 | No WAV in spool | rtpengine socket config wrong | Check Kamailio → rtpengine `rtpengine_sock` parameter. |
 | Vosk idle (no transcription) | Model not yet downloaded | First run downloads ~40MB model via HTTP. Wait 30-60s. |
 | SELinux volume errors | Missing `:z` flag | Add `:z` to volume definition in docker-compose.yml. |
-| `podman-compose` not found | Not installed | Debian: `sudo apt install podman-compose` · Arch: `sudo pacman -S podman-compose` · Fedora: `sudo dnf install podman-compose` · Or: `pip install podman-compose` |
+| `podman-compose` not found | Not installed | Debian: `sudo apt install` · Arch: `sudo pacman -S` · Fedora: `sudo dnf install` · Or: `pip install podman-compose` |
 | MongoDB connection refused | Container still starting | Wait 10-15s for first boot. Check `podman logs mvno-mongodb`. |
 | Vector not parsing logs | Wrong log path | Verify Kamailio/OsmoSMSC write logs to paths in vector.toml. |
 | FastAPI returns `allow:true` for everything | AI filter unreachable | Expected in sandbox — SLA fallback allows when filter is down. |
+
+---
+
+## 12. Appendix
+
+### A. eTOM Reference
+
+**eTOM (Enhanced Telecom Operations Map)** is the TM Forum's standard business process framework for telecom service providers. The three domains relevant to this project:
+
+| eTOM Domain | TM Forum Definition | Our Implementation |
+|-------------|-------------------|-------------------|
+| **Fulfilment** | Order-to-service delivery, provisioning, activation | SIP call routing (Kamailio), SMS store-and-forward (OsmoSMSC), media anchoring (rtpengine) |
+| **Assurance** | Real-time monitoring, QoS, fault management, fraud detection | Real-time interception, AI classification, Vosk STT transcription, voice biometrics, DTMF logging, LAC/CellID geofencing, EIR device binding, PIKE rate limiting, STIR/SHAKEN anti-spoofing |
+| **Billing / OCS** | Usage metering, balance management, online charging | Prepaid balance check (FastAPI SQLite query) before allowing calls/SMS. Zero-balance = session dropped |
+
+### B. Feature Integration Map
+
+| # | Feature | Location | Mechanism |
+|---|---------|----------|-----------|
+| 1 | **Prepaid OCS Interception** | `telecom-api/main.py` + Kamailio HTTP call | Kamailio calls `POST /api/v1/intercept/call` or `/sms`. FastAPI queries subscriber SQLite balance. If 0 → `allow: false`. |
+| 2 | **STIR/SHAKEN Anti-Spoofing** | `kamailio.cfg` request_route | Compares SIP `From` header (`$fU`) to authenticated username (`$au`). Mismatch → `407 Proxy Auth Required`. |
+| 3 | **LAC/CellID Geofencing** | `vector.toml` → FastAPI → AI Filter | Vector parses Cell ID from OsmoSMSC delivery report logs. Forwards to FastAPI `/api/v1/events`. AI filter applies zone policies. |
+| 4 | **EIR Device Binding** | `telecom-api/main.py:check_eir_binding()` | In-memory tracker maps IMEI→MSISDN. >3 swaps in 10min = spam box → `allow: false`. |
+| 5 | **DTMF Interception** | `rtpengine.conf` + `vosk_worker.py` | rtpengine logs DTMF tones to companion JSON. Vosk worker parses and includes in API POST. |
+| 6 | **Voice Biometrics** | `vosk_worker.py:extract_voice_biometrics()` | numpy FFT analysis. High silence ratio = robocall. Low spectral flatness = TTS synthesis. |
+| 7 | **SLA Fallback HTable** | `kamailio.cfg` htable + http_client 1s timeout | If FastAPI times out, Kamailio checks local HTable whitelist/blacklist before routing. |
+
+### C. Architectural Decisions Summary
+
+| Decision | Alternative | Why Chosen |
+|----------|------------|------------|
+| **Kamailio** over OpenSIPS | OpenSIPS (simpler config) | Better rtpengine/pike/htable module support — critical for security features |
+| **rtpengine** over rtpproxy | rtpproxy (lighter) | In-kernel forwarding + native recording + DTMF logging. Near-zero CPU. |
+| **OsmoSMSC** over Kannel | Kannel (more popular) | Supports SS7 integration (future-proof), native SQLite WAL mode, cleaner SMPP |
+| **FastAPI** over Flask/Express | Flask (simpler) | Async + Pydantic + auto-docs essential for a gateway handling concurrent carrier traffic |
+| **Vosk** over Whisper | Whisper (more accurate) | 40MB offline model vs 1.5GB. Runs on any hardware, Whisper needs GPU. |
+| **Vector** over Filebeat/Loki | Filebeat (Elastic stack) | Single Rust binary (5MB), zero GC, built-in backpressure, VRL transform language |
+| **VictoriaMetrics** over Prometheus | Prometheus (more popular) | Single binary (20MB), Prometheus is ~300MB with full state. Same protocol. |
+| **SQLite WAL** over PostgreSQL | PostgreSQL (production-grade) | Zero server process. For sandbox scale (1000s of TPS), WAL mode handles it. PostgreSQL adds 100MB+ RAM. |
+| **Rootless Podman** over Docker | Docker (more common) | Daemonless, no privileged ports, no security risks. Compose syntax is compatible. |
+| **Custom Osmocom Dockerfile** over pre-built image | docker-playground (complex) | No `osmo-msc-latest` image exists on any registry. Our build: 2-layer Dockerfile, apt install from Debian repos, no source compilation. |
