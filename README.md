@@ -86,8 +86,6 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ## 📖 5. Documentation Directory
 
-All architectural plans, setup guides, and best practices are stored locally inside the repository:
-*   [docs/implementation_plan.md](docs/implementation_plan.md): Contains system requirements, open design questions, and verification scenarios.
+All setup guides and best practices are stored locally inside the repository:
 *   [docs/deployment_guide.md](docs/deployment_guide.md): Details the step-by-step configuration runbook, ports, and configuration scripts for Kamailio, rtpengine, and Osmocom.
 *   [docs/best_practices.md](docs/best_practices.md): Lists advanced telecom security practices, including PIKE rate limiting, Caller ID spoofing prevention (STIR/SHAKEN), WebRTC transcoding, and SQLite WAL tuning.
-*   [.agents/AGENTS.md](.agents/AGENTS.md): Preserves project-scoped constraints for lightweight memory footprints.
