@@ -67,13 +67,13 @@ A comprehensive guide to building a rootless containerized MVNO core network tha
 
 ```bash
 # Podman (daemonless, rootless container engine)
-sudo apt update && sudo apt install -y podman podman-compose
+sudo pacman -S --needed podman podman-compose
 
-# Python 3.11+ for FastAPI and Vosk worker scripts
-sudo apt install -y python3.11 python3.11-venv sqlite3
+# Python + SQLite for FastAPI and Vosk worker scripts
+sudo pacman -S --needed python python-pip sqlite3
 
-# (Optional) sipp for SIP call testing
-sudo apt install -y sipp
+# (Optional) sipp for SIP call testing — available in AUR
+# yay -S sipp
 
 # Verify rootless mode
 podman info | grep rootless
@@ -1212,7 +1212,7 @@ print('Sent — expect allow:false in FastAPI logs')
 | No WAV in spool | rtpengine socket config wrong | Check Kamailio → rtpengine `rtpengine_sock` parameter. |
 | Vosk idle (no transcription) | Model not yet downloaded | First run downloads ~40MB model via HTTP. Wait 30-60s. |
 | SELinux volume errors | Missing `:z` flag | Add `:z` to volume definition in docker-compose.yml. |
-| `podman-compose` not found | Not installed | `pip install podman-compose` or `sudo apt install podman-compose`. |
+| `podman-compose` not found | Not installed | `sudo pacman -S podman-compose` or `pip install podman-compose`. |
 | MongoDB connection refused | Container still starting | Wait 10-15s for first boot. Check `podman logs mvno-mongodb`. |
 | Vector not parsing logs | Wrong log path | Verify Kamailio/OsmoSMSC write logs to paths in vector.toml. |
 | FastAPI returns `allow:true` for everything | AI filter unreachable | Expected in sandbox — SLA fallback allows when filter is down. |
