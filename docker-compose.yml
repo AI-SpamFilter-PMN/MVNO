@@ -1,0 +1,128 @@
+version: "3.8"
+
+networks:
+  mvno_net:
+    driver: bridge
+
+services:
+  mongodb:
+    image: mongo:8.0
+    container_name: mvno-mongodb
+    command: mongod --wiredTigerCacheSizeGB 0.25
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./state/mongodb:/data/db:z
+    networks:
+      - mvno_net
+    restart: "no"
+    healthcheck:
+      test: mongosh --eval 'db.runCommand({ping:1})' --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  rtpengine:
+    image: ngcp/rtpengine:latest
+    container_name: mvno-rtpengine
+    ports:
+      - "30000-30100:30000-30100/udp"
+    volumes:
+      - ./configs/rtpengine:/etc/rtpengine:z
+      - ./state/spool:/var/spool/rtpengine:z
+    networks:
+      - mvno_net
+    restart: "no"
+
+  kamailio:
+    image: kamailio/kamailio:5.7-alpine
+    container_name: mvno-kamailio
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+    volumes:
+      - ./configs/kamailio:/etc/kamailio:z
+      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
+    depends_on:
+      rtpengine:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  osmo-smsc:
+    build:
+      context: ./configs/osmocom
+    container_name: mvno-osmosmsc
+    ports:
+      - "2775:2775"
+    volumes:
+      - ./configs/osmocom:/etc/osmocom:z
+      - ./state/hlr:/var/lib/osmocom:z
+    networks:
+      - mvno_net
+    restart: "no"
+
+  telecom-api:
+    build:
+      context: ./telecom-api
+    container_name: mvno-api
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
+    networks:
+      - mvno_net
+    restart: "no"
+
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: mvno-victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - ./state/vm-data:/victoria-metrics-data:z
+    networks:
+      - mvno_net
+    restart: "no"
+
+  vmagent:
+    image: victoriametrics/vmagent:latest
+    container_name: mvno-vmagent
+    volumes:
+      - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
+    depends_on:
+      victoria-metrics:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: mvno-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./state/grafana:/var/lib/grafana:z
+    depends_on:
+      victoria-metrics:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  vosk-worker:
+    build:
+      context: ./telecom-data-pipeline
+      dockerfile: Dockerfile.vosk
+    container_name: mvno-vosk
+    volumes:
+      - ./state/spool:/var/spool/rtpengine:z
+      - ./state/vosk-model:/opt:z
+    depends_on:
+      telecom-api:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
