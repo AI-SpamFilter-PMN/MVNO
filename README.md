@@ -1,4 +1,4 @@
-# 📡 MVNO Interception & Monitoring Core
+# MVNO Interception & Monitoring Core
 ### Core Network Interception & Observability for the AI Spam Filter Platform
 
 [![Orchestration](https://img.shields.io/badge/Orchestration-Podman--Compose_%7C_Docker-orange?style=for-the-badge&logo=podman)](docs/deployment_guide.md)
@@ -10,61 +10,80 @@ This repository contains the **Mobile Virtual Network Operator (MVNO) / Private 
 
 ---
 
-## 🏗️ 1. System Architecture
+## 1. System Architecture
 
 The core network operates as an unprivileged, rootless stack that handles real-time SMS routing and SIP/VoIP calling, intercepts the payloads, and requests allow/block decisions from the AI Spam Filter REST APIs.
 
 ![MVNO Core Integration Flow Diagram](docs/architecture_flow.svg)
 
+```
+SIP Phone ──▶ Kamailio ──▶ rtpengine ──▶ Vosk STT
+                │
+SMPP Client ──▶ OsmoSMSC ──▶ Spring Boot Gateway ──▶ AI Spam Filter
+                │                         │
+5G UE ──▶ Open5GS (AMF) ──┘              └── MongoDB (subscribers)
+```
+
+Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP). The 5G SA core adds UERANSIM gNB+UE simulation with SMS-over-NAS routed through the same pipeline. All decisions go through the Spring Boot policy gateway.
+
+3 test UEs: **normal** (balance=100), **spam** (EIR trigger), **zero-balance** (OCS block).
+
 ---
 
-## ⚙️ 2. Core Functional Transactions
+## 2. Core Functional Transactions
 
 ### A. VoIP Voice Call Flow
 1. **SIP Invite**: User Equipment 1 (`UE_1`) initiates a call. Kamailio receives the `INVITE` signal.
 2. **Media Anchor**: Kamailio hooks `rtpengine` to proxy the media streams in-kernel and forks a raw audio copy into `/var/spool/rtpengine`.
-3. **Translation Loop**: When the call completes, the background `vosk_worker.py` detects the finalized `.wav` audio, transcribes it offline via the local Vosk speech-to-text model, and posts the text to the FastAPI Gateway.
-4. **AI Interception Check**: FastAPI queries the external **AI Spam Filter REST API**. If flagged as spam, the calling MSISDN is blacklisted.
+3. **Translation Loop**: When the call completes, the background `vosk_worker.py` detects the finalized `.wav` audio, transcribes it offline via the local Vosk speech-to-text model, and posts the text to the Spring Boot Gateway.
+4. **AI Interception Check**: Spring Boot queries the external **AI Spam Filter REST API**. If flagged as spam, the calling MSISDN is blacklisted.
 
 ### B. SMS Interception Flow
 1. **SMS Submit**: An ESME client submits an SMS to `OsmoSMSC` via SMPP.
-2. **API Verification Check**: `OsmoSMSC` holds delivery and queries the FastAPI gateway (`POST /api/v1/intercept/sms`).
-3. **Action Policy**: FastAPI forwards the content to the AI classification model. If approved (`allow: true`), `OsmoSMSC` forwards it to the recipient. If spam, the message is dropped.
+2. **API Verification Check**: `OsmoSMSC` holds delivery and queries the Spring Boot gateway (`POST /api/v1/intercept/sms`).
+3. **Action Policy**: Spring Boot forwards the content to the AI classification model. If approved (`allow: true`), `OsmoSMSC` forwards it to the recipient. If spam, the message is dropped.
 
 ---
 
-## 🛠️ 3. Technology Stack
+## 3. Technology Stack
 
-*   **Signaling & Proxy**: Kamailio (SIP Registrar/Proxy) + `rtpengine` (In-kernel media proxy/forker).
-*   **SMS Control Plane**: Osmocom (`OsmoSMSC` / `OsmoMSC` / `OsmoHLR`).
-*   **Speech Processing**: Vosk Speech-to-Text (Local offline runtime, zero cloud latency).
-*   **Interception Gateway**: FastAPI Async ASGI server (Uvicorn).
-*   **Observability**: VictoriaMetrics (Single-binary TSDB) + `vmagent` (Telemetry scraper) + Grafana (Dashboard).
-*   **Log Mediators**: Vector.dev (Rust-based log pipeline, zero GC).
+- **Signaling & Proxy**: Kamailio (SIP Registrar/Proxy) + `rtpengine` (In-kernel media proxy/forker).
+- **SMS Control Plane**: Osmocom (`OsmoSMSC` / `OsmoMSC` / `OsmoHLR`).
+- **Speech Processing**: Vosk Speech-to-Text (Local offline runtime, zero cloud latency).
+- **Interception Gateway**: Spring Boot 4.1 + JDK 25 + Virtual Threads (Tomcat, JDBCTemplate, RestClient).
+- **Observability**: VictoriaMetrics (Single-binary TSDB) + `vmagent` (Telemetry scraper) + Grafana (Dashboard).
+- **Log Mediators**: Vector.dev (Rust-based log pipeline, zero GC).
+- **5G Core**: Open5GS (10 NFs) + UERANSIM (gNB + 3 UEs).
 
 ---
 
-## 🚀 4. Getting Started
+## 4. Getting Started
 
 ### Method A: Containerized (Podman / Docker Compose)
-Recommended for sandbox development. Rootless-compliant out-of-the-box (no system modifications needed).
+Recommended for sandbox development. Rootless-compliant out-of-the-box.
 
-1. **Deploy the stack**:
-   ```bash
-   make up
-   ```
-2. **Review running containers**:
-   ```bash
-   podman ps
-   ```
-3. **Trigger mock SMS traffic to verify interception**:
-   ```bash
-   make test-sms
-   ```
-4. **Trigger mock SIP VoIP call to verify media recording**:
-   ```bash
-   make test-call
-   ```
+```bash
+# 1. Prerequisites (pick your distro)
+sudo pacman -S --needed podman docker-compose python python-pip sqlite3   # Arch/CachyOS
+sudo apt install -y podman docker-compose python3 python3-pip sqlite3     # Debian/Ubuntu
+sudo dnf install -y podman docker-compose python3 python3-pip sqlite3     # Fedora
+
+# 2. Enable Podman API socket (required for Docker Compose Plugin)
+systemctl --user enable --now podman.socket
+
+# 3. Initialize databases
+make init-db
+
+# 4. Start the stack — offline-first (uses pre-loaded images)
+make up
+
+#    To build from source instead (needs internet):
+#    podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+
+# 5. Test interception
+make test-sms    # SMS via SMPP → Spring Boot → AI Filter
+make test-call   # SIP call → rtpengine → Vosk STT → Spring Boot
+```
 
 ### Method B: Native (systemd)
 Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
@@ -84,24 +103,36 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ---
 
-## 🔧 5. Implemented Features
+## 5. Stack
 
-| # | Feature | Description |
-|---|---------|-------------|
-| 1 | **Prepaid OCS Interception** | Balance check before allowing calls/SMS. Zero-balance subscribers are blocked. |
-| 2 | **STIR/SHAKEN Anti-Spoofing** | SIP `From` header verified against authenticated MSISDN. Mismatch → `407 Proxy Auth Required`. |
-| 3 | **LAC/CellID Geofencing** | Location metadata extracted by Vector from OsmoSMSC logs and forwarded for zone-based AI filtering. |
-| 4 | **EIR Device Binding** | IMEI-IMSI pairs tracked in FastAPI. Rapid SIM swaps (>3 in 10min) blocked as spam boxes. |
-| 5 | **DTMF Interception** | rtpengine logs dial tones to JSON metadata. Vosk worker parses and appends to API requests. |
-| 6 | **Voice Biometrics** | WAV analysis for silence ratio + spectral flatness to detect robocalls and TTS synthesis. |
-| 7 | **SLA Fallback HTable** | If AI filter API is unreachable, Kamailio falls back to local in-memory whitelist/blacklist cache. |
+| Layer | Components | Purpose |
+|-------|-----------|---------|
+| **5G Access** | UERANSIM (gNB + 3 UEs) | 5G SA simulation over N2/N3 |
+| **5G Core** | Open5GS (NRF, AMF, SMF, UPF, UDM, AUSF, NSSF, PCF, UDR, BSF) | 5GC network functions + MongoDB subscriber DB |
+| **MVNO Core** | Kamailio, rtpengine, OsmoSMSC | SIP routing, media anchoring, SMS store-and-forward |
+| **Interception** | Spring Boot Gateway, Vosk STT | AI filter decision point, offline speech-to-text |
+| **Observability** | VictoriaMetrics, Grafana, Vector | Metrics, dashboards, log shipping |
 
 ---
 
-## 📖 6. Documentation Directory
+## 6. Features
 
-All setup guides are stored locally inside the repository:
-*   [docs/implementation_guide.md](docs/implementation_guide.md): **Complete implementation guide** with all configuration files, code, build steps, and rationale.
-*   [docs/deployment_guide.md](docs/deployment_guide.md): Step-by-step configuration runbook, ports, and integration scripts for Kamailio, rtpengine, and Osmocom.
-*   [docs/implementation_plan.md](docs/implementation_plan.md): Original design planning document.
-*   [docs/best_practices.md](docs/best_practices.md): SOTA best practices and architectural decisions.
+| # | Feature | Implementation |
+|---|---------|---------------|
+| 1 | **Prepaid OCS** | Balance check before calls/SMS. Zero-balance blocked. |
+| 2 | **STIR/SHAKEN** | SIP `From` header vs authenticated user. Spoof blocked. |
+| 3 | **Geofencing** | LAC/CellID from OsmoSMSC logs → zone-based AI filtering. |
+| 4 | **EIR Binding** | IMEI-IMSI tracked in Spring Boot gateway. Rapid SIM swaps blocked. |
+| 5 | **DTMF Logging** | rtpengine tones captured in JSON metadata. |
+| 6 | **Voice Biometrics** | Silence ratio + spectral flatness for robocall/TTS detection. |
+| 7 | **SLA Fallback** | Local HTable whitelist/blacklist when AI filter is down. |
+| 8 | **5G SA Core** | Open5GS 10-NF 5GC + UERANSIM simulation. |
+| 9 | **SMS-over-NAS** | 5G UE → AMF → OsmoSMSC → Spring Boot Gateway (same pipeline). |
+| 10 | **MongoDB Seed** | Atomic init script avoids WebUI admin hash bug. |
+
+---
+
+## 7. Documentation
+
+* [docs/deployment_guide.md](docs/deployment_guide.md): Step-by-step configuration runbook, ports, and integration scripts for Kamailio, rtpengine, and Osmocom.
+* [docs/best_practices.md](docs/best_practices.md): SOTA best practices and architectural decisions.
