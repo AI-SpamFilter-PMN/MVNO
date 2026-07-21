@@ -11,7 +11,6 @@
       .text-title { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; font-weight: bold; fill: #ffffff; }
       .text-body { font-family: 'Inter', system-ui, sans-serif; font-size: 11px; fill: #b3b3b3; }
       .text-link { font-family: 'Inter', system-ui, sans-serif; font-size: 10px; fill: #00e5ff; font-weight: bold; }
-      .text-orange-link { font-family: 'Inter', system-ui, sans-serif; font-size: 10px; fill: #ff7043; font-weight: bold; }
       .arrow { stroke: #8e8e93; stroke-width: 2; fill: none; stroke-dasharray: 4,4; }
       .solid-arrow { stroke: #00e5ff; stroke-width: 2; fill: none; }
       .sec-arrow { stroke: #ff5722; stroke-width: 2; fill: none; }
@@ -41,17 +40,8 @@
   <rect width="1000" height="650" class="bg" />
 
   <!-- Diagram Title -->
-  <text x="30" y="38" font-family="'Inter', sans-serif" font-size="20" font-weight="bold" fill="#ffffff">MVNO Core Integration Flow &amp; Process Steps</text>
-  <text x="30" y="58" font-family="'Inter', sans-serif" font-size="12" fill="#8e8e93">Real-time SMS/VoIP Interception, Native Speech Translation, and AI Classification</text>
-
-  <!-- EXTERNAL AI MODEL BOX (TOP RIGHT ACCENT) -->
-  <g transform="translate(760, 20)">
-    <rect width="210" height="55" class="ai-box" />
-    <text x="12" y="20" class="text-title">AI Spam Filter Service (Java 21)</text>
-    <text x="12" y="36" class="text-body">• POST /api/v1/classify</text>
-    <text x="120" y="36" class="text-orange-link">ai-filter:8000</text>
-    <text x="12" y="48" class="text-orange-link">5s SLA Timeout (Fail-Open)</text>
-  </g>
+  <text x="30" y="40" font-family="'Inter', sans-serif" font-size="20" font-weight="bold" fill="#ffffff">MVNO Core Integration Flow &amp; Process Steps</text>
+  <text x="30" y="60" font-family="'Inter', sans-serif" font-size="12" fill="#8e8e93">Real-time SMS/VoIP Interception, Native Speech Translation, and Observability Layers</text>
 
   <!-- 1. ACCESS LAYER -->
   <g transform="translate(40, 100)">
@@ -93,62 +83,56 @@
 
     <!-- Kamailio -->
     <g transform="translate(15, 60)">
-      <rect width="170" height="110" class="box" />
+      <rect width="170" height="120" class="box" />
       <text x="12" y="22" class="text-title">Kamailio CSCF</text>
       <text x="12" y="42" class="text-body">• SQLite contact backend</text>
       <text x="12" y="60" class="text-body">• PIKE rate-limiting</text>
       <text x="12" y="78" class="text-body">• SIP Signalling Route</text>
-      <text x="12" y="96" class="text-link">UDP/TCP Port 5060</text>
+      <text x="12" y="96" class="text-body">• REST API webhook hooks</text>
+      <text x="12" y="112" class="text-link">Runs: Native / Podman</text>
     </g>
 
     <!-- rtpengine -->
-    <g transform="translate(15, 185)">
-      <rect width="170" height="105" class="box" />
+    <g transform="translate(15, 200)">
+      <rect width="170" height="100" class="box" />
       <text x="12" y="22" class="text-title">rtpengine</text>
-      <text x="12" y="42" class="text-body">• In-kernel media proxy</text>
-      <text x="12" y="60" class="text-body">• PCAP audio recording</text>
-      <text x="12" y="78" class="text-body">• DTMF JSON metadata</text>
-      <text x="12" y="94" class="text-link">Control: UDP 22222</text>
+      <text x="12" y="42" class="text-body">• In-kernel media relay</text>
+      <text x="12" y="60" class="text-body">• Forks audio to files</text>
+      <text x="12" y="78" class="text-body">• Generates JSON metadata</text>
+      <text x="12" y="92" class="text-link">Ports: 30000-40000</text>
     </g>
 
     <!-- OsmoSMSC -->
-    <g transform="translate(15, 305)">
-      <rect width="170" height="105" class="box" />
-      <text x="12" y="22" class="text-title">OsmoSMSC / OsmoMSC</text>
+    <g transform="translate(15, 340)">
+      <rect width="170" height="110" class="box" />
+      <text x="12" y="22" class="text-title">OsmoSMSC</text>
       <text x="12" y="42" class="text-body">• SMS Store-and-Forward</text>
-      <text x="12" y="60" class="text-body">• OsmoHLR subscriber DB</text>
-      <text x="12" y="78" class="text-body">• REST Intercept query</text>
-      <text x="12" y="94" class="text-link">SMPP Port 2775</text>
-    </g>
-
-    <!-- Open5GS 5GC -->
-    <g transform="translate(15, 425)">
-      <rect width="170" height="45" class="box" />
-      <text x="12" y="18" class="text-title">Open5GS (AMF/SMF/UPF)</text>
-      <text x="12" y="34" class="text-link">5G SA SBI HTTP/2</text>
+      <text x="12" y="60" class="text-body">• SQLite SMS db</text>
+      <text x="12" y="78" class="text-body">• Throttle windowing</text>
+      <text x="12" y="92" class="text-link">TCP Port 2775</text>
     </g>
   </g>
 
   <!-- 3. INTEGRATION GATEWAY -->
-  <g transform="translate(540, 100)">
-    <rect width="200" height="480" class="box" />
+  <g transform="translate(560, 100)">
+    <rect width="180" height="480" class="ai-box" />
     <text x="15" y="30" class="text-title">3. Integration Gateway</text>
 
     <!-- Spring Boot Gateway -->
-    <g transform="translate(15, 50)">
-      <rect width="170" height="135" class="box" fill="#1e2a38" stroke="#00e5ff" stroke-width="2" />
+    <g transform="translate(15, 60)">
+      <rect width="150" height="140" class="box" />
       <text x="12" y="22" class="text-title">telecom-api (Spring)</text>
       <text x="12" y="42" class="text-body">• Java 21 Virtual Threads</text>
       <text x="12" y="60" class="text-body">• Prepaid checks (OCS)</text>
-      <text x="12" y="78" class="text-body">• EIR IMEI binding tracker</text>
-      <text x="12" y="96" class="text-body">• Carrier SLA fail-open (5s)</text>
+      <text x="12" y="78" class="text-body">• Subscriber provision</text>
+      <text x="12" y="96" class="text-body">• Liveness/Readiness</text>
       <text x="12" y="114" class="text-body">• Intercepts SMS/Calls</text>
       <text x="12" y="130" class="text-link">HTTP Port 8080</text>
     </g>
 
-    <!-- Vosk ASR -->
-    <g transform="translate(15, 200)">
-      <rect width="170" height="100" class="box" />
+    <!-- Vosk translation worker -->
+    <g transform="translate(15, 220)">
+      <rect width="150" height="100" class="box" />
       <text x="12" y="22" class="text-title">Vosk Java 21 ASR</text>
       <text x="12" y="42" class="text-body">• Scans audio spool</text>
       <text x="12" y="60" class="text-body">• Native JNI ASR</text>
@@ -157,8 +141,8 @@
     </g>
 
     <!-- Vector Log Parser -->
-    <g transform="translate(15, 315)">
-      <rect width="170" height="110" class="box" />
+    <g transform="translate(15, 340)">
+      <rect width="150" height="110" class="box" />
       <text x="12" y="22" class="text-title">Vector Parser</text>
       <text x="12" y="42" class="text-body">• Tails log files</text>
       <text x="12" y="60" class="text-body">• Regex parse to JSON</text>
@@ -195,31 +179,29 @@
 
   <!-- FLOW INTER-CONNECTING ARROWS -->
 
-  <!-- 1. Voice SIP Flow: UE_1 -> Kamailio -->
+  <!-- Voice Flow Arrows -->
   <path d="M 205,170 L 290,170" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <path d="M 390,220 L 390,200" class="solid-arrow" />
+  <path d="M 390,300 L 390,320 M 390,320 L 590,320 L 590,300" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
   <text x="215" y="160" class="text-body" fill="#00e5ff">1. Call Setup (SIP)</text>
 
-  <!-- 2. Kamailio -> rtpengine Control Socket -->
-  <path d="M 390,210 L 390,285" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="395" y="245" class="text-body" fill="#00e5ff">2. RTP Anchor</text>
+  <!-- Media recording flow -->
+  <path d="M 475,250 C 500,250 500,280 560,280" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="490" y="235" class="text-body" fill="#00e5ff">2. Media Fork</text>
 
-  <!-- 3. rtpengine -> Vosk Audio Spool Fork -->
-  <path d="M 475,340 L 555,340" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="480" y="330" class="text-body" fill="#00e5ff">3. Audio Spool</text>
+  <!-- Vosk to API -->
+  <path d="M 635,220 L 635,200" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="640" y="212" class="text-body" fill="#00e5ff">3. Transcript</text>
 
-  <!-- 4. Vosk -> Java Gateway Transcript -->
-  <path d="M 645,300 L 645,235" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="650" y="270" class="text-body" fill="#00e5ff">4. Transcript</text>
+  <!-- SMS Intercept -->
+  <path d="M 205,480 L 290,480" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <path d="M 475,480 L 635,480 L 635,300" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="215" y="470" class="text-body" fill="#00e5ff">1. SMS submit</text>
+  <text x="500" y="470" class="text-body" fill="#00e5ff">2. Intercept check</text>
 
-  <!-- 5. SMS Intercept: ESME -> OsmoSMSC -> Gateway -->
-  <path d="M 205,480 L 290,440" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <path d="M 475,440 L 520,440 L 520,180 L 555,180" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="215" y="470" class="text-body" fill="#00e5ff">1. SMS Submit</text>
-  <text x="480" y="430" class="text-body" fill="#00e5ff">Intercept Query</text>
-
-  <!-- 6. OUTBOUND AI FILTER QUERY ARROW (From Spring Gateway -> External Java 21 AI Model) -->
-  <path d="M 725,180 L 745,180 L 745,45 L 758,45" class="sec-arrow" marker-end="url(#arrow-head-orange)" />
-  <text x="690" y="35" class="text-body" fill="#ff5722">5. Outbound AI Query</text>
+  <!-- API to external AI Filter (Rerouted away from header space) -->
+  <path d="M 725,120 L 780,120 L 780,75 L 560,75 L 560,95" class="sec-arrow" marker-end="url(#arrow-head-orange)" />
+  <text x="650" y="70" class="text-body" fill="#ff5722">4. AI Query</text>
 
   <!-- Observability metrics routes -->
   <path d="M 475,130 L 800,130" class="obs-arrow" marker-end="url(#arrow-head-purple)" />
