@@ -1,0 +1,39 @@
+# ==============================================================================
+# VictoriaMetrics Scraper Daemon Configuration (vmagent)
+# ==============================================================================
+# TELEMETRY ARCHITECTURE:
+# vmagent is a lightweight scraper daemon from the VictoriaMetrics suite.
+# It reads Prometheus-formatted HTTP endpoints across the container network
+# and streams time-series metric samples into VictoriaMetrics TSDB (port 8428).
+# ==============================================================================
+
+global:
+  scrape_interval: 5s     # Scrape metrics every 5 seconds for real-time NOC resolution
+  scrape_timeout: 4s      # Cancel HTTP scrape connection if target takes longer than 4 seconds
+
+scrape_configs:
+  # RTPEngine Media Relay Prometheus Endpoint
+  - job_name: "rtpengine"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["rtpengine:9900"]
+        labels:
+          subsystem: "media-plane"
+          component: "rtpengine"
+
+  # Spring Boot Interception Gateway Actuator Endpoint
+  - job_name: "telecom-api"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["telecom-api:8080"]
+        labels:
+          subsystem: "control-plane"
+          component: "spring-gateway"
+
+  # Scraper Self-Monitoring Endpoint
+  - job_name: "vmagent"
+    static_configs:
+      - targets: ["vmagent:8429"]
+        labels:
+          subsystem: "telemetry"
+          component: "vmagent"

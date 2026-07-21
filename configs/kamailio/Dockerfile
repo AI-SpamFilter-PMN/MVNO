@@ -1,6 +1,16 @@
-FROM alpine:3.19
-RUN apk add --no-cache kamailio kamailio-sqlite kamailio-tls kamailio-sctp kamailio-utils
-COPY configs/kamailio/kamailio.cfg /etc/kamailio/
-VOLUME ["/etc/kamailio"]
+# ==============================================================================
+# MVNO Telecom Core — Custom Kamailio Container Dockerfile
+# ==============================================================================
+# Extends standard Alpine-based Kamailio image with the 'kamailio-utils' package,
+# which provides necessary http_client.so and xhttp_prom.so modules.
+# ==============================================================================
+
+FROM kamailio/kamailio:5.7-alpine
+
+# Install kamailio-utils package from Alpine 3.19 apk repositories
+RUN apk add --no-cache kamailio-utils
+
+# Expose SIP signaling UDP and TCP ports
 EXPOSE 5060/udp 5060/tcp
-CMD ["kamailio", "-f", "/etc/kamailio/kamailio.cfg", "-DD"]
+
+CMD ["kamailio", "-DD", "-E"]

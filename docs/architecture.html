@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MVNO Architecture</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { margin: 0; background: #fff; display: flex; justify-content: center; padding: 20px; }
+  .mermaid { max-width: 100%; }
+</style>
+</head>
+<body>
+<pre class="mermaid">
+graph TB
+  subgraph External
+    SIP["SIP Phone / UE"]
+    SMPP["SMPP Client (ESME)"]
+    ADM["Admin"]
+    AI["AI Spam Filter"]
+  end
+
+  subgraph "MVNO Interception Core"
+    K["Kamailio — SIP Router"]
+    RTP["rtpengine — Media Proxy"]
+    SMSC["OsmoSMSC — SMS Center"]
+    GW["Spring Boot Gateway"]
+    V["Vosk Worker — STT"]
+    VEC["Vector — Log Shipper"]
+    MET["VictoriaMetrics + Grafana"]
+    SPOOL[("Spool Dir — WAV + JSON")]
+    DB[("SQLite — Subscriber DB")]
+  end
+
+  SIP -->|"SIP (UDP 5060)"| K
+  SMPP -->|"SMPP (TCP 2775)"| SMSC
+  K -->|"ng (UDP 22222)"| RTP
+  RTP -->|"Write"| SPOOL
+  V -->|"Read WAV"| SPOOL
+  V -->|"HTTP POST /transcript"| GW
+  VEC -->|"HTTP POST /events"| GW
+  K -->|"HTTP POST /intercept/call"| GW
+  SMSC -->|"HTTP POST /intercept/sms"| GW
+  K -->|"SQL"| DB
+  SMSC -->|"SMPP"| GW
+  GW -->|"SQL"| DB
+  GW -->|"HTTP POST /classify"| AI
+  ADM -->|"HTTP (TCP 3000)"| MET
+</pre>
+</body>
+</html>
