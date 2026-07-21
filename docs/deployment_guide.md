@@ -12,7 +12,7 @@ This guide covers the transaction flow, software prerequisites, and complete con
 1. **SIP Invite**: `UE_1` sends an `INVITE` request to Kamailio.
 2. **Media Path Setup**: Kamailio proxies the signaling, registers the call location in the SQLite database, and calls `rtpengine` to bind media ports.
 3. **Media Forking**: When the call starts, `rtpengine` forwards the media (RTP streams) between clients in-kernel and forks a raw copy of the audio to the spool directory `/var/spool/rtpengine`.
-4. **Offline Translation**: The `vosk_worker.py` script detects the finished audio files, transcribes them using the local Vosk model, and sends the transcript to the Spring Boot Gateway.
+4. **Offline Translation**: `NativeVoskService.java` inside the Spring Boot Gateway detects the audio capture, transcribes it in-memory using native Java 21 Vosk JNI bindings (`com.alphacephei:vosk`), and extracts voice biometrics.
 5. **AI Filtration Check**: The Spring Boot Gateway queries the external AI Filtration System's REST API. If the call contains spam, the number is blacklisted.
 
 ### SMS Transaction Steps:
@@ -32,8 +32,8 @@ Deploying directly onto a Debian-slim/Ubuntu 22.04 LTS host:
 | **Kamailio** | Debian/Ubuntu packages | `sudo apt install kamailio kamailio-sqlite-modules` |
 | **rtpengine** | Packages / Source | `sudo apt install ngcp-rtpengine ngcp-rtpengine-daemon` |
 | **Osmocom** | Osmocom OBS repositories | `sudo apt install osmo-msc osmo-hlr` |
-| **Vosk STT** | Python / Pip library | `pip install vosk soundfile requests` |
-| **Spring Boot** | Java 25 + Maven | `./mvnw spring-boot:run` |
+| **Vosk STT** | Native Java JNI (`com.alphacephei:vosk`) | Built-in via Maven dependency in `telecom-api` |
+| **Spring Boot** | Java 21 LTS + Maven 3.9.9 | `./mvnw spring-boot:run` |
 | **Vector** | Vector deb repo | `sudo apt install vector` |
 | **VictoriaMetrics**| Pre-compiled binary | Download from GitHub releases |
 | **Grafana** | Grafana APT repo | `sudo apt install grafana` |
@@ -46,11 +46,10 @@ Operating in a daemonless, rootless environment:
 | **Podman** | `sudo apt install podman` | Daemonless rootless engine |
 | **Docker Compose Plugin**| `sudo apt install docker-compose` | Compose orchestration via `podman compose` |
 | **Podman API Socket**| `systemctl --user enable --now podman.socket` | Required by Docker Compose Plugin to talk to Podman |
-| **Kamailio Image** | `mvno-kamailio:latest` | Custom Alpine build (adds kamailio-http) from `configs/kamailio/Dockerfile` |
+| **Kamailio Image** | `mvno-kamailio:latest` | Custom Alpine build (adds kamailio-utils) from `configs/kamailio/Dockerfile` |
 | **rtpengine Image**| `drachtio/rtpengine:latest` | Media engine container |
-| **Osmocom Image** | `mvno-osmo-smsc:latest` | Custom Debian build from `configs/osmocom/Dockerfile` (no official image exists) |
-| **Vosk Image** | `mvno-vosk-worker:latest` | Custom multi-stage Python build with vendored wheels |
-| **Spring Boot Image** | `mvno-telecom-api:latest` | Custom multi-stage Maven/Temurin build from `telecom-api/Dockerfile` |
+| **Osmocom Image** | `mvno-osmo-smsc:latest` | Custom Debian build from `configs/osmocom/Dockerfile` |
+| **Spring Boot Image** | `mvno-telecom-api:latest` | Custom multi-stage Maven/Temurin build from `telecom-api/Dockerfile` (Java 21 LTS + Native Vosk) |
 | **VictoriaMetrics**| `victoriametrics/victoria-metrics` | Single-node database container |
 | **Grafana Image** | `grafana/grafana-oss` | Metric UI dashboard container |
 
@@ -319,7 +318,7 @@ Configure the signaling systems to call the API Gateway for approval before rout
 2. **Call Interception**: In `kamailio.cfg`, the gateway is queried via HTTP POST during the INVITE handling:
    ```kamailio
    # http_client.so is NOT available in the Alpine image.
-   # Instead, use exec + curl (or build mvno-kamailio:latest with kamailio-http).
+   # Instead, use exec + curl (or build mvno-kamailio:latest with kamailio-utils).
    # The gateway URL uses the container hostname:
    #   http://telecom-api:8080/api/v1/intercept/call
    ```
