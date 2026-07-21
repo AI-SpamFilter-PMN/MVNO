@@ -299,14 +299,14 @@ Initialize the database files and configure them for high concurrency (WAL Mode)
 
 ### Step 2: Establish the Media Plane Connection (Kamailio ↔ rtpengine)
 Link the signaling server (Kamailio) with the packet forwarding proxy (rtpengine):
-1. **Set rtpengine NG listen port**: In `configs/rtpengine/rtpengine.conf`, the NG control socket listens on port `22223` (UDP, container-internal):
+1. **Set rtpengine NG listen port**: In `configs/rtpengine/rtpengine.conf`, the NG control socket listens on port `22222` (UDP, container-internal):
    ```ini
-   listen-ng = 0.0.0.0:22223
+   listen-ng = 0.0.0.0:22222
    ```
 2. **Configure Kamailio module**: In `configs/kamailio/kamailio.cfg`, load the module and point it to the rtpengine container:
    ```kamailio
    loadmodule "rtpengine.so"
-   modparam("rtpengine", "rtpengine_sock", "udp:rtpengine:22223")
+   modparam("rtpengine", "rtpengine_sock", "udp:rtpengine:22222")
    ```
    Note: In containers, use the service hostname (`rtpengine`), not `127.0.0.1`.
 
@@ -332,20 +332,23 @@ Configure the signaling systems to call the API Gateway for approval before rout
    ```
    See `configs/kamailio/kamailio.cfg` `route[INTERCEPT]` for the full implementation.
 
-### Step 4: Configure the Speech Translation Pipeline (rtpengine ↔ Vosk ↔ AI Filter)
-Set up the automated loop that records media, transcribes it, and routes it to the AI filter:
+### Step 4: Speech Translation Pipeline (rtpengine ↔ NativeVoskService ↔ AI Filter)
+The ASR pipeline runs **entirely inside the Spring Boot JVM** via `NativeVoskService.java` — there is no external Python worker.
+
 1. **Set shared spool**: Point rtpengine's recording path to the shared volume mount in `rtpengine.conf`:
    ```ini
    recording-dir = /var/spool/rtpengine
    recording-method = pcap
    recording-format = eth
    ```
-   **Note:** rtpengine only supports PCAP recording formats (`eth`, `eth0`, `raw`). WAV is not supported. The `eth` format captures full Ethernet frames. The Vosk worker must convert PCAP → WAV using ffmpeg/sox before transcription.
+   > **Note:** rtpengine supports only PCAP formats (`eth`, `raw`). WAV is not a valid option.
 
-2. **Launch Translation Worker**: The `vosk-worker` container polls `/var/spool/rtpengine` via volume mount:
-   - When a PCAP file is finalized, the worker converts it to WAV using ffmpeg, then transcribes it using the offline Vosk model (`vosk-model-small-en-us-0.15`).
-   - It performs a `POST` request with the transcript to the Spring Boot Gateway (`http://telecom-api:8080/api/v1/transcriptions`).
-   - The gateway routes the result to the AI Filtration REST API for allow/block decisions.
+2. **Native Java 21 Vosk ASR** (`NativeVoskService.java` inside `mvno-api`):
+   - Uses a `@Scheduled(fixedDelay = 3000)` virtual-thread task that polls `/var/spool/rtpengine` every 3 seconds.
+   - When a `.wav` file is ready, it is decoded in-memory using native JNI bindings (`com.alphacephei:vosk:0.3.45`) — zero Python, zero cloud.
+   - The transcript + biometrics are `POST`-ed to `POST /api/v1/transcriptions` (same JVM, loopback).
+   - The gateway then routes the result to the AI Spam Model REST API for allow/block decisions.
+   - **No separate `vosk-worker` container is needed** — this is handled entirely by `mvno-api`.
 
 ### Step 5: Observability Aggregation (vmagent ↔ VictoriaMetrics)
 Connect the lightweight time-series stack to scrape metrics:
@@ -363,4 +366,23 @@ Connect the lightweight time-series stack to scrape metrics:
          - targets: ['rtpengine:22223']
    ```
 2. **Set ingestion write-path**: Point `vmagent` to push all aggregated telemetry to the VictoriaMetrics TSDB single-binary database at `victoria-metrics:8428`.
+
+---
+
+## 6. Makefile Targets
+
+All developer lifecycle operations are in the `Makefile`:
+
+| Target | Command | Purpose |
+|---|---|---|
+| `make init-db` | `sqlite3 state/kamailio.db ...` | Initialize SQLite WAL databases + seed test subscribers |
+| `make up` | `podman compose up -d --build` | Start the full stack |
+| `make down` | `podman compose down` | Stop all containers |
+| `make ps` | `podman ps` | List running containers |
+| `make logs` | `podman compose logs -f` | Stream all container logs |
+| `make test-api` | `curl /actuator/health/liveness` | Verify gateway health |
+| `make test-sms` | SMPP test via Python `smpplib` | End-to-end SMS intercept test |
+| `make test-call` | SIPp scenario | SIP call intercept test |
+| `make clean` | `rm -rf state/*` | Wipe all state data |
+| `make rebuild` | `clean + init-db + up` | Full teardown and rebuild |
 
