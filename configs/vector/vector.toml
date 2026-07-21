@@ -1,0 +1,40 @@
+# ==============================================================================
+# Vector High-Throughput Log Shipper & VRL Parser Configuration
+# ==============================================================================
+# LOG PIPELINE ARCHITECTURE:
+# Vector collects raw syslog and stdout log streams from Kamailio, OsmoMSC, and
+# Spring Boot, applies VRL (Vector Remap Language) regex transforms to parse E.164
+# phone numbers and SIP Call-IDs, and ships structured JSON logs to VictoriaLogs/Grafana.
+# ==============================================================================
+
+[sources.container_logs]
+type = "docker_logs"
+include_containers = ["mvno-kamailio", "mvno-api", "mvno-osmosmsc"]
+
+[transforms.parse_telecom_events]
+type = "remap"
+inputs = ["container_logs"]
+source = '''
+# Extract timestamp, container name, and raw message body
+.timestamp = parse_timestamp!(.timestamp, format: "%+")
+.container = .container_name
+
+# VRL Regex Parsing: Extract E.164 phone numbers (MSISDN) from raw signaling logs
+if contains(to_string!(.message), "INVITE") {
+  .event_type = "SIP_INVITE"
+  caps = parse_regex(.message, r'from: sip:(?P<caller>\d+)@')??
+  if caps != null {
+    .caller_msisdn = caps.caller
+  }
+} else if contains(to_string!(.message), "submit_sm") {
+  .event_type = "SMS_SUBMIT"
+} else {
+  .event_type = "SYSTEM_LOG"
+}
+'''
+
+[sinks.stdout]
+type = "console"
+inputs = ["parse_telecom_events"]
+target = "stdout"
+encoding.codec = "json"
