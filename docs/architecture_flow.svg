@@ -1,21 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1150 650" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="100%" height="100%">
   <defs>
     <style>
-      .bg { fill: #0f111a; }
-      .box { fill: #1a1d2d; stroke: #2a2f4a; stroke-width: 2; rx: 8; ry: 8; }
-      .client-box { fill: #132238; stroke: #007acc; stroke-width: 2; rx: 8; ry: 8; }
-      .core-box { fill: #0f3326; stroke: #00e5ff; stroke-width: 2; rx: 8; ry: 8; }
-      .gw-box { fill: #2c1a38; stroke: #ab47bc; stroke-width: 2; rx: 8; ry: 8; }
-      .ai-box { fill: #3b1812; stroke: #ff5722; stroke-width: 2; rx: 8; ry: 8; }
-      .obs-box { fill: #1d2538; stroke: #29b6f6; stroke-width: 2; rx: 8; ry: 8; }
+      .bg { fill: #0d0f18; }
+      .box { fill: #161929; stroke: #262b45; stroke-width: 2; rx: 8; ry: 8; }
+      .client-box { fill: #101d30; stroke: #007acc; stroke-width: 2; rx: 10; ry: 10; }
+      .core-box { fill: #0a261c; stroke: #00e5ff; stroke-width: 2; rx: 10; ry: 10; }
+      .gw-box { fill: #23132e; stroke: #ab47bc; stroke-width: 2; rx: 10; ry: 10; }
+      .ai-box { fill: #33120c; stroke: #ff5722; stroke-width: 2; rx: 10; ry: 10; }
+      .obs-box { fill: #151c2e; stroke: #29b6f6; stroke-width: 2; rx: 10; ry: 10; }
       
-      .text-header { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; font-weight: bold; fill: #ffffff; }
+      .text-header { font-family: 'Inter', system-ui, sans-serif; font-size: 15px; font-weight: bold; fill: #ffffff; }
       .text-title { font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: bold; fill: #ffffff; }
       .text-body { font-family: 'Inter', system-ui, sans-serif; font-size: 11px; fill: #b0bec5; }
       .text-link { font-family: 'Inter', system-ui, sans-serif; font-size: 10px; fill: #00e5ff; font-weight: bold; }
       .text-label { font-family: 'Inter', system-ui, sans-serif; font-size: 11px; font-weight: bold; }
       
-      .solid-arrow { stroke: #00e5ff; stroke-width: 2; fill: none; }
+      .solid-arrow { stroke: #00e5ff; stroke-width: 2.2; fill: none; }
       .ai-arrow { stroke: #ff5722; stroke-width: 2.5; fill: none; }
       .obs-arrow { stroke: #29b6f6; stroke-width: 2; fill: none; stroke-dasharray: 4,4; }
       
@@ -37,214 +37,214 @@
   </defs>
 
   <!-- Background -->
-  <rect width="1150" height="650" class="bg" />
+  <rect width="1280" height="720" class="bg" />
 
-  <!-- Diagram Header -->
-  <text x="30" y="38" font-family="'Inter', sans-serif" font-size="20" font-weight="bold" fill="#ffffff">MVNO Core Integration Flow &amp; Process Steps</text>
-  <text x="30" y="58" font-family="'Inter', sans-serif" font-size="12" fill="#90a4ae">Real-Time Telecommunication Signaling Interception &amp; Java 21 AI Filtration Gateway</text>
+  <!-- Diagram Title Header -->
+  <text x="40" y="42" font-family="'Inter', sans-serif" font-size="22" font-weight="bold" fill="#ffffff">MVNO Core Integration Flow &amp; Process Steps</text>
+  <text x="40" y="65" font-family="'Inter', sans-serif" font-size="13" fill="#90a4ae">Real-Time Telecommunication Signaling Interception &amp; Java 21 AI Filtration Gateway</text>
 
-  <!-- 1. ACCESS LAYER -->
-  <g transform="translate(30, 85)">
-    <rect width="200" height="535" class="client-box" />
-    <text x="15" y="28" class="text-header">1. Access / Client Layer</text>
+  <!-- ==================== 1. ACCESS LAYER (X: 40, W: 200) ==================== -->
+  <g transform="translate(40, 95)">
+    <rect width="200" height="595" class="client-box" />
+    <text x="15" y="30" class="text-header">1. Access / Client Layer</text>
     
     <!-- UE 1 -->
-    <g transform="translate(15, 45)">
-      <rect width="170" height="100" class="box" />
-      <text x="12" y="22" class="text-title">SIP User (UE_1)</text>
-      <text x="12" y="42" class="text-body">• Originated Voice Call</text>
-      <text x="12" y="60" class="text-body">• SIP INVITE Signaling</text>
-      <text x="12" y="78" class="text-body">• Protocol: SIP / RTP</text>
-      <text x="12" y="92" class="text-link">UDP Port 5060</text>
+    <g transform="translate(15, 55)">
+      <rect width="170" height="110" class="box" />
+      <text x="12" y="24" class="text-title">SIP User (UE_1)</text>
+      <text x="12" y="46" class="text-body">• Originated Voice Call</text>
+      <text x="12" y="64" class="text-body">• SIP INVITE Signaling</text>
+      <text x="12" y="82" class="text-body">• Protocol: SIP / RTP</text>
+      <text x="12" y="98" class="text-link">UDP Port 5060</text>
     </g>
 
     <!-- UE 2 -->
-    <g transform="translate(15, 175)">
-      <rect width="170" height="100" class="box" />
-      <text x="12" y="22" class="text-title">SIP User (UE_2)</text>
-      <text x="12" y="42" class="text-body">• Terminating Recipient</text>
-      <text x="12" y="60" class="text-body">• SIP 200 OK / ACK</text>
-      <text x="12" y="78" class="text-body">• Protocol: SIP / RTP</text>
-      <text x="12" y="92" class="text-link">UDP Port 5060</text>
+    <g transform="translate(15, 190)">
+      <rect width="170" height="110" class="box" />
+      <text x="12" y="24" class="text-title">SIP User (UE_2)</text>
+      <text x="12" y="46" class="text-body">• Terminating Recipient</text>
+      <text x="12" y="64" class="text-body">• SIP 200 OK / ACK</text>
+      <text x="12" y="82" class="text-body">• Protocol: SIP / RTP</text>
+      <text x="12" y="98" class="text-link">UDP Port 5060</text>
     </g>
 
     <!-- ESME Client -->
-    <g transform="translate(15, 305)">
-      <rect width="170" height="100" class="box" />
-      <text x="12" y="22" class="text-title">SMS Client (ESME)</text>
-      <text x="12" y="42" class="text-body">• A2P / P2P SMS Submit</text>
-      <text x="12" y="60" class="text-body">• submit_sm PDU</text>
-      <text x="12" y="78" class="text-body">• Protocol: SMPP 3.4</text>
-      <text x="12" y="92" class="text-link">TCP Port 2775</text>
+    <g transform="translate(15, 325)">
+      <rect width="170" height="110" class="box" />
+      <text x="12" y="24" class="text-title">SMS Client (ESME)</text>
+      <text x="12" y="46" class="text-body">• A2P / P2P SMS Submit</text>
+      <text x="12" y="64" class="text-body">• submit_sm PDU</text>
+      <text x="12" y="82" class="text-body">• Protocol: SMPP 3.4</text>
+      <text x="12" y="98" class="text-link">TCP Port 2775</text>
     </g>
 
     <!-- 5G SA UE -->
-    <g transform="translate(15, 420)">
-      <rect width="170" height="100" class="box" />
-      <text x="12" y="22" class="text-title">5G SA UE (UERANSIM)</text>
-      <text x="12" y="42" class="text-body">• 5G gNB + UE Simulation</text>
-      <text x="12" y="60" class="text-body">• NAS SMS over N1/N2</text>
-      <text x="12" y="78" class="text-body">• Open5GS 10-NF Core</text>
-      <text x="12" y="92" class="text-link">N2 / N3 Interface</text>
+    <g transform="translate(15, 460)">
+      <rect width="170" height="110" class="box" />
+      <text x="12" y="24" class="text-title">5G SA UE (UERANSIM)</text>
+      <text x="12" y="46" class="text-body">• 5G gNB + UE Simulation</text>
+      <text x="12" y="64" class="text-body">• NAS SMS over N1/N2</text>
+      <text x="12" y="82" class="text-body">• Open5GS 10-NF Core</text>
+      <text x="12" y="98" class="text-link">N2 / N3 Interface</text>
     </g>
   </g>
 
-  <!-- 2. MVNO NETWORK CORE -->
-  <g transform="translate(320, 85)">
-    <rect width="210" height="535" class="core-box" />
-    <text x="15" y="28" class="text-header">2. MVNO Network Core</text>
+  <!-- ==================== 2. MVNO NETWORK CORE (X: 350, W: 220) ==================== -->
+  <g transform="translate(350, 95)">
+    <rect width="220" height="595" class="core-box" />
+    <text x="15" y="30" class="text-header">2. MVNO Network Core</text>
 
     <!-- Kamailio -->
-    <g transform="translate(15, 45)">
-      <rect width="180" height="120" class="box" />
+    <g transform="translate(15, 55)">
+      <rect width="190" height="115" class="box" />
       <text x="12" y="22" class="text-title">Kamailio CSCF</text>
       <text x="12" y="42" class="text-body">• SIP Registrar / Proxy</text>
       <text x="12" y="60" class="text-body">• SQLite contact db</text>
       <text x="12" y="78" class="text-body">• PIKE rate-limiting</text>
-      <text x="12" y="96" class="text-body">• STIR/SHAKEN validation</text>
-      <text x="12" y="112" class="text-link">UDP / TCP 5060</text>
+      <text x="12" y="94" class="text-body">• STIR/SHAKEN validation</text>
+      <text x="12" y="108" class="text-link">UDP / TCP 5060</text>
     </g>
 
     <!-- rtpengine -->
-    <g transform="translate(15, 185)">
-      <rect width="180" height="120" class="box" />
+    <g transform="translate(15, 215)">
+      <rect width="190" height="115" class="box" />
       <text x="12" y="22" class="text-title">rtpengine</text>
       <text x="12" y="42" class="text-body">• In-kernel RTP proxy</text>
       <text x="12" y="60" class="text-body">• PCAP Audio Spooler</text>
       <text x="12" y="78" class="text-body">• DTMF RFC2833 capture</text>
-      <text x="12" y="96" class="text-body">• HTTP control engine</text>
-      <text x="12" y="112" class="text-link">NG Control: UDP 22222</text>
+      <text x="12" y="94" class="text-body">• HTTP control engine</text>
+      <text x="12" y="108" class="text-link">NG Control: UDP 22222</text>
     </g>
 
     <!-- OsmoSMSC -->
-    <g transform="translate(15, 325)">
-      <rect width="180" height="120" class="box" />
+    <g transform="translate(15, 375)">
+      <rect width="190" height="115" class="box" />
       <text x="12" y="22" class="text-title">OsmoSMSC / OsmoMSC</text>
       <text x="12" y="42" class="text-body">• Store &amp; Forward SMSC</text>
       <text x="12" y="60" class="text-body">• Standalone OsmoHLR</text>
       <text x="12" y="78" class="text-body">• Delivery hold hook</text>
-      <text x="12" y="96" class="text-body">• Geofencing LAC/CellID</text>
-      <text x="12" y="112" class="text-link">SMPP: TCP 2775</text>
+      <text x="12" y="94" class="text-body">• Geofencing LAC/CellID</text>
+      <text x="12" y="108" class="text-link">SMPP: TCP 2775</text>
     </g>
   </g>
 
-  <!-- 3. INTEGRATION GATEWAY -->
-  <g transform="translate(620, 85)">
-    <rect width="220" height="535" class="gw-box" />
-    <text x="15" y="28" class="text-header">3. Integration Gateway</text>
+  <!-- ==================== 3. INTEGRATION GATEWAY (X: 680, W: 240) ==================== -->
+  <g transform="translate(680, 95)">
+    <rect width="240" height="595" class="gw-box" />
+    <text x="15" y="30" class="text-header">3. Integration Gateway</text>
 
     <!-- Spring Boot Gateway -->
-    <g transform="translate(15, 45)">
-      <rect width="190" height="150" class="box" />
+    <g transform="translate(15, 55)">
+      <rect width="210" height="145" class="box" />
       <text x="12" y="22" class="text-title">telecom-api (Spring Boot 3.4)</text>
       <text x="12" y="42" class="text-body">• Java 21 Virtual Threads</text>
       <text x="12" y="60" class="text-body">• Prepaid OCS balance check</text>
       <text x="12" y="78" class="text-body">• EIR SIM-swap tracker</text>
       <text x="12" y="96" class="text-body">• 5s Carrier SLA Fail-Open</text>
       <text x="12" y="114" class="text-body">• REST Policy Controller</text>
-      <text x="12" y="132" class="text-body">• Actuator liveness probes</text>
-      <text x="12" y="144" class="text-link">HTTP Port 8080</text>
+      <text x="12" y="130" class="text-body">• Actuator liveness probes</text>
+      <text x="12" y="140" class="text-link">HTTP Port 8080</text>
     </g>
 
     <!-- Native Vosk ASR -->
-    <g transform="translate(15, 215)">
-      <rect width="190" height="120" class="box" />
+    <g transform="translate(15, 235)">
+      <rect width="210" height="115" class="box" />
       <text x="12" y="22" class="text-title">Native Vosk Java 21 ASR</text>
       <text x="12" y="42" class="text-body">• Native JNI Vosk Service</text>
       <text x="12" y="60" class="text-body">• Scans /var/spool/rtpengine</text>
       <text x="12" y="78" class="text-body">• Offline Speech-to-Text</text>
-      <text x="12" y="96" class="text-body">• Silence &amp; Spectral biometrics</text>
-      <text x="12" y="112" class="text-link">Engine: In-JVM Virtual Threads</text>
+      <text x="12" y="94" class="text-body">• Silence &amp; Spectral biometrics</text>
+      <text x="12" y="108" class="text-link">Engine: In-JVM Virtual Threads</text>
     </g>
 
     <!-- Vector Parser -->
-    <g transform="translate(15, 355)">
-      <rect width="190" height="110" class="box" />
+    <g transform="translate(15, 375)">
+      <rect width="210" height="115" class="box" />
       <text x="12" y="22" class="text-title">Vector Log Pipeline</text>
       <text x="12" y="42" class="text-body">• Rust log shipper</text>
       <text x="12" y="60" class="text-body">• Regex VRL transform</text>
       <text x="12" y="78" class="text-body">• Disk backpressure</text>
-      <text x="12" y="96" class="text-body">• Zero GC engine</text>
-      <text x="12" y="106" class="text-link">Native Log Shipper</text>
+      <text x="12" y="94" class="text-body">• Zero GC engine</text>
+      <text x="12" y="108" class="text-link">Native Log Shipper</text>
     </g>
   </g>
 
-  <!-- 4. EXTERNAL AI SPAM FILTER PLATFORM -->
-  <g transform="translate(930, 85)">
-    <rect width="190" height="230" class="ai-box" />
-    <text x="12" y="28" class="text-header">4. AI Spam Platform</text>
+  <!-- ==================== 4. AI SPAM PLATFORM (X: 1000, W: 240) ==================== -->
+  <g transform="translate(1000, 95)">
+    <rect width="240" height="250" class="ai-box" />
+    <text x="15" y="30" class="text-header">4. AI Spam Platform</text>
 
-    <g transform="translate(12, 45)">
-      <rect width="166" height="165" class="box" stroke="#ff5722" />
-      <text x="10" y="22" class="text-title" fill="#ff7043">AI Spam Model</text>
-      <text x="10" y="42" class="text-body">• Java 21 Model Server</text>
-      <text x="10" y="60" class="text-body">• SMS Classifier</text>
-      <text x="10" y="78" class="text-body">• Voice Biometric</text>
-      <text x="10" y="96" class="text-body">• Allow/Block decision</text>
-      <text x="10" y="114" class="text-body">• POST /api/v1/classify</text>
-      <text x="10" y="132" class="text-body">• SLA Response &lt; 5s</text>
-      <text x="10" y="150" class="text-link">HTTP Port 8000</text>
+    <g transform="translate(15, 55)">
+      <rect width="210" height="175" class="box" stroke="#ff5722" />
+      <text x="12" y="24" class="text-title" fill="#ff7043">AI Spam Model Server</text>
+      <text x="12" y="46" class="text-body">• Java 21 REST Model Server</text>
+      <text x="12" y="66" class="text-body">• SMS Spam Classifier</text>
+      <text x="12" y="86" class="text-body">• Voice Biometric Evaluator</text>
+      <text x="12" y="106" class="text-body">• Real-time allow/block decision</text>
+      <text x="12" y="126" class="text-body">• POST /api/v1/classify</text>
+      <text x="12" y="146" class="text-body">• Carrier SLA Response &lt; 5s</text>
+      <text x="12" y="162" class="text-link">HTTP Port 8000</text>
     </g>
   </g>
 
-  <!-- 5. OBSERVABILITY STACK -->
-  <g transform="translate(930, 335)">
-    <rect width="190" height="285" class="obs-box" />
-    <text x="12" y="28" class="text-header">5. Observability</text>
+  <!-- ==================== 5. OBSERVABILITY STACK (X: 1000, W: 240) ==================== -->
+  <g transform="translate(1000, 370)">
+    <rect width="240" height="320" class="obs-box" />
+    <text x="15" y="30" class="text-header">5. Observability Stack</text>
 
     <!-- VictoriaMetrics -->
-    <g transform="translate(12, 45)">
-      <rect width="166" height="100" class="box" />
-      <text x="10" y="22" class="text-title">VictoriaMetrics</text>
-      <text x="10" y="42" class="text-body">• Metric TSDB</text>
-      <text x="10" y="60" class="text-body">• Scraped via vmagent</text>
-      <text x="10" y="78" class="text-body">• PromQL query API</text>
-      <text x="10" y="92" class="text-link">HTTP Port 8428</text>
+    <g transform="translate(15, 55)">
+      <rect width="210" height="110" class="box" />
+      <text x="12" y="22" class="text-title">VictoriaMetrics TSDB</text>
+      <text x="12" y="42" class="text-body">• High-performance metrics</text>
+      <text x="12" y="60" class="text-body">• Scraped via vmagent</text>
+      <text x="12" y="78" class="text-body">• PromQL query API</text>
+      <text x="12" y="94" class="text-link">HTTP Port 8428</text>
     </g>
 
     <!-- Grafana -->
-    <g transform="translate(12, 160)">
-      <rect width="166" height="100" class="box" />
-      <text x="10" y="22" class="text-title">Grafana Dashboards</text>
-      <text x="10" y="42" class="text-body">• Telecom NOC views</text>
-      <text x="10" y="60" class="text-body">• Call / SMS KPIs</text>
-      <text x="10" y="78" class="text-body">• Interception metrics</text>
-      <text x="10" y="92" class="text-link">HTTP Port 3000</text>
+    <g transform="translate(15, 185)">
+      <rect width="210" height="110" class="box" />
+      <text x="12" y="22" class="text-title">Grafana Dashboards</text>
+      <text x="12" y="42" class="text-body">• Telecom NOC views</text>
+      <text x="12" y="60" class="text-body">• Real-time call / SMS KPIs</text>
+      <text x="12" y="78" class="text-body">• Spam interception metrics</text>
+      <text x="12" y="94" class="text-link">HTTP Port 3000</text>
     </g>
   </g>
 
-  <!-- INTER-CONNECTING SIGNAL & DATA FLOW ARROWS -->
+  <!-- ==================== SIGNAL & DATA FLOW ARROWS ==================== -->
 
   <!-- 1. Voice Call Setup: UE_1 -> Kamailio -->
-  <path d="M 215,155 L 325,155" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="240" y="145" class="text-label" fill="#00e5ff">1. INVITE</text>
+  <path d="M 240,205 L 350,205" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="255" y="195" class="text-label" fill="#00e5ff">1. INVITE</text>
 
-  <!-- 2. Media Anchoring: Kamailio -> rtpengine -->
-  <path d="M 425,165 L 425,230" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="432" y="200" class="text-label" fill="#00e5ff">2. Media Anchor</text>
+  <!-- 2. Media Anchoring: Kamailio -> rtpengine (In vertical gap y=270 to y=310) -->
+  <path d="M 460,270 L 460,310" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="470" y="295" class="text-label" fill="#00e5ff">2. Media Anchor</text>
 
   <!-- 3. Audio Spool Fork: rtpengine -> Native Vosk ASR -->
-  <path d="M 515,245 L 625,245" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="535" y="235" class="text-label" fill="#00e5ff">3. Audio Fork</text>
+  <path d="M 570,365 L 680,365" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="585" y="355" class="text-label" fill="#00e5ff">3. Audio Fork</text>
 
-  <!-- 4. Transcript to Gateway: Native Vosk -> telecom-api -->
-  <path d="M 730,215 L 730,195" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="736" y="210" class="text-label" fill="#00e5ff">4. In-JVM ASR</text>
+  <!-- 4. In-JVM ASR: Native Vosk -> telecom-api (In vertical gap y=330 to y=295) -->
+  <path d="M 800,330 L 800,295" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="810" y="318" class="text-label" fill="#00e5ff">4. In-JVM ASR</text>
 
   <!-- 5. SMS Submit & Hold: ESME -> OsmoSMSC -->
-  <path d="M 215,390 L 325,390" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="235" y="380" class="text-label" fill="#00e5ff">5. submit_sm</text>
+  <path d="M 240,480 L 350,480" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="255" y="470" class="text-label" fill="#00e5ff">5. submit_sm</text>
 
   <!-- 6. SMS Intercept Check: OsmoSMSC -> telecom-api -->
-  <path d="M 515,390 L 575,390 L 575,140 L 625,140" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="525" y="380" class="text-label" fill="#00e5ff">6. Intercept Check</text>
+  <path d="M 570,480 L 625,480 L 625,220 L 680,220" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="580" y="470" class="text-label" fill="#00e5ff">6. Intercept Check</text>
 
-  <!-- 7. Outbound AI Classification: telecom-api -> AI Spam Filter Platform (DIRECT FORWARD ARROW) -->
-  <path d="M 840,150 L 920,150" class="ai-arrow" marker-end="url(#arrow-head-orange)" />
-  <text x="845" y="140" class="text-label" fill="#ff5722">7. AI Classify</text>
+  <!-- 7. Outbound AI Classification: telecom-api -> AI Spam Platform (DIRECT CLEAR ARROW) -->
+  <path d="M 920,220 L 1000,220" class="ai-arrow" marker-end="url(#arrow-head-orange)" />
+  <text x="926" y="210" class="text-label" fill="#ff5722">7. AI Classify</text>
 
-  <!-- 8. Observability Scraping: vmagent -> telecom-api / rtpengine -->
-  <path d="M 930,420 L 850,420 L 850,170" class="obs-arrow" marker-end="url(#arrow-head-blue)" />
-  <text x="855" y="410" class="text-label" fill="#29b6f6">Metrics</text>
+  <!-- 8. Observability Scraping: vmagent -> telecom-api -->
+  <path d="M 1000,500 L 950,500 L 950,250 L 920,250" class="obs-arrow" marker-end="url(#arrow-head-blue)" />
+  <text x="940" y="490" class="text-label" fill="#29b6f6">Metrics</text>
 
 </svg>
