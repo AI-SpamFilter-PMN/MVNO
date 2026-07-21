@@ -107,7 +107,22 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ---
 
-## 5. Stack
+## 5. Network Ports & Protocols
+
+| Service | Container Name | Port | Protocol | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **Spring Boot Gateway** | `mvno-api` | `8080` | HTTP / REST | Interception policy control & subscriber API |
+| **Kamailio CSCF** | `mvno-kamailio` | `5060` | UDP / TCP | SIP signaling & registrar proxy |
+| **rtpengine NG** | `mvno-rtpengine` | `22222` | UDP | In-kernel media proxy control port |
+| **rtpengine Media** | `mvno-rtpengine` | `30000-30100`| UDP | RTP media audio stream relay range |
+| **OsmoSMSC / MSC** | `mvno-osmosmsc` | `2775` | TCP / SMPP | Short Message Peer-to-Peer (SMPP 3.4) |
+| **VictoriaMetrics** | `mvno-victoriametrics`| `8428` | HTTP | Telemetry TSDB & PromQL query API |
+| **Grafana NOC** | `mvno-grafana` | `3000` | HTTP | Real-time telecom NOC dashboard UI |
+| **AI Spam Model** | `ai-filter` | `8000` | HTTP / REST | External AI Spam Model Server |
+
+---
+
+## 6. Stack
 
 | Layer | Components | Purpose |
 |-------|-----------|---------|
@@ -119,7 +134,7 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ---
 
-## 6. Features
+## 7. Features
 
 | # | Feature | Implementation |
 |---|---------|---------------|
@@ -136,7 +151,7 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ---
 
-## 7. Documentation
+## 8. Documentation
 
 * [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Public AI Spam Filter REST API contract & JSON schemas for teammates.
 * [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
