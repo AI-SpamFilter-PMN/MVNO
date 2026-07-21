@@ -33,3 +33,17 @@ docs/*.drawio
 docs/*.png
 
 # NOTE: docs/API_CONTRACT.md is UNIGNORED so it can be shared with teammates on GitHub!
+
+# ============================================================
+# !! SECURITY: AI AGENT WORKSPACE — NEVER PUBLISH !!
+# ============================================================
+# .agents/ contains local AI agent workspace rules (AGENTS.md)
+# that are STRICTLY machine-local configuration.
+# This folder MUST NEVER appear in any git commit, push,
+# PR, or fork on ANY remote repository.
+#
+# History was already purged via git-filter-repo.
+# This rule is the permanent guard against re-introduction.
+# ============================================================
+.agents/
+.agents
