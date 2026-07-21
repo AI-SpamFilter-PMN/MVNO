@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 680" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 760" width="100%" height="100%">
   <defs>
     <style>
       .bg { fill: #080b14; }
@@ -74,9 +74,9 @@
   </defs>
 
   <!-- Background -->
-  <rect width="1100" height="680" fill="url(#grad-bg)"/>
+  <rect width="1100" height="760" fill="url(#grad-bg)"/>
   <line x1="0" y1="148" x2="1100" y2="148" class="divider"/>
-  <line x1="0" y1="660" x2="1100" y2="660" class="divider"/>
+  <line x1="0" y1="738" x2="1100" y2="738" class="divider"/>
 
   <!-- Title -->
   <text x="30" y="36" class="title-main">SMS Store-and-Forward Interception Flow</text>
@@ -152,58 +152,68 @@
   <line x1="662" y1="332" x2="479" y2="332" class="arrow-ai arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-ai-l)"/>
   <text x="570" y="324" text-anchor="middle" class="lbl" fill="#ef5350">HTTP 200 OK { allow: true/false }</text>
 
-  <!-- ══ BRANCH BOX ══ -->
-  <rect x="55" y="362" width="990" height="256" rx="8" fill="#080d1a" stroke="#1e2740" stroke-width="1.5"/>
+  <!--
+    POLICY DECISION BRANCH — vertical layout plan (y from top of outer box)
+    Outer box:     y=362  h=320  → bottom=682
+    Header row:    y=393  h=26   → bottom=419
+    Row 7a/7b:     label-y=442  arrow-y=452   (23px below header bottom)
+    Row 8a:        label-y=480  arrow-y=490   (28px below 7a/7b arrow)
+    Row 8b-box:    y=510  h=50  → bottom=560  (20px below 8a arrow)
+    Row 9a:        label-y=582  arrow-y=590   (30px below 8b bottom)
+  -->
+
+  <!-- ══ OUTER BRANCH BOX ══ -->
+  <rect x="55" y="362" width="990" height="320" rx="8" fill="#080d1a" stroke="#1e2740" stroke-width="1.5"/>
   <text x="76" y="384" class="branch-lbl" fill="#90a4ae">POLICY DECISION BRANCH:</text>
 
-  <!-- ── Branch A: ALLOW ── -->
-  <rect x="68" y="393" width="480" height="208" rx="6" class="branch-allow"/>
-  <rect x="68" y="393" width="480" height="26"  rx="6" class="branch-label-allow"/>
+  <!-- ── Branch A: ALLOW (x=68 w=480 right=548) ── -->
+  <rect x="68"  y="393" width="480" height="282" rx="6" class="branch-allow"/>
+  <rect x="68"  y="393" width="480" height="26"  rx="6" class="branch-label-allow"/>
   <text x="308" y="410" text-anchor="middle" class="branch-lbl" fill="#66bb6a">✓ ALLOW  (allow: true)</text>
 
-  <!-- 7a: allow response to SMSC -->
-  <circle cx="470" cy="436" r="9" fill="#66bb6a" opacity="0.9"/>
-  <text x="470" y="440" text-anchor="middle" class="badge-num" fill="#000">7a</text>
-  <line x1="462" y1="436" x2="263" y2="436" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
-  <text x="362" y="428" text-anchor="middle" class="lbl" fill="#66bb6a">HTTP 200 OK { allow: true }</text>
-
-  <!-- 8a: deliver_sm to Recipient -->
-  <circle cx="255" cy="468" r="9" fill="#66bb6a" opacity="0.9"/>
-  <text x="255" y="472" text-anchor="middle" class="badge-num" fill="#000">8a</text>
-  <line x1="264" y1="468" x2="877" y2="468" class="arrow-allow" marker-end="url(#h-allow)"/>
-  <!-- label anchored left to stay within ALLOW branch, clear of BLOCK boundary -->
-  <text x="290" y="460" class="lbl" fill="#66bb6a">deliver_sm PDU (Forward SMS to Recipient)</text>
-
-  <!-- 9a: submit_sm_resp success -->
-  <line x1="263" y1="500" x2="88" y2="500" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
-  <text x="172" y="492" text-anchor="middle" class="lbl" fill="#66bb6a">submit_sm_resp (success)</text>
-
-  <!-- ── Branch B: BLOCK ── -->
-  <rect x="561" y="393" width="474" height="208" rx="6" class="branch-block"/>
+  <!-- ── Branch B: BLOCK (x=561 w=474 right=1035) ── -->
+  <rect x="561" y="393" width="474" height="282" rx="6" class="branch-block"/>
   <rect x="561" y="393" width="474" height="26"  rx="6" class="branch-label-block"/>
-  <text x="798" y="410" text-anchor="middle" class="branch-lbl" fill="#ef5350">✗ BLOCK  (allow: false, reason: "Spam")</text>
+  <text x="798" y="410" text-anchor="middle" class="branch-lbl" fill="#ef5350">✗ BLOCK  (allow: false)</text>
 
-  <!-- 7b: block decision — GW sends reject back to SMSC -->
-  <circle cx="670" cy="436" r="9" fill="#ef5350" opacity="0.9"/>
-  <text x="670" y="440" text-anchor="middle" class="badge-num">7b</text>
-  <!-- arrow travels left across branch boundary to indicate GW→SMSC rejection -->
-  <line x1="661" y1="436" x2="575" y2="436" class="arrow-block arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-block-l)"/>
-  <text x="798" y="428" text-anchor="middle" class="lbl" fill="#ef5350">GW → SMSC: { allow: false, reason: "Spam" }</text>
+  <!-- ════ ROW 1 — Step 7 (response back to SMSC): label y=442 arrow y=452 ════ -->
 
-  <!-- 8b: Drop + Log — 2-line text to avoid overflow in 458px box -->
-  <rect x="569" y="455" width="458" height="46" rx="5" fill="#130505" stroke="#7b1818" stroke-width="1"/>
-  <text x="798" y="471" text-anchor="middle" class="lbl" fill="#ef5350">8b. SMSC drops SMS · Interception event logged</text>
-  <text x="798" y="489" text-anchor="middle" class="lbl" fill="#ef5350">submit_sm_resp(failure) → ESME notified</text>
+  <!-- 7a: GW (x=470) → SMSC (x=255): HTTP 200 allow:true -->
+  <text x="362" y="442" text-anchor="middle" class="lbl" fill="#66bb6a">HTTP 200 OK { allow: true }</text>
+  <circle cx="470" cy="452" r="9" fill="#66bb6a" opacity="0.9"/>
+  <text   x="470" y="456" text-anchor="middle" class="badge-num" fill="#000">7a</text>
+  <line x1="461" y1="452" x2="264" y2="452" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
+
+  <!-- 7b: GW sends reject to SMSC — label above arrow, in BLOCK lane -->
+  <text x="798" y="442" text-anchor="middle" class="lbl" fill="#ef5350">GW → SMSC: { allow: false, reason: "Spam" }</text>
+  <circle cx="670" cy="452" r="9" fill="#ef5350" opacity="0.9"/>
+  <text   x="670" y="456" text-anchor="middle" class="badge-num">7b</text>
+  <line x1="661" y1="452" x2="578" y2="452" class="arrow-block arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-block-l)"/>
+
+  <!-- ════ ROW 2 — Step 8a: SMSC → Recipient: deliver_sm: label y=480 arrow y=490 ════ -->
+  <text x="292" y="480" class="lbl" fill="#66bb6a">deliver_sm PDU → Recipient UE</text>
+  <circle cx="255" cy="490" r="9" fill="#66bb6a" opacity="0.9"/>
+  <text   x="255" y="494" text-anchor="middle" class="badge-num" fill="#000">8a</text>
+  <line x1="264" y1="490" x2="877" y2="490" class="arrow-allow" marker-end="url(#h-allow)"/>
+
+  <!-- ════ ROW 3 — Step 8b: BLOCK outcome box: y=510 to y=560 ════ -->
+  <rect x="569" y="510" width="458" height="50" rx="5" fill="#130505" stroke="#7b1818" stroke-width="1"/>
+  <text x="798" y="530" text-anchor="middle" class="lbl" fill="#ef5350">8b. SMSC drops SMS</text>
+  <text x="798" y="548" text-anchor="middle" class="lbl" fill="#ef5350">Interception logged · failure resp → ESME</text>
+
+  <!-- ════ ROW 4 — Step 9a: SMSC → ESME submit_sm_resp(success): label y=582 arrow y=590 ════ -->
+  <text x="172" y="582" text-anchor="middle" class="lbl" fill="#66bb6a">submit_sm_resp (success)</text>
+  <line x1="263" y1="590" x2="89"  y2="590" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
 
   <!-- Footer legend -->
-  <line x1="30"  y1="650" x2="80"  y2="650" stroke="#26c6da" stroke-width="2.2"/>
-  <text x="88"  y="654" class="lbl" fill="#78909c" font-size="10">SMPP Signaling</text>
-  <line x1="195" y1="650" x2="245" y2="650" stroke="#9b59b6" stroke-width="2"/>
-  <text x="253" y="654" class="lbl" fill="#78909c" font-size="10">OCS Check</text>
-  <line x1="330" y1="650" x2="380" y2="650" stroke="#ef5350" stroke-width="2.2"/>
-  <text x="388" y="654" class="lbl" fill="#78909c" font-size="10">AI Classify</text>
-  <line x1="460" y1="650" x2="510" y2="650" stroke="#66bb6a" stroke-width="2.5"/>
-  <text x="518" y="654" class="lbl" fill="#78909c" font-size="10">Allowed Path</text>
-  <line x1="605" y1="650" x2="655" y2="650" stroke="#ef5350" stroke-width="2.5"/>
-  <text x="663" y="654" class="lbl" fill="#78909c" font-size="10">Blocked Path</text>
+  <line x1="30"  y1="726" x2="80"  y2="726" stroke="#26c6da" stroke-width="2.2"/>
+  <text x="88"  y="730" class="lbl" fill="#78909c" font-size="10">SMPP Signaling</text>
+  <line x1="195" y1="726" x2="245" y2="726" stroke="#9b59b6" stroke-width="2"/>
+  <text x="253" y="730" class="lbl" fill="#78909c" font-size="10">OCS Check</text>
+  <line x1="330" y1="726" x2="380" y2="726" stroke="#ef5350" stroke-width="2.2"/>
+  <text x="388" y="730" class="lbl" fill="#78909c" font-size="10">AI Classify</text>
+  <line x1="460" y1="726" x2="510" y2="726" stroke="#66bb6a" stroke-width="2.5"/>
+  <text x="518" y="730" class="lbl" fill="#78909c" font-size="10">Allowed Path</text>
+  <line x1="605" y1="726" x2="655" y2="726" stroke="#ef5350" stroke-width="2.5"/>
+  <text x="663" y="730" class="lbl" fill="#78909c" font-size="10">Blocked Path</text>
 </svg>
