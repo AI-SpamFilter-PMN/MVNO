@@ -25,7 +25,8 @@ vendor/
 *.swp
 
 # Docs — private personal guides & notes (strictly local-only)
-docs/private/
+docs/implementation_guide.md
+docs/ISSUES.md
 docs/*.rar
 docs/*.pdf
 docs/*.drawio
