@@ -1,0 +1,36 @@
+server:
+  port: 8080
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:sqlite:/etc/kamailio/kamailio.db
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      pool-name: SQLitePool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-test-query: SELECT 1
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+ai-filter:
+  url: http://ai-filter:8000/api/v1/classify
+  timeout-seconds: 2
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
