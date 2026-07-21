@@ -1,82 +1,346 @@
-version: "3.8"
-
 networks:
   mvno_net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 10.92.0.0/16
 
 services:
+  # ─── Data Stores ─────────────────────────────────────
   mongodb:
-    image: mongo:8.0
+    image: mongo:7.0
     container_name: mvno-mongodb
     command: mongod --wiredTigerCacheSizeGB 0.25
     ports:
       - "27017:27017"
     volumes:
       - ./state/mongodb:/data/db:z
+      - ./configs/open5gs/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:z
     networks:
       - mvno_net
-    restart: "no"
+    restart: "unless-stopped"
     healthcheck:
       test: mongosh --eval 'db.runCommand({ping:1})' --quiet
       interval: 10s
       timeout: 5s
       retries: 3
 
+  # ─── MVNO Core ───────────────────────────────────────
   rtpengine:
-    image: ngcp/rtpengine:latest
+    image: drachtio/rtpengine:latest
     container_name: mvno-rtpengine
+    entrypoint: ["rtpengine", "-f", "-E", "--config-file=/etc/rtpengine.conf"]
     ports:
       - "30000-30100:30000-30100/udp"
     volumes:
-      - ./configs/rtpengine:/etc/rtpengine:z
+      - ./configs/rtpengine/rtpengine.conf:/etc/rtpengine.conf:z
       - ./state/spool:/var/spool/rtpengine:z
     networks:
       - mvno_net
-    restart: "no"
+    restart: "unless-stopped"
 
   kamailio:
-    image: kamailio/kamailio:5.7-alpine
+    image: mvno-kamailio:latest
     container_name: mvno-kamailio
     ports:
-      - "5060:5060/udp"
-      - "5060:5060/tcp"
+      - "5065:5060/udp"
+      - "5065:5060/tcp"
     volumes:
       - ./configs/kamailio:/etc/kamailio:z
       - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
+      - ./state/logs/kamailio:/var/log/kamailio:z
     depends_on:
       rtpengine:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: "unless-stopped"
+
+  osmo-hlr:
+    image: mvno-osmo-smsc:latest
+    container_name: mvno-osmo-hlr
+    command: ["osmo-hlr", "-c", "/etc/osmocom/osmo-hlr.cfg"]
+    volumes:
+      - ./configs/osmocom/osmo-hlr.cfg:/etc/osmocom/osmo-hlr.cfg:z
+      - ./state/hlr:/var/lib/osmocom:z
+    networks:
+      mvno_net:
+        ipv4_address: 10.92.2.56
+    restart: "unless-stopped"
 
   osmo-smsc:
-    build:
-      context: ./configs/osmocom
+    image: mvno-osmo-smsc:latest
     container_name: mvno-osmosmsc
     ports:
       - "2775:2775"
     volumes:
-      - ./configs/osmocom:/etc/osmocom:z
-      - ./state/hlr:/var/lib/osmocom:z
+      - ./configs/osmocom/osmo-smsc.cfg:/etc/osmocom/osmo-smsc.cfg:z
+      - ./state/logs/osmocom:/var/log/osmocom:z
+    depends_on:
+      - osmo-hlr
     networks:
       - mvno_net
-    restart: "no"
+    restart: "unless-stopped"
 
+  # ─── Integration Layer ───────────────────────────────
   telecom-api:
-    build:
-      context: ./telecom-api
+    image: mvno-telecom-api:latest
     container_name: mvno-api
     ports:
       - "8080:8080"
     volumes:
       - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
+    environment:
+      AI_FILTER_URL: http://ai-filter:8000/api/v1/classify
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health/liveness"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  vosk-worker:
+    image: mvno-vosk-worker:latest
+    container_name: mvno-vosk
+    volumes:
+      - ./state/spool:/var/spool/rtpengine:z
+    environment:
+      VOSK_MODEL_PATH: /opt/vosk-model-small-en-us-0.15
+    depends_on:
+      telecom-api:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  # ─── Log Processing (Vector) ──────────────────────────
+  vector:
+    image: timberio/vector:0.38.0-alpine
+    container_name: mvno-vector
+    volumes:
+      - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
+      - ./state/spool:/var/spool/rtpengine:z
+      - ./state/logs/kamailio:/var/log/kamailio:ro,z
+      - ./state/logs/osmocom:/var/log/osmocom:ro,z
+    depends_on:
+      telecom-api:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  # ─── 5G Core (Open5GS) ───────────────────────────────
+  nrf:
+    image: mvno-open5gs:latest
+    container_name: mvno-nrf
+    environment:
+      COMPONENT_NAME: nrf
+    volumes:
+      - ./configs/open5gs/nrf.yaml:/etc/open5gs/nrf.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  amf:
+    image: mvno-open5gs:latest
+    container_name: mvno-amf
+    environment:
+      COMPONENT_NAME: amf
+    volumes:
+      - ./configs/open5gs/amf.yaml:/etc/open5gs/amf.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  smf:
+    image: mvno-open5gs:latest
+    container_name: mvno-smf
+    environment:
+      COMPONENT_NAME: smf
+    volumes:
+      - ./configs/open5gs/smf.yaml:/etc/open5gs/smf.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  upf:
+    image: mvno-open5gs:latest
+    container_name: mvno-upf
+    environment:
+      COMPONENT_NAME: upf
+    volumes:
+      - ./configs/open5gs/upf.yaml:/etc/open5gs/upf.yaml:z
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    devices:
+      - "/dev/net/tun:/dev/net/tun"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  udm:
+    image: mvno-open5gs:latest
+    container_name: mvno-udm
+    environment:
+      COMPONENT_NAME: udm
+    volumes:
+      - ./configs/open5gs/udm.yaml:/etc/open5gs/udm.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  ausf:
+    image: mvno-open5gs:latest
+    container_name: mvno-ausf
+    environment:
+      COMPONENT_NAME: ausf
+    volumes:
+      - ./configs/open5gs/ausf.yaml:/etc/open5gs/ausf.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  nssf:
+    image: mvno-open5gs:latest
+    container_name: mvno-nssf
+    environment:
+      COMPONENT_NAME: nssf
+    volumes:
+      - ./configs/open5gs/nssf.yaml:/etc/open5gs/nssf.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  pcf:
+    image: mvno-open5gs:latest
+    container_name: mvno-pcf
+    environment:
+      COMPONENT_NAME: pcf
+    volumes:
+      - ./configs/open5gs/pcf.yaml:/etc/open5gs/pcf.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  udr:
+    image: mvno-open5gs:latest
+    container_name: mvno-udr
+    environment:
+      COMPONENT_NAME: udr
+    volumes:
+      - ./configs/open5gs/udr.yaml:/etc/open5gs/udr.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  bsf:
+    image: mvno-open5gs:latest
+    container_name: mvno-bsf
+    environment:
+      COMPONENT_NAME: bsf
+    volumes:
+      - ./configs/open5gs/bsf.yaml:/etc/open5gs/bsf.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  webui:
+    image: mvno-open5gs-webui:latest
+    container_name: mvno-webui
+    ports:
+      - "9999:9999"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "unless-stopped"
+
+  # ─── 5G Simulator (UERANSIM) ─────────────────────────
+  ueransim-gnb:
+    image: mvno-ueransim:latest
+    container_name: mvno-gnb
+    command: ["/usr/local/bin/nr-gnb", "-c", "/etc/ueransim/gnb.yaml"]
+    volumes:
+      - ./configs/ueransim:/etc/ueransim:z
+    depends_on:
+      - amf
     networks:
       - mvno_net
     restart: "no"
 
+  ueransim-ue-1:
+    image: mvno-ueransim:latest
+    container_name: mvno-ue-1
+    command: ["/usr/local/bin/nr-ue", "-c", "/etc/ueransim/ue.yaml"]
+    volumes:
+      - ./configs/ueransim:/etc/ueransim:z
+    depends_on:
+      - ueransim-gnb
+    networks:
+      - mvno_net
+    restart: "no"
+
+  ueransim-ue-2:
+    image: mvno-ueransim:latest
+    container_name: mvno-ue-2
+    command: ["/usr/local/bin/nr-ue", "-c", "/etc/ueransim/ue-spam.yaml"]
+    volumes:
+      - ./configs/ueransim:/etc/ueransim:z
+    depends_on:
+      - ueransim-gnb
+    networks:
+      - mvno_net
+    restart: "no"
+
+  ueransim-ue-3:
+    image: mvno-ueransim:latest
+    container_name: mvno-ue-3
+    command: ["/usr/local/bin/nr-ue", "-c", "/etc/ueransim/ue-zero.yaml"]
+    volumes:
+      - ./configs/ueransim:/etc/ueransim:z
+    depends_on:
+      - ueransim-gnb
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Observability ───────────────────────────────────
   victoria-metrics:
-    image: victoriametrics/victoria-metrics:latest
+    image: victoriametrics/victoria-metrics:v1.101.0
     container_name: mvno-victoriametrics
     ports:
       - "8428:8428"
@@ -84,11 +348,14 @@ services:
       - ./state/vm-data:/victoria-metrics-data:z
     networks:
       - mvno_net
-    restart: "no"
+    restart: "unless-stopped"
 
   vmagent:
-    image: victoriametrics/vmagent:latest
+    image: victoriametrics/vmagent:v1.101.0
     container_name: mvno-vmagent
+    command:
+      - "-remoteWrite.url=http://victoria-metrics:8428/api/v1/write"
+      - "-promscrape.config=/etc/prometheus/prometheus.yml"
     volumes:
       - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
     depends_on:
@@ -96,13 +363,15 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: "unless-stopped"
 
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:11.6.0
     container_name: mvno-grafana
     ports:
       - "3000:3000"
+    environment:
+      - GF_DATABASE_WAL=true
     volumes:
       - ./state/grafana:/var/lib/grafana:z
     depends_on:
@@ -110,19 +379,4 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
-
-  vosk-worker:
-    build:
-      context: ./telecom-data-pipeline
-      dockerfile: Dockerfile.vosk
-    container_name: mvno-vosk
-    volumes:
-      - ./state/spool:/var/spool/rtpengine:z
-      - ./state/vosk-model:/opt:z
-    depends_on:
-      telecom-api:
-        condition: service_started
-    networks:
-      - mvno_net
-    restart: "no"
+    restart: "unless-stopped"
