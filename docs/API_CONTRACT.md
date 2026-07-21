@@ -17,7 +17,7 @@ This document defines the interface contracts, SLA constraints, networking param
 ┌─────────────────────────────────────────────────────────┐
 │            AI Spam Filter Team (AI-SpamFilter-PMN)      │
 │                                                         │
-│  [ai-filter:8000] ──▶ [PyTorch / FastAPI / ONNX Model] │
+│  [ai-filter:8000] ──▶ [AI Model REST Service (Java 21)] │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -93,12 +93,10 @@ Share the following checklist with your teammates on the `AI-SpamFilter-PMN` pro
 ### Network & Container Setup
 - [ ] **Container Service Name**: Name container/service `ai-filter` in Docker/Podman compose.
 - [ ] **Bridge Network**: Attach `ai-filter` container to `mvno_net` bridge network.
-- [ ] **IP Binding**: Bind FastAPI/Uvicorn server to `0.0.0.0:8000` inside container (NOT `127.0.0.1`).
-- [ ] **Exposed Port**: Expose port `8000` internally on `mvno_net`.
-
-### Model Performance & Throughput
-- [ ] **Inference Speed**: Optimize PyTorch/BERT/RoBERTa model using ONNX Runtime, TensorRT, or quantization to achieve $\le 500\text{ ms}$ latency per request.
-- [ ] **Concurrency**: Run Uvicorn/FastAPI with `--workers 4` or async event loop (`async def classify`) to handle concurrent requests without blocking.
+- [ ] **IP Binding**: Bind REST server to `0.0.0.0:8000` inside container (NOT `127.0.0.1`).
+- [ ] **Docker Network**: Attach container to `mvno_net` network with service name `ai-filter`.
+- [ ] **Response SLA**: Ensure classification completes within 5 seconds to prevent Carrier SLA Fail-Open fallback.
+- [ ] **Concurrency**: Handle concurrent HTTP requests without thread blocking.
 - [ ] **Batching**: Enable dynamic batching if processing bulk SMS streams.
 
 ### Text & Noise Handling

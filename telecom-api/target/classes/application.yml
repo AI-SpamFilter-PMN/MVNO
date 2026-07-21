@@ -29,8 +29,8 @@ spring:
 
 # AI Spam Filter Team Integration Parameters (AI-SpamFilter-PMN)
 ai-filter:
-  # REST endpoint URL of the FastAPI AI Spam Model server
-  url: http://ai-filter:8000/api/v1/classify
+  # REST endpoint URL of the Java 21 AI Spam Model server
+  url: ${AI_FILTER_URL:http://ai-filter:8000/api/v1/classify}
   # Socket timeout in seconds — set to 5s to accommodate CPU model inference latency
   timeout-seconds: 5
 
