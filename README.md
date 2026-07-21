@@ -67,15 +67,15 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 Recommended for sandbox development. Rootless-compliant out-of-the-box.
 
 ```bash
-# 1. Prerequisites (pick your distro)
-sudo pacman -S --needed podman docker-compose python python-pip sqlite3   # Arch/CachyOS
-sudo apt install -y podman docker-compose python3 python3-pip sqlite3     # Debian/Ubuntu
-sudo dnf install -y podman docker-compose python3 python3-pip sqlite3     # Fedora
+# 1. Prerequisites (pick your distro — no Python needed, Vosk is Java 21 JNI)
+sudo pacman -S --needed podman docker-compose sqlite3   # Arch/CachyOS
+sudo apt install -y podman docker-compose sqlite3       # Debian/Ubuntu
+sudo dnf install -y podman docker-compose sqlite3       # Fedora
 
 # 2. Enable Podman API socket (required for Docker Compose Plugin)
 systemctl --user enable --now podman.socket
 
-# 3. Initialize databases
+# 3. Initialize SQLite databases (WAL mode + test subscribers)
 make init-db
 
 # 4. Start the stack — offline-first (uses pre-loaded images)
@@ -84,7 +84,17 @@ make up
 #    To build from source instead (needs internet):
 #    podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 
-# 5. Test interception
+# 5. Smoke-test the stack (after containers are up)
+curl http://localhost:8080/actuator/health/liveness
+# Expected: {"status":"UP"}
+
+curl http://localhost:8080/api/v1/intercept/subscriber/15551234567
+# Expected: {"msisdn":"15551234567","balance":100}  ← allowed
+
+curl http://localhost:8080/api/v1/intercept/subscriber/15557654321
+# Expected: {"msisdn":"15557654321","balance":0}    ← zero-balance blocked
+
+# 6. Test interception
 make test-sms    # SMS via SMPP → Spring Boot → AI Filter
 make test-call   # SIP call → rtpengine → Vosk STT → Spring Boot
 ```
@@ -155,4 +165,12 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 * [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Public AI Spam Filter REST API contract & JSON schemas for teammates.
 * [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
-* [docs/architecture_flow.svg](docs/architecture_flow.svg): System architecture diagram.
+* [docs/architecture_flow.svg](docs/architecture_flow.svg): System architecture overview diagram.
+* [docs/ims_voice_call_flow.svg](docs/ims_voice_call_flow.svg): IMS VoLTE/VoNR Voice Call Interception sequence diagram.
+* [docs/sms_interception_flow.svg](docs/sms_interception_flow.svg): SMS Store-and-Forward Interception sequence diagram.
+
+### Key Environment Variable
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AI_FILTER_URL` | `http://ai-filter:8000/api/v1/classify` | External AI Spam Model REST endpoint — set in `docker-compose.yml` environment block |

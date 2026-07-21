@@ -1,140 +1,203 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 580" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 660" width="100%" height="100%">
   <defs>
     <style>
-      .bg { fill: #0d0f18; }
-      .box { fill: #161929; stroke: #262b45; stroke-width: 2; rx: 8; ry: 8; }
-      .client-header { fill: #101d30; stroke: #007acc; stroke-width: 2; rx: 6; ry: 6; }
-      .core-header { fill: #0a261c; stroke: #00e5ff; stroke-width: 2; rx: 6; ry: 6; }
-      .gw-header { fill: #23132e; stroke: #ab47bc; stroke-width: 2; rx: 6; ry: 6; }
-      .ai-header { fill: #33120c; stroke: #ff5722; stroke-width: 2; rx: 6; ry: 6; }
-      
-      .text-main-title { font-family: 'Inter', system-ui, sans-serif; font-size: 20px; font-weight: bold; fill: #ffffff; }
-      .text-sub-title { font-family: 'Inter', system-ui, sans-serif; font-size: 12px; fill: #90a4ae; }
-      .text-node-title { font-family: 'Inter', system-ui, sans-serif; font-size: 12px; font-weight: bold; fill: #ffffff; }
-      .text-node-sub { font-family: 'Inter', system-ui, sans-serif; font-size: 10px; fill: #b0bec5; }
-      .text-step { font-family: 'Inter', system-ui, sans-serif; font-size: 11px; font-weight: bold; }
-      
-      .lifeline { stroke: #2a2f4a; stroke-width: 1.5; stroke-dasharray: 4,4; }
-      .sig-line { stroke: #00e5ff; stroke-width: 2; fill: none; }
-      .allow-line { stroke: #76ff03; stroke-width: 2.2; fill: none; }
-      .block-line { stroke: #ff1744; stroke-width: 2.2; fill: none; }
-      .ai-line { stroke: #ff5722; stroke-width: 2.2; fill: none; }
-      
-      .marker-cyan { fill: #00e5ff; }
-      .marker-green { fill: #76ff03; }
-      .marker-red { fill: #ff1744; }
-      .marker-orange { fill: #ff5722; }
+      .bg { fill: #080b14; }
+      .panel-client { fill: #0d1b2e; stroke: #1e6fa8; stroke-width: 1.5; }
+      .panel-core   { fill: #051a14; stroke: #00c49a; stroke-width: 1.5; }
+      .panel-gw     { fill: #1a0d2e; stroke: #9b59b6; stroke-width: 1.5; }
+      .panel-ai     { fill: #1f0a08; stroke: #e74c3c; stroke-width: 1.5; }
+
+      .badge-num { font-family: Inter, system-ui, sans-serif; font-size: 10px; font-weight: 700; fill: #080b14; }
+      .title-main { font-family: Inter, system-ui, sans-serif; font-size: 21px; font-weight: 700; fill: #ffffff; letter-spacing: 0.3px; }
+      .title-sub  { font-family: Inter, system-ui, sans-serif; font-size: 12px; fill: #78909c; }
+      .node-name  { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 700; fill: #eceff1; }
+      .node-sub   { font-family: Inter, system-ui, sans-serif; font-size: 10px; fill: #90a4ae; }
+      .lbl        { font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 600; }
+      .branch-lbl { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 700; }
+
+      .lifeline-client { stroke: #1e6fa8; stroke-width: 1; stroke-dasharray: 5,4; opacity: 0.6; }
+      .lifeline-core   { stroke: #00c49a; stroke-width: 1; stroke-dasharray: 5,4; opacity: 0.6; }
+      .lifeline-gw     { stroke: #9b59b6; stroke-width: 1; stroke-dasharray: 5,4; opacity: 0.6; }
+      .lifeline-ai     { stroke: #e74c3c; stroke-width: 1; stroke-dasharray: 5,4; opacity: 0.6; }
+
+      .arrow-smpp  { stroke: #26c6da; stroke-width: 2.2; fill: none; }
+      .arrow-ocs   { stroke: #9b59b6; stroke-width: 2;   fill: none; }
+      .arrow-ai    { stroke: #ef5350; stroke-width: 2.2; fill: none; }
+      .arrow-allow { stroke: #66bb6a; stroke-width: 2.5; fill: none; }
+      .arrow-block { stroke: #ef5350; stroke-width: 2.5; fill: none; }
+      .arrow-resp  { stroke-dasharray: 5,3; }
+
+      .divider { stroke: #1e2740; stroke-width: 1; }
+      .branch-allow { fill: #051a0d; stroke: #2e7d32; stroke-width: 1.5; }
+      .branch-block { fill: #1f0808; stroke: #c62828; stroke-width: 1.5; }
+      .branch-label-allow { fill: #060f07; stroke: #2e7d32; stroke-width: 1.5; }
+      .branch-label-block { fill: #0f0505; stroke: #c62828; stroke-width: 1.5; }
+      .note-box { fill: #0e1627; stroke: #263252; stroke-width: 1; }
     </style>
 
-    <marker id="head-cyan" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" class="marker-cyan" />
+    <marker id="h-smpp" viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 4 L 0 8 z" fill="#26c6da"/>
     </marker>
-    <marker id="head-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" class="marker-green" />
+    <marker id="h-smpp-l" viewBox="0 0 10 8" refX="2" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 10 0 L 0 4 L 10 8 z" fill="#26c6da"/>
     </marker>
-    <marker id="head-red" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" class="marker-red" />
+    <marker id="h-ocs" viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 4 L 0 8 z" fill="#9b59b6"/>
     </marker>
-    <marker id="head-orange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" class="marker-orange" />
+    <marker id="h-ai"  viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 4 L 0 8 z" fill="#ef5350"/>
     </marker>
+    <marker id="h-ai-l" viewBox="0 0 10 8" refX="2" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 10 0 L 0 4 L 10 8 z" fill="#ef5350"/>
+    </marker>
+    <marker id="h-allow" viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 4 L 0 8 z" fill="#66bb6a"/>
+    </marker>
+    <marker id="h-allow-l" viewBox="0 0 10 8" refX="2" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 10 0 L 0 4 L 10 8 z" fill="#66bb6a"/>
+    </marker>
+    <marker id="h-block" viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 4 L 0 8 z" fill="#ef5350"/>
+    </marker>
+    <marker id="h-block-l" viewBox="0 0 10 8" refX="2" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 10 0 L 0 4 L 10 8 z" fill="#ef5350"/>
+    </marker>
+
+    <linearGradient id="grad-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#0d1526"/>
+      <stop offset="100%" stop-color="#080b14"/>
+    </linearGradient>
+    <filter id="glow-teal">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
 
   <!-- Background -->
-  <rect width="1050" height="580" class="bg" />
+  <rect width="1100" height="660" fill="url(#grad-bg)"/>
+  <line x1="0" y1="148" x2="1100" y2="148" class="divider"/>
+  <line x1="0" y1="632" x2="1100" y2="632" class="divider"/>
 
-  <!-- Header -->
-  <text x="30" y="38" class="text-main-title">SMS Store-and-Forward Interception Signaling Flow</text>
-  <text x="30" y="58" class="text-sub-title">Real-Time SMPP 3.4 Delivery Hold, Prepaid OCS Balance Check &amp; AI Classification</text>
+  <!-- Title -->
+  <text x="30" y="36" class="title-main">SMS Store-and-Forward Interception Flow</text>
+  <text x="30" y="56" class="title-sub">SMPP 3.4 Delivery Hold · Prepaid OCS Balance Check · AI Classification · Dual-Branch Policy Decision</text>
 
-  <!-- PARTICIPANT HEADERS (X positions: 90, 310, 540, 770, 960) -->
-  
-  <!-- 1. ESME Client -->
-  <g transform="translate(25, 80)">
-    <rect width="130" height="45" class="client-header" />
-    <text x="65" y="20" text-anchor="middle" class="text-node-title">ESME / 5G UE</text>
-    <text x="65" y="35" text-anchor="middle" class="text-node-sub">SMS Sender</text>
-  </g>
-  <line x1="90" y1="125" x2="90" y2="550" class="lifeline" />
+  <!-- ═══════════ PARTICIPANT BOXES ═══════════
+       X-centers: ESME=80  SMSC=255  GW=470  AI=670  RECV=880 -->
 
-  <!-- 2. OsmoSMSC -->
-  <g transform="translate(245, 80)">
-    <rect width="130" height="45" class="core-header" />
-    <text x="65" y="20" text-anchor="middle" class="text-node-title">OsmoSMSC</text>
-    <text x="65" y="35" text-anchor="middle" class="text-node-sub">SMSC + OsmoHLR</text>
-  </g>
-  <line x1="310" y1="125" x2="310" y2="550" class="lifeline" />
+  <!-- ESME / 5G UE -->
+  <rect x="18"  y="72" width="125" height="52" rx="7" class="panel-client"/>
+  <text x="80"  y="93"  text-anchor="middle" class="node-name">ESME / 5G UE</text>
+  <text x="80"  y="110" text-anchor="middle" class="node-sub">SMS Sender · SMPP 3.4</text>
+  <line x1="80"  y1="124" x2="80"  y2="620" class="lifeline-client"/>
 
-  <!-- 3. Spring Boot Gateway -->
-  <g transform="translate(470, 80)">
-    <rect width="140" height="45" class="gw-header" />
-    <text x="70" y="20" text-anchor="middle" class="text-node-title">telecom-api</text>
-    <text x="70" y="35" text-anchor="middle" class="text-node-sub">Spring Boot Gateway</text>
-  </g>
-  <line x1="540" y1="125" x2="540" y2="550" class="lifeline" />
+  <!-- OsmoSMSC -->
+  <rect x="180" y="72" width="150" height="52" rx="7" class="panel-core"/>
+  <text x="255" y="93"  text-anchor="middle" class="node-name">OsmoSMSC / OsmoMSC</text>
+  <text x="255" y="110" text-anchor="middle" class="node-sub">SMSC + OsmoHLR · :2775</text>
+  <line x1="255" y1="124" x2="255" y2="620" class="lifeline-core"/>
 
-  <!-- 4. AI Spam Model Server -->
-  <g transform="translate(700, 80)">
-    <rect width="140" height="45" class="ai-header" />
-    <text x="70" y="20" text-anchor="middle" class="text-node-title">AI Spam Model</text>
-    <text x="70" y="35" text-anchor="middle" class="text-node-sub">Java 21 REST API</text>
-  </g>
-  <line x1="770" y1="125" x2="770" y2="550" class="lifeline" />
+  <!-- telecom-api -->
+  <rect x="390" y="72" width="160" height="52" rx="7" class="panel-gw"/>
+  <text x="470" y="93"  text-anchor="middle" class="node-name">telecom-api</text>
+  <text x="470" y="110" text-anchor="middle" class="node-sub">Spring Boot Gateway · :8080</text>
+  <line x1="470" y1="124" x2="470" y2="620" class="lifeline-gw"/>
 
-  <!-- 5. Recipient UE -->
-  <g transform="translate(900, 80)">
-    <rect width="120" height="45" class="client-header" />
-    <text x="60" y="20" text-anchor="middle" class="text-node-title">Recipient UE</text>
-    <text x="60" y="35" text-anchor="middle" class="text-node-sub">Target MSISDN</text>
-  </g>
-  <line x1="960" y1="125" x2="960" y2="550" class="lifeline" />
+  <!-- AI Spam Model -->
+  <rect x="596" y="72" width="148" height="52" rx="7" class="panel-ai"/>
+  <text x="670" y="93"  text-anchor="middle" class="node-name">AI Spam Model</text>
+  <text x="670" y="110" text-anchor="middle" class="node-sub">REST API · :8000</text>
+  <line x1="670" y1="124" x2="670" y2="620" class="lifeline-ai"/>
 
-  <!-- ==================== SIGNALING STEPS ==================== -->
+  <!-- Recipient UE -->
+  <rect x="820" y="72" width="130" height="52" rx="7" class="panel-client"/>
+  <text x="885" y="93"  text-anchor="middle" class="node-name">Recipient UE</text>
+  <text x="885" y="110" text-anchor="middle" class="node-sub">Target MSISDN</text>
+  <line x1="885" y1="124" x2="885" y2="620" class="lifeline-client"/>
+
+  <!-- ═══════════ SIGNALING STEPS ═══════════ -->
 
   <!-- Step 1: submit_sm PDU -->
-  <path d="M 90,150 L 310,150" class="sig-line" marker-end="url(#head-cyan)" />
-  <text x="100" y="142" class="text-step" fill="#00e5ff">1. submit_sm PDU (Sender, Recipient, SMS Text)</text>
+  <circle cx="80" cy="165" r="9" fill="#26c6da" opacity="0.9"/>
+  <text x="80" y="169" text-anchor="middle" class="badge-num">1</text>
+  <line x1="89" y1="165" x2="247" y2="165" class="arrow-smpp" marker-end="url(#h-smpp)" filter="url(#glow-teal)"/>
+  <text x="163" y="157" text-anchor="middle" class="lbl" fill="#26c6da">submit_sm PDU (Sender, Dest, Text)</text>
 
-  <!-- Step 2: Hold Delivery & HLR Lookup -->
-  <rect x="230" y="170" width="160" height="30" class="box" stroke="#00e5ff" />
-  <text x="310" y="189" text-anchor="middle" class="text-step" fill="#00e5ff">2. Delivery Hold &amp; HLR Check</text>
+  <!-- Step 2: Delivery Hold + HLR check -->
+  <rect x="190" y="185" width="130" height="28" rx="5" class="note-box" stroke="#00c49a"/>
+  <text x="255" y="203" text-anchor="middle" class="lbl" fill="#00c49a">2. Hold · OsmoHLR Check</text>
 
-  <!-- Step 3: SMS Intercept Check to Gateway -->
-  <path d="M 310,225 L 540,225" class="sig-line" marker-end="url(#head-cyan)" />
-  <text x="320" y="217" class="text-step" fill="#00e5ff">3. POST /api/v1/intercept/sms</text>
+  <!-- Step 3: POST /api/v1/intercept/sms -->
+  <circle cx="255" cy="235" r="9" fill="#26c6da" opacity="0.9"/>
+  <text x="255" y="239" text-anchor="middle" class="badge-num">3</text>
+  <line x1="264" y1="235" x2="462" y2="235" class="arrow-smpp" marker-end="url(#h-smpp)"/>
+  <text x="363" y="227" text-anchor="middle" class="lbl" fill="#26c6da">POST /api/v1/intercept/sms</text>
 
-  <!-- Step 4: Prepaid OCS Balance Check -->
-  <rect x="460" y="245" width="160" height="30" class="box" stroke="#ab47bc" />
-  <text x="540" y="264" text-anchor="middle" class="text-step" fill="#ab47bc">4. Prepaid Balance Check ($1/SMS)</text>
+  <!-- Step 4: Prepaid OCS Balance Check (self-note) -->
+  <rect x="408" y="252" width="125" height="26" rx="5" class="note-box" stroke="#9b59b6"/>
+  <text x="470" y="269" text-anchor="middle" class="lbl" fill="#9b59b6">4. Prepaid OCS ($1/SMS)</text>
 
-  <!-- Step 5: AI Model Classification Call -->
-  <path d="M 540,300 L 770,300" class="ai-line" marker-end="url(#head-orange)" />
-  <text x="550" y="292" class="text-step" fill="#ff5722">5. POST /api/v1/classify (SMS Payload)</text>
+  <!-- Step 5: POST /api/v1/classify -->
+  <circle cx="470" cy="300" r="9" fill="#ef5350" opacity="0.9"/>
+  <text x="470" y="304" text-anchor="middle" class="badge-num">5</text>
+  <line x1="479" y1="300" x2="662" y2="300" class="arrow-ai" marker-end="url(#h-ai)"/>
+  <text x="570" y="292" text-anchor="middle" class="lbl" fill="#ef5350">POST /classify (SMS Content)</text>
 
-  <!-- Step 6: AI Model Decision Response -->
-  <path d="M 770,330 L 540,330" class="ai-line" marker-end="url(#head-orange)" stroke-dasharray="4,4" />
-  <text x="550" y="322" class="text-step" fill="#ff5722">6. HTTP 200 OK (allow: true / false)</text>
+  <!-- Step 6: AI decision response -->
+  <circle cx="670" cy="332" r="9" fill="#ef5350" opacity="0.9"/>
+  <text x="670" y="336" text-anchor="middle" class="badge-num">6</text>
+  <line x1="662" y1="332" x2="479" y2="332" class="arrow-ai arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-ai-l)"/>
+  <text x="570" y="324" text-anchor="middle" class="lbl" fill="#ef5350">HTTP 200 OK { allow: true/false }</text>
 
-  <!-- BRANCH BOX: ALTERNATIVE PATHS -->
-  <rect x="230" y="360" width="760" height="175" class="box" stroke="#262b45" />
-  <text x="245" y="380" class="text-step" fill="#ffffff">DECISION BRANCH (Policy Gateway Output):</text>
+  <!-- ══ BRANCH BOX ══ -->
+  <rect x="55" y="362" width="990" height="238" rx="8" fill="#080d1a" stroke="#1e2740" stroke-width="1.5"/>
+  <text x="76" y="384" class="branch-lbl" fill="#90a4ae">POLICY DECISION BRANCH:</text>
 
-  <!-- Path A: Approved (allow: true) -->
-  <g transform="translate(0, 10)">
-    <path d="M 540,395 L 310,395" class="allow-line" marker-end="url(#head-green)" stroke-dasharray="4,4" />
-    <text x="340" y="387" class="text-step" fill="#76ff03">7a. HTTP 200 OK (allow: true)</text>
+  <!-- ── Branch A: ALLOW ── -->
+  <rect x="68" y="393" width="480" height="190" rx="6" class="branch-allow"/>
+  <rect x="68" y="393" width="480" height="26"  rx="6" class="branch-label-allow"/>
+  <text x="308" y="410" text-anchor="middle" class="branch-lbl" fill="#66bb6a">✓ ALLOW  (allow: true)</text>
 
-    <path d="M 310,430 L 960,430" class="allow-line" marker-end="url(#head-green)" />
-    <text x="340" y="422" class="text-step" fill="#76ff03">8a. deliver_sm PDU (Forward SMS to Recipient)</text>
-  </g>
+  <!-- 7a: allow response to SMSC -->
+  <circle cx="470" cy="436" r="9" fill="#66bb6a" opacity="0.9"/>
+  <text x="470" y="440" text-anchor="middle" class="badge-num" fill="#000">7a</text>
+  <line x1="462" y1="436" x2="263" y2="436" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
+  <text x="362" y="428" text-anchor="middle" class="lbl" fill="#66bb6a">HTTP 200 OK { allow: true }</text>
 
-  <!-- Path B: Spam Flagged (allow: false) -->
-  <g transform="translate(0, 65)">
-    <path d="M 540,395 L 310,395" class="block-line" marker-end="url(#head-red)" stroke-dasharray="4,4" />
-    <text x="340" y="387" class="text-step" fill="#ff1744">7b. HTTP 200 OK (allow: false, reason: "Spam")</text>
+  <!-- 8a: deliver_sm to Recipient -->
+  <circle cx="255" cy="468" r="9" fill="#66bb6a" opacity="0.9"/>
+  <text x="255" y="472" text-anchor="middle" class="badge-num" fill="#000">8a</text>
+  <line x1="264" y1="468" x2="877" y2="468" class="arrow-allow" marker-end="url(#h-allow)"/>
+  <text x="568" y="460" text-anchor="middle" class="lbl" fill="#66bb6a">deliver_sm PDU (Forward SMS to Recipient)</text>
 
-    <rect x="250" y="415" width="120" height="25" class="box" stroke="#ff1744" />
-    <text x="310" y="432" text-anchor="middle" class="text-step" fill="#ff1744">8b. Drop &amp; Log SMS</text>
-  </g>
+  <!-- 9a: submit_sm_resp success -->
+  <line x1="263" y1="500" x2="88" y2="500" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
+  <text x="172" y="492" text-anchor="middle" class="lbl" fill="#66bb6a">submit_sm_resp (success)</text>
 
+  <!-- ── Branch B: BLOCK ── -->
+  <rect x="561" y="393" width="474" height="190" rx="6" class="branch-block"/>
+  <rect x="561" y="393" width="474" height="26"  rx="6" class="branch-label-block"/>
+  <text x="798" y="410" text-anchor="middle" class="branch-lbl" fill="#ef5350">✗ BLOCK  (allow: false, reason: "Spam")</text>
+
+  <!-- 7b: block response to SMSC -->
+  <circle cx="670" cy="436" r="9" fill="#ef5350" opacity="0.9"/>
+  <text x="670" y="440" text-anchor="middle" class="badge-num">7b</text>
+  <line x1="662" y1="436" x2="570" y2="436" class="arrow-block arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-block-l)"/>
+  <text x="616" y="428" text-anchor="middle" class="lbl" fill="#ef5350">{ allow: false }</text>
+
+  <!-- 8b: Drop + Log -->
+  <rect x="569" y="455" width="458" height="30" rx="5" fill="#130505" stroke="#7b1818" stroke-width="1"/>
+  <text x="797" y="474" text-anchor="middle" class="lbl" fill="#ef5350">8b. SMSC drops SMS · Interception logged · submit_sm_resp(failure) to ESME</text>
+
+  <!-- Footer legend -->
+  <line x1="30"  y1="648" x2="80"  y2="648" stroke="#26c6da" stroke-width="2.2"/>
+  <text x="88"  y="652" class="lbl" fill="#78909c" font-size="10">SMPP Signaling</text>
+  <line x1="190" y1="648" x2="240" y2="648" stroke="#9b59b6" stroke-width="2"/>
+  <text x="248" y="652" class="lbl" fill="#78909c" font-size="10">OCS Check</text>
+  <line x1="320" y1="648" x2="370" y2="648" stroke="#ef5350" stroke-width="2.2"/>
+  <text x="378" y="652" class="lbl" fill="#78909c" font-size="10">AI Classify</text>
+  <line x1="450" y1="648" x2="500" y2="648" stroke="#66bb6a" stroke-width="2.5"/>
+  <text x="508" y="652" class="lbl" fill="#78909c" font-size="10">Allowed Path</text>
+  <line x1="590" y1="648" x2="640" y2="648" stroke="#ef5350" stroke-width="2.5"/>
+  <text x="648" y="652" class="lbl" fill="#78909c" font-size="10">Blocked Path</text>
 </svg>
