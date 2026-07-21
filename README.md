@@ -49,8 +49,8 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 
 - **Signaling & Proxy**: Kamailio (SIP Registrar/Proxy) + `rtpengine` (In-kernel media proxy/forker).
 - **SMS Control Plane**: Osmocom (`OsmoSMSC` / `OsmoMSC` / `OsmoHLR`).
-- **Speech Processing**: Vosk Speech-to-Text (Local offline runtime, zero cloud latency).
-- **Interception Gateway**: Spring Boot 4.1 + JDK 25 + Virtual Threads (Tomcat, JDBCTemplate, RestClient).
+- **Speech Processing**: Native Vosk Speech-to-Text (In-JVM JNI Java 21 runtime, zero cloud latency).
+- **Interception Gateway**: Spring Boot 3.4.3 + Java 21 LTS + Virtual Threads (Tomcat, JdbcTemplate, RestClient).
 - **Observability**: VictoriaMetrics (Single-binary TSDB) + `vmagent` (Telemetry scraper) + Grafana (Dashboard).
 - **Log Mediators**: Vector.dev (Rust-based log pipeline, zero GC).
 - **5G Core**: Open5GS (10 NFs) + UERANSIM (gNB + 3 UEs).
@@ -134,5 +134,6 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ## 7. Documentation
 
+* [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Public AI Spam Filter REST API contract & JSON schemas for teammates.
 * [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
 * [docs/architecture_flow.svg](docs/architecture_flow.svg): System architecture diagram.
