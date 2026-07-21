@@ -10,7 +10,7 @@
       .obs-box { fill: #2d1d38; stroke: #9c27b0; stroke-width: 2; rx: 8; ry: 8; }
       .text-title { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; font-weight: bold; fill: #ffffff; }
       .text-body { font-family: 'Inter', system-ui, sans-serif; font-size: 11px; fill: #b3b3b3; }
-      .text-link { font-family: 'Inter', system-ui, sans-serif; font-size: 10px; fill: #00e5ff; font-weight: bold; }
+      .text-link { font-family: 'Inter', system-ui, sans-serif; font-size: 11px; fill: #00e5ff; font-weight: bold; }
       .arrow { stroke: #8e8e93; stroke-width: 2; fill: none; stroke-dasharray: 4,4; }
       .solid-arrow { stroke: #00e5ff; stroke-width: 2; fill: none; }
       .sec-arrow { stroke: #ff5722; stroke-width: 2; fill: none; }
@@ -40,171 +40,205 @@
   <rect width="1000" height="650" class="bg" />
 
   <!-- Diagram Title -->
-  <text x="30" y="40" font-family="'Inter', sans-serif" font-size="20" font-weight="bold" fill="#ffffff">MVNO Core Integration Flow &amp; Process Steps</text>
+  <text x="30" y="40" font-family="'Inter', sans-serif" font-size="20" font-weight="bold" fill="#ffffff">MVNO Core Integration Flow &amp; Architecture</text>
   <text x="30" y="60" font-family="'Inter', sans-serif" font-size="12" fill="#8e8e93">Real-time SMS/VoIP Interception, Speech Translation, and Observability Layers</text>
 
   <!-- 1. ACCESS LAYER -->
-  <g transform="translate(40, 100)">
-    <rect width="180" height="480" class="client-box" />
+  <g transform="translate(40, 90)">
+    <rect width="180" height="520" class="client-box" />
     <text x="20" y="30" class="text-title">1. Access / Client Layer</text>
-    
+
     <!-- UE 1 -->
-    <g transform="translate(15, 60)">
-      <rect width="150" height="90" class="box" />
-      <text x="15" y="25" class="text-title">SIP User (UE_1)</text>
-      <text x="15" y="45" class="text-body">VoIP Call / SIP Register</text>
-      <text x="15" y="65" class="text-body">Protocols: SIP / RTP</text>
-      <text x="15" y="80" class="text-link">UDP Port 5060</text>
+    <g transform="translate(15, 50)">
+      <rect width="150" height="95" class="box" />
+      <text x="15" y="24" class="text-title">SIP User (UE_1)</text>
+      <text x="15" y="44" class="text-body">• VoIP Call / Register</text>
+      <text x="15" y="62" class="text-body">• Protocol: SIP / RTP</text>
+      <text x="15" y="82" class="text-link">UDP Port 5060</text>
     </g>
 
     <!-- UE 2 -->
-    <g transform="translate(15, 200)">
-      <rect width="150" height="90" class="box" />
-      <text x="15" y="25" class="text-title">SIP User (UE_2)</text>
-      <text x="15" y="45" class="text-body">Terminating Voice client</text>
-      <text x="15" y="65" class="text-body">Protocols: SIP / RTP</text>
-      <text x="15" y="80" class="text-link">UDP Port 5060</text>
+    <g transform="translate(15, 175)">
+      <rect width="150" height="95" class="box" />
+      <text x="15" y="24" class="text-title">SIP User (UE_2)</text>
+      <text x="15" y="44" class="text-body">• Terminating client</text>
+      <text x="15" y="62" class="text-body">• Protocol: SIP / RTP</text>
+      <text x="15" y="82" class="text-link">UDP Port 5060</text>
     </g>
 
     <!-- SMS Client -->
-    <g transform="translate(15, 340)">
-      <rect width="150" height="90" class="box" />
-      <text x="15" y="25" class="text-title">SMS Client (ESME)</text>
-      <text x="15" y="45" class="text-body">Sends A2P/P2P Text SMS</text>
-      <text x="15" y="65" class="text-body">Protocol: SMPP</text>
-      <text x="15" y="80" class="text-link">TCP Port 2775</text>
+    <g transform="translate(15, 300)">
+      <rect width="150" height="95" class="box" />
+      <text x="15" y="24" class="text-title">SMS Client (ESME)</text>
+      <text x="15" y="44" class="text-body">• A2P / P2P Text SMS</text>
+      <text x="15" y="62" class="text-body">• Protocol: SMPP</text>
+      <text x="15" y="82" class="text-link">TCP Port 2775</text>
+    </g>
+
+    <!-- 5G UE -->
+    <g transform="translate(15, 425)">
+      <rect width="150" height="80" class="box" />
+      <text x="15" y="24" class="text-title">5G UE (UERANSIM)</text>
+      <text x="15" y="44" class="text-body">• SMS-over-NAS</text>
+      <text x="15" y="64" class="text-link">NGAP / SCTP 38412</text>
     </g>
   </g>
 
   <!-- 2. CORE TELECOM LAYER -->
-  <g transform="translate(290, 100)">
-    <rect width="200" height="480" class="core-box" />
+  <g transform="translate(280, 90)">
+    <rect width="210" height="520" class="core-box" />
     <text x="20" y="30" class="text-title">2. MVNO Network Core</text>
 
     <!-- Kamailio -->
-    <g transform="translate(15, 60)">
-      <rect width="170" height="120" class="box" />
-      <text x="12" y="22" class="text-title">Kamailio CSCF</text>
+    <g transform="translate(15, 50)">
+      <rect width="180" height="120" class="box" />
+      <text x="12" y="22" class="text-title">Kamailio SIP Router</text>
       <text x="12" y="42" class="text-body">• SQLite contact backend</text>
       <text x="12" y="60" class="text-body">• PIKE rate-limiting</text>
       <text x="12" y="78" class="text-body">• SIP Signalling Route</text>
       <text x="12" y="96" class="text-body">• REST API webhook hooks</text>
-      <text x="12" y="112" class="text-link">Runs: Native / Podman</text>
+      <text x="12" y="112" class="text-link">UDP/TCP Port 5060</text>
     </g>
 
     <!-- rtpengine -->
-    <g transform="translate(15, 200)">
-      <rect width="170" height="100" class="box" />
+    <g transform="translate(15, 185)">
+      <rect width="180" height="105" class="box" />
       <text x="12" y="22" class="text-title">rtpengine</text>
-      <text x="12" y="42" class="text-body">• In-kernel media relay</text>
-      <text x="12" y="60" class="text-body">• Forks audio to files</text>
-      <text x="12" y="78" class="text-body">• Generates JSON metadata</text>
-      <text x="12" y="92" class="text-link">Ports: 30000-40000</text>
+      <text x="12" y="42" class="text-body">• In-kernel media proxy</text>
+      <text x="12" y="60" class="text-body">• PCAP audio recording</text>
+      <text x="12" y="78" class="text-body">• DTMF JSON metadata</text>
+      <text x="12" y="94" class="text-link">Control: UDP 22222</text>
     </g>
 
     <!-- OsmoSMSC -->
-    <g transform="translate(15, 340)">
-      <rect width="170" height="110" class="box" />
-      <text x="12" y="22" class="text-title">OsmoSMSC</text>
+    <g transform="translate(15, 305)">
+      <rect width="180" height="105" class="box" />
+      <text x="12" y="22" class="text-title">OsmoSMSC / OsmoMSC</text>
       <text x="12" y="42" class="text-body">• SMS Store-and-Forward</text>
-      <text x="12" y="60" class="text-body">• SQLite SMS db</text>
-      <text x="12" y="78" class="text-body">• Throttle windowing</text>
-      <text x="12" y="92" class="text-link">TCP Port 2775</text>
+      <text x="12" y="60" class="text-body">• OsmoHLR subscriber DB</text>
+      <text x="12" y="78" class="text-body">• REST Intercept query</text>
+      <text x="12" y="94" class="text-link">SMPP Port 2775</text>
+    </g>
+
+    <!-- Open5GS 5GC -->
+    <g transform="translate(15, 425)">
+      <rect width="180" height="80" class="box" />
+      <text x="12" y="22" class="text-title">Open5GS (AMF/SMF/UPF)</text>
+      <text x="12" y="42" class="text-body">• 5G SA Control Plane</text>
+      <text x="12" y="64" class="text-link">SBI HTTP/2 7777</text>
     </g>
   </g>
 
   <!-- 3. INTEGRATION GATEWAY -->
-  <g transform="translate(560, 100)">
-    <rect width="180" height="480" class="ai-box" />
+  <g transform="translate(540, 90)">
+    <rect width="200" height="520" class="ai-box" />
     <text x="15" y="30" class="text-title">3. Integration Gateway</text>
 
-    <!-- FastAPI Gateway -->
-    <g transform="translate(15, 60)">
-      <rect width="150" height="140" class="box" />
-      <text x="12" y="22" class="text-title">FastAPI API</text>
-      <text x="12" y="42" class="text-body">• Async logic parser</text>
-      <text x="12" y="60" class="text-body">• Prepaid checks (OCS)</text>
-      <text x="12" y="78" class="text-body">• Subscriber provision</text>
-      <text x="12" y="96" class="text-body">• Liveness/Readiness</text>
-      <text x="12" y="114" class="text-body">• Intercepts SMS/Calls</text>
-      <text x="12" y="130" class="text-link">HTTP Port 8080</text>
+    <!-- Spring Boot Gateway -->
+    <g transform="translate(15, 50)">
+      <rect width="170" height="135" class="box" />
+      <text x="12" y="22" class="text-title">telecom-api (Spring Boot)</text>
+      <text x="12" y="42" class="text-body">• Java 21 / Virtual Threads</text>
+      <text x="12" y="60" class="text-body">• Prepaid balance check</text>
+      <text x="12" y="78" class="text-body">• EIR IMEI binding tracker</text>
+      <text x="12" y="96" class="text-body">• Carrier SLA fail-open (2s)</text>
+      <text x="12" y="114" class="text-body">• Proxy → ai-filter:8000</text>
+      <text x="12" y="128" class="text-link">HTTP Port 8080</text>
     </g>
 
     <!-- Vosk translation worker -->
-    <g transform="translate(15, 220)">
-      <rect width="150" height="100" class="box" />
-      <text x="12" y="22" class="text-title">Vosk STT Worker</text>
-      <text x="12" y="42" class="text-body">• Scans audio spool</text>
-      <text x="12" y="60" class="text-body">• Translates voice to text</text>
-      <text x="12" y="78" class="text-body">• Feeds API Gateway</text>
-      <text x="12" y="92" class="text-link">Vosk Engine: Local</text>
+    <g transform="translate(15, 200)">
+      <rect width="170" height="110" class="box" />
+      <text x="12" y="22" class="text-title">vosk-worker (Python)</text>
+      <text x="12" y="42" class="text-body">• FFmpeg PCAP→WAV</text>
+      <text x="12" y="60" class="text-body">• Vosk offline ASR</text>
+      <text x="12" y="78" class="text-body">• FFT voice biometrics</text>
+      <text x="12" y="96" class="text-body">• DTMF metadata parser</text>
+      <text x="12" y="104" class="text-link">Offline Model Runtime</text>
     </g>
 
     <!-- Vector Log Parser -->
-    <g transform="translate(15, 340)">
-      <rect width="150" height="110" class="box" />
-      <text x="12" y="22" class="text-title">Vector Parser</text>
-      <text x="12" y="42" class="text-body">• Tails log files</text>
-      <text x="12" y="60" class="text-body">• Regex parse to JSON</text>
-      <text x="12" y="78" class="text-body">• IMSI Leak Alerting</text>
-      <text x="12" y="96" class="text-body">• Rust runtime</text>
-      <text x="12" y="102" class="text-link">Zero GC Engine</text>
+    <g transform="translate(15, 325)">
+      <rect width="170" height="105" class="box" />
+      <text x="12" y="22" class="text-title">Vector Log Shipper</text>
+      <text x="12" y="42" class="text-body">• Tails SIP/SMS logs</text>
+      <text x="12" y="60" class="text-body">• VRL regex transform</text>
+      <text x="12" y="78" class="text-body">• CellID &amp; EIR event post</text>
+      <text x="12" y="96" class="text-link">Single Rust Binary</text>
+    </g>
+
+    <!-- External AI Filter -->
+    <g transform="translate(15, 445)">
+      <rect width="170" height="55" class="box" />
+      <text x="12" y="22" class="text-title">ai-filter (PyTorch/ONNX)</text>
+      <text x="12" y="42" class="text-link">HTTP Port 8000 (Sub-2s)</text>
     </g>
   </g>
 
   <!-- 4. OBSERVABILITY STACK -->
-  <g transform="translate(800, 100)">
-    <rect width="160" height="480" class="obs-box" />
+  <g transform="translate(790, 90)">
+    <rect width="170" height="520" class="obs-box" />
     <text x="15" y="30" class="text-title">4. Observability</text>
 
     <!-- VictoriaMetrics -->
-    <g transform="translate(15, 60)">
-      <rect width="130" height="100" class="box" />
+    <g transform="translate(15, 50)">
+      <rect width="140" height="105" class="box" />
       <text x="10" y="22" class="text-title">VictoriaMetrics</text>
       <text x="10" y="42" class="text-body">• Single binary TSDB</text>
-      <text x="10" y="60" class="text-body">• PromQL query api</text>
+      <text x="10" y="60" class="text-body">• PromQL query API</text>
       <text x="10" y="78" class="text-body">• 10x lower RAM</text>
-      <text x="10" y="92" class="text-link">Port 8428</text>
+      <text x="10" y="94" class="text-link">HTTP Port 8428</text>
+    </g>
+
+    <!-- vmagent -->
+    <g transform="translate(15, 170)">
+      <rect width="140" height="85" class="box" />
+      <text x="10" y="22" class="text-title">vmagent</text>
+      <text x="10" y="42" class="text-body">• Metrics scraper</text>
+      <text x="10" y="60" class="text-body">• Low CPU agent</text>
+      <text x="10" y="76" class="text-link">Port 8429</text>
     </g>
 
     <!-- Grafana -->
-    <g transform="translate(15, 180)">
-      <rect width="130" height="80" class="box" />
+    <g transform="translate(15, 270)">
+      <rect width="140" height="90" class="box" />
       <text x="10" y="22" class="text-title">Grafana</text>
       <text x="10" y="42" class="text-body">• Telecom KPI view</text>
       <text x="10" y="60" class="text-body">• Active call stats</text>
-      <text x="10" y="72" class="text-link">Port 3000</text>
+      <text x="10" y="78" class="text-link">HTTP Port 3000</text>
     </g>
   </g>
 
   <!-- FLOW INTER-CONNECTING ARROWS -->
 
-  <!-- Voice Flow Arrows -->
-  <path d="M 205,170 L 290,170" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <path d="M 390,220 L 390,200" class="solid-arrow" />
-  <path d="M 390,300 L 390,320 M 390,320 L 590,320 L 590,300" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="215" y="160" class="text-body" fill="#00e5ff">1. Call Setup (SIP)</text>
+  <!-- Voice Setup Flow -->
+  <path d="M 205,185 L 295,185" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="215" y="175" class="text-body" fill="#00e5ff">SIP INVITE</text>
 
-  <!-- Media recording flow -->
-  <path d="M 475,250 C 500,250 500,280 560,280" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="490" y="235" class="text-body" fill="#00e5ff">2. Media Fork</text>
+  <!-- Kamailio to rtpengine -->
+  <path d="M 385,170 L 385,185" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
 
-  <!-- Vosk to API -->
-  <path d="M 635,220 L 635,200" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="640" y="212" class="text-body" fill="#00e5ff">3. Transcript</text>
+  <!-- Media Fork to Vosk Spool -->
+  <path d="M 475,237 C 505,237 515,255 555,255" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="480" y="225" class="text-body" fill="#00e5ff">Audio Fork</text>
 
-  <!-- SMS Intercept -->
-  <path d="M 205,480 L 290,480" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <path d="M 475,480 L 635,480 L 635,300" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="215" y="470" class="text-body" fill="#00e5ff">1. SMS submit</text>
-  <text x="500" y="470" class="text-body" fill="#00e5ff">2. Intercept check</text>
+  <!-- Vosk to telecom-api -->
+  <path d="M 625,200 L 625,185" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="633" y="195" class="text-body" fill="#00e5ff">POST /transcription</text>
 
-  <!-- API to external AI Filter -->
-  <path d="M 725,230 L 780,230 M 780,230 L 780,20 L 520,20 L 520,50 L 560,50" class="sec-arrow" marker-end="url(#arrow-head-orange)" />
-  <text x="735" y="220" class="text-body" fill="#ff5722">4. AI Query</text>
+  <!-- SMS Intercept Flow -->
+  <path d="M 205,395 L 295,395" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="215" y="385" class="text-body" fill="#00e5ff">SMPP submit_sm</text>
+
+  <path d="M 475,357 L 555,357 L 555,185" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="480" y="347" class="text-body" fill="#00e5ff">POST /intercept/sms</text>
+
+  <!-- telecom-api to ai-filter -->
+  <path d="M 625,185 L 625,445" class="sec-arrow" marker-end="url(#arrow-head-orange)" />
+  <text x="633" y="435" class="text-body" fill="#ff5722">POST /classify (2s SLA)</text>
 
   <!-- Observability metrics routes -->
-  <path d="M 475,130 L 800,130" class="obs-arrow" marker-end="url(#arrow-head-purple)" />
-  <path d="M 725,480 L 800,480" class="obs-arrow" marker-end="url(#arrow-head-purple)" />
-  <path d="M 880,160 L 880,180" class="obs-arrow" marker-end="url(#arrow-head-purple)" />
+  <path d="M 490,140 L 805,140" class="obs-arrow" marker-end="url(#arrow-head-purple)" />
+  <path d="M 710,140 L 805,140" class="obs-arrow" marker-end="url(#arrow-head-purple)" />
 </svg>
+

@@ -71,12 +71,13 @@ services:
       - "8080:8080"
     volumes:
       - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
+      - ./state/spool:/var/spool/rtpengine:z
     networks:
       - mvno_net
     restart: "no"
 
   victoria-metrics:
-    image: victoriametrics/victoria-metrics:latest
+    image: victoriametrics/victoria-metrics:v1.101.0
     container_name: mvno-victoriametrics
     ports:
       - "8428:8428"
@@ -87,7 +88,7 @@ services:
     restart: "no"
 
   vmagent:
-    image: victoriametrics/vmagent:latest
+    image: victoriametrics/vmagent:v1.101.0
     container_name: mvno-vmagent
     volumes:
       - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
@@ -99,7 +100,7 @@ services:
     restart: "no"
 
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:11.6.0
     container_name: mvno-grafana
     ports:
       - "3000:3000"
@@ -107,21 +108,6 @@ services:
       - ./state/grafana:/var/lib/grafana:z
     depends_on:
       victoria-metrics:
-        condition: service_started
-    networks:
-      - mvno_net
-    restart: "no"
-
-  vosk-worker:
-    build:
-      context: ./telecom-data-pipeline
-      dockerfile: Dockerfile.vosk
-    container_name: mvno-vosk
-    volumes:
-      - ./state/spool:/var/spool/rtpengine:z
-      - ./state/vosk-model:/opt:z
-    depends_on:
-      telecom-api:
         condition: service_started
     networks:
       - mvno_net
