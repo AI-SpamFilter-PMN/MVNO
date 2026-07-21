@@ -134,5 +134,5 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ## 7. Documentation
 
-* [docs/deployment_guide.md](docs/deployment_guide.md): Step-by-step configuration runbook, ports, and integration scripts for Kamailio, rtpengine, and Osmocom.
-* [docs/best_practices.md](docs/best_practices.md): SOTA best practices and architectural decisions.
+* [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
+* [docs/architecture_flow.svg](docs/architecture_flow.svg): System architecture diagram.
