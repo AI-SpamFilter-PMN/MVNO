@@ -25,16 +25,10 @@ vendor/
 *.swp
 
 # Docs — private personal guides & notes (strictly local-only)
+docs/private/
 docs/*.rar
 docs/*.pdf
 docs/*.drawio
 docs/*.png
-docs/best_practices.md
-docs/implementation_guide.md
-docs/implementation_plan.md
-docs/implementation.md
-docs/spring_boot_cs_learning_masterclass.md
-docs/spring_boot_learning_guide.md
-docs/ISSUES.md
 
 # NOTE: docs/API_CONTRACT.md is UNIGNORED so it can be shared with teammates on GitHub!
