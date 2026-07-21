@@ -85,11 +85,11 @@
   <!-- ═══════════ PARTICIPANT BOXES ═══════════
        X-centers: ESME=80  SMSC=255  GW=470  AI=670  RECV=880 -->
 
-  <!-- ESME / 5G UE -->
-  <rect x="18"  y="72" width="125" height="52" rx="7" class="panel-client"/>
+  <!-- ESME / 5G UE — widened 125→132px to give node-sub 7px padding each side -->
+  <rect x="14"  y="72" width="132" height="52" rx="7" class="panel-client"/>
   <text x="80"  y="93"  text-anchor="middle" class="node-name">ESME / 5G UE</text>
-  <text x="80"  y="110" text-anchor="middle" class="node-sub">SMS Sender · SMPP 3.4</text>
-  <line x1="80"  y1="124" x2="80"  y2="620" class="lifeline-client"/>
+  <text x="80"  y="110" text-anchor="middle" class="node-sub">Sender · SMPP 3.4</text>
+  <line x1="80"  y1="124" x2="80"  y2="625" class="lifeline-client"/>
 
   <!-- OsmoSMSC -->
   <rect x="180" y="72" width="150" height="52" rx="7" class="panel-core"/>
@@ -97,11 +97,11 @@
   <text x="255" y="110" text-anchor="middle" class="node-sub">SMSC + OsmoHLR · :2775</text>
   <line x1="255" y1="124" x2="255" y2="620" class="lifeline-core"/>
 
-  <!-- telecom-api -->
-  <rect x="390" y="72" width="160" height="52" rx="7" class="panel-gw"/>
+  <!-- telecom-api — widened 160→170px to give node-sub 9px padding each side -->
+  <rect x="385" y="72" width="170" height="52" rx="7" class="panel-gw"/>
   <text x="470" y="93"  text-anchor="middle" class="node-name">telecom-api</text>
-  <text x="470" y="110" text-anchor="middle" class="node-sub">Spring Boot Gateway · :8080</text>
-  <line x1="470" y1="124" x2="470" y2="620" class="lifeline-gw"/>
+  <text x="470" y="110" text-anchor="middle" class="node-sub">Spring Boot · :8080</text>
+  <line x1="470" y1="124" x2="470" y2="625" class="lifeline-gw"/>
 
   <!-- AI Spam Model -->
   <rect x="596" y="72" width="148" height="52" rx="7" class="panel-ai"/>
@@ -121,10 +121,12 @@
   <circle cx="80" cy="165" r="9" fill="#26c6da" opacity="0.9"/>
   <text x="80" y="169" text-anchor="middle" class="badge-num">1</text>
   <line x1="89" y1="165" x2="247" y2="165" class="arrow-smpp" marker-end="url(#h-smpp)" filter="url(#glow-teal)"/>
-  <text x="163" y="157" text-anchor="middle" class="lbl" fill="#26c6da">submit_sm PDU (Sender, Dest, Text)</text>
+  <!-- label center x=168 keeps 204px text within arrow span 89-247 -->
+  <text x="168" y="157" text-anchor="middle" class="lbl" fill="#26c6da">submit_sm PDU (Sender, Dest, Text)</text>
 
-  <!-- Step 2: Delivery Hold + HLR check -->
-  <rect x="190" y="185" width="130" height="28" rx="5" class="note-box" stroke="#00c49a"/>
+  <!-- Step 2: Delivery Hold + HLR check
+       Box widened 130→148px (x: 190→181) so 138px text has 5px clearance each side -->
+  <rect x="181" y="185" width="148" height="28" rx="5" class="note-box" stroke="#00c49a"/>
   <text x="255" y="203" text-anchor="middle" class="lbl" fill="#00c49a">2. Hold · OsmoHLR Check</text>
 
   <!-- Step 3: POST /api/v1/intercept/sms -->
@@ -133,8 +135,9 @@
   <line x1="264" y1="235" x2="462" y2="235" class="arrow-smpp" marker-end="url(#h-smpp)"/>
   <text x="363" y="227" text-anchor="middle" class="lbl" fill="#26c6da">POST /api/v1/intercept/sms</text>
 
-  <!-- Step 4: Prepaid OCS Balance Check (self-note) -->
-  <rect x="408" y="252" width="125" height="26" rx="5" class="note-box" stroke="#9b59b6"/>
+  <!-- Step 4: Prepaid OCS Balance Check
+       Box widened 125→152px (x: 408→394) so 138px text has 7px clearance each side -->
+  <rect x="394" y="252" width="152" height="26" rx="5" class="note-box" stroke="#9b59b6"/>
   <text x="470" y="269" text-anchor="middle" class="lbl" fill="#9b59b6">4. Prepaid OCS ($1/SMS)</text>
 
   <!-- Step 5: POST /api/v1/classify -->
