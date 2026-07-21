@@ -17,11 +17,11 @@ The core network operates as an unprivileged, rootless stack that handles real-t
 ![MVNO Core Integration Flow Diagram](docs/architecture_flow.svg)
 
 ```
-SIP Phone ──▶ Kamailio ──▶ rtpengine ──▶ Vosk STT
-                │
-SMPP Client ──▶ OsmoSMSC ──▶ Spring Boot Gateway ──▶ AI Spam Filter
-                │                         │
-5G UE ──▶ Open5GS (AMF) ──┘              └── MongoDB (subscribers)
+SIP Phone ──▶ Kamailio ──▶ rtpengine ──(Audio Spool)──┐
+                │                                    ▼
+SMPP Client ──▶ OsmoSMSC ───────────────▶ Spring Boot Gateway (Java 21) ──▶ AI Spam Filter
+                │                         (Native Vosk ASR JNI)
+5G UE ──▶ Open5GS (AMF) ─────────────────┘
 ```
 
 Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP). The 5G SA core adds UERANSIM gNB+UE simulation with SMS-over-NAS routed through the same pipeline. All decisions go through the Spring Boot policy gateway.
