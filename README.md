@@ -32,13 +32,17 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 
 ## 2. Core Functional Transactions
 
-### A. VoIP Voice Call Flow
+### A. VoIP Voice Call Interception Flow
+![IMS Voice Call Interception Flow](docs/ims_voice_call_flow.svg)
+
 1. **SIP Invite**: User Equipment 1 (`UE_1`) initiates a call. Kamailio receives the `INVITE` signal.
 2. **Media Anchor**: Kamailio hooks `rtpengine` to proxy the media streams in-kernel and forks a raw audio copy into `/var/spool/rtpengine`.
 3. **Translation Loop**: When the call completes, `NativeVoskService.java` inside the Spring Boot Gateway detects the audio capture, transcribes it offline using native Vosk Java 21 ASR JNI bindings, and extracts voice biometrics.
 4. **AI Interception Check**: Spring Boot queries the external **AI Spam Filter REST API**. If flagged as spam, the calling MSISDN is blacklisted.
 
 ### B. SMS Interception Flow
+![SMS Interception Flow](docs/sms_interception_flow.svg)
+
 1. **SMS Submit**: An ESME client submits an SMS to `OsmoSMSC` via SMPP.
 2. **API Verification Check**: `OsmoSMSC` holds delivery and queries the Spring Boot gateway (`POST /api/v1/intercept/sms`).
 3. **Action Policy**: Spring Boot forwards the content to the AI classification model. If approved (`allow: true`), `OsmoSMSC` forwards it to the recipient. If spam, the message is dropped.

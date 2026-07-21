@@ -10,59 +10,11 @@ This guide covers the transaction flow, software prerequisites, and complete con
 
 ### IMS VoLTE / VoNR Voice Call Signaling Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor UE1 as SIP User (UE_1)
-    participant K as Kamailio CSCF
-    participant RTP as rtpengine
-    actor UE2 as SIP User (UE_2)
-    participant VOSK as Native Vosk ASR (JVM)
-    participant GW as Spring Boot Gateway
-    participant AI as AI Spam Filter
-
-    UE1->>K: 1. SIP INVITE (SDP, From: 15551234567)
-    K->>GW: 2. POST /api/v1/intercept/call (Prepaid & EIR check)
-    GW-->>K: 3. HTTP 200 OK (allow: true)
-    K->>RTP: 4. offer (Bind media ports & enable PCAP spooling)
-    RTP-->>K: 5. SDP answer
-    K->>UE2: 6. SIP INVITE
-    UE2-->>K: 7. SIP 200 OK
-    K->>UE1: 8. SIP 200 OK
-    UE1->>UE2: 9. RTP Media Stream (In-Kernel Proxy via rtpengine)
-    RTP->>RTP: 10. Fork audio copy to /var/spool/rtpengine
-    Note over RTP,VOSK: Call Ends (SIP BYE)
-    VOSK->>VOSK: 11. Native JNI ASR Speech-to-Text & Biometrics
-    VOSK->>AI: 12. POST /api/v1/classify (Transcript & Biometrics)
-    AI-->>VOSK: 13. Decision (allow/block)
-```
+![IMS Voice Call Interception Flow](ims_voice_call_flow.svg)
 
 ### SMS Store-and-Forward Interception Signaling Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor ESME as SMS Client / 5G NAS
-    participant SMSC as OsmoSMSC / OsmoMSC
-    participant GW as Spring Boot Gateway
-    participant AI as AI Spam Filter
-    actor RECV as Recipient UE
-
-    ESME->>SMSC: 1. submit_sm PDU (Sender: 15551234567, Text)
-    SMSC->>SMSC: 2. Hold Delivery & Check Standalone OsmoHLR
-    SMSC->>GW: 3. POST /api/v1/intercept/sms (Sender, Recipient, Content)
-    GW->>GW: 4. Prepaid OCS Balance Check ($1/SMS)
-    GW->>AI: 5. POST /api/v1/classify (SMS Text Content)
-    alt AI Approved (allow: true)
-        AI-->>GW: 6a. HTTP 200 OK (allow: true)
-        GW-->>SMSC: 7a. HTTP 200 OK (allow: true)
-        SMSC->>RECV: 8a. deliver_sm / Forward SMS
-    else AI Spam Flagged (allow: false)
-        AI-->>GW: 6b. HTTP 200 OK (allow: false, reason: "Spam")
-        GW-->>SMSC: 7b. HTTP 200 OK (allow: false)
-        SMSC->>SMSC: 8b. Drop SMS & Log Interception
-    end
-```
+![SMS Interception Flow](sms_interception_flow.svg)
 
 ### Voice Transaction Steps:
 1. **SIP Invite**: `UE_1` sends an `INVITE` request to Kamailio.
