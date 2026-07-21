@@ -1,7 +1,7 @@
 # ==============================================================================
 # MVNO Telecom Interception Gateway — Application Configuration
 # ==============================================================================
-# This configuration file defines the server port, Java 25 Virtual Thread settings,
+# This configuration file defines the server port, Java 21 Virtual Thread settings,
 # SQLite HikariCP database pool, AI Spam Filter REST endpoint, and Spring Actuator health probes.
 # ==============================================================================
 
@@ -10,7 +10,7 @@ server:
   port: 8080
 
 spring:
-  # Java 25 Virtual Threads (JEP 444 / JEP 491)
+  # Java 21 Virtual Threads (JEP 444)
   # Enables high-throughput carrier-grade concurrency without blocking OS threads.
   threads:
     virtual:

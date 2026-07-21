@@ -1,17 +1,29 @@
+# ==============================================================================
+# MVNO Telecom Interception Core — Automation Makefile
+# ==============================================================================
+# Provides developer build targets for rootless container lifecycle management,
+# SQLite WAL database initialization, VTY control socket assertions, and REST API testing.
+# ==============================================================================
+
 .PHONY: up down logs ps init-db test test-sms test-call test-api test-vty
 
+# Launches all rootless container services using scripts/up.sh
 up:
 	./scripts/up.sh
 
+# Stops and removes all container services
 down:
 	podman compose -f docker-compose.yml down
 
+# Streams live container logs across all microservices
 logs:
 	podman compose -f docker-compose.yml logs -f
 
+# Displays running container status
 ps:
 	podman ps
 
+# Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
 	@mkdir -p state/mongodb state/spool state/hlr state/vm-data state/grafana state/logs/kamailio state/logs/osmocom
 	@sqlite3 state/kamailio.db \
