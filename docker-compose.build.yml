@@ -1,0 +1,76 @@
+# Build override — adds build: stanzas for online/source compilation.
+# Default (docker-compose.yml) uses pre-loaded images for offline-first operation.
+# Use this file when you want to build images from source:
+#   podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  kamailio:
+    build:
+      context: .
+      dockerfile: configs/kamailio/Dockerfile
+
+  osmo-smsc:
+    build:
+      context: ./configs/osmocom
+
+  telecom-api:
+    build:
+      context: .
+      dockerfile: telecom-api/Dockerfile
+
+  vosk-worker:
+    build:
+      context: .
+      dockerfile: vosk-worker/Dockerfile
+
+  nrf:
+    build: ./configs/open5gs
+
+  amf:
+    build: ./configs/open5gs
+
+  smf:
+    build: ./configs/open5gs
+
+  upf:
+    build: ./configs/open5gs
+
+  udm:
+    build: ./configs/open5gs
+
+  ausf:
+    build: ./configs/open5gs
+
+  nssf:
+    build: ./configs/open5gs
+
+  pcf:
+    build: ./configs/open5gs
+
+  udr:
+    build: ./configs/open5gs
+
+  bsf:
+    build: ./configs/open5gs
+
+  webui:
+    build: ./configs/open5gs/webui
+
+  ueransim-gnb:
+    build:
+      context: .
+      dockerfile: configs/ueransim/Dockerfile
+
+  ueransim-ue-1:
+    build:
+      context: .
+      dockerfile: configs/ueransim/Dockerfile
+
+  ueransim-ue-2:
+    build:
+      context: .
+      dockerfile: configs/ueransim/Dockerfile
+
+  ueransim-ue-3:
+    build:
+      context: .
+      dockerfile: configs/ueransim/Dockerfile
