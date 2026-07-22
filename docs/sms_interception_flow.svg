@@ -210,7 +210,9 @@
 
   <!-- ════ ROW 4 — Step 9a: SMSC → ESME submit_sm_resp(success): label y=582 arrow y=590 ════ -->
   <text x="172" y="582" text-anchor="middle" class="lbl" fill="#66bb6a">submit_sm_resp / CP-ACK (success)</text>
-  <line x1="263" y1="590" x2="89"  y2="590" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
+  <circle cx="255" cy="590" r="9" fill="#66bb6a" opacity="0.9"/>
+  <text   x="255" y="594" text-anchor="middle" class="badge-num" fill="#000">9a</text>
+  <line x1="246" y1="590" x2="89"  y2="590" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
 
   <!-- Footer legend -->
   <line x1="30"  y1="726" x2="80"  y2="726" stroke="#26c6da" stroke-width="2.2"/>
