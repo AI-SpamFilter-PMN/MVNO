@@ -4,9 +4,8 @@
 [![Orchestration](https://img.shields.io/badge/Orchestration-Podman--Compose_%7C_Docker-orange?style=for-the-badge&logo=podman)](docs/deployment_guide.md)
 [![Database](https://img.shields.io/badge/Database-SQLite_WAL_%7C_MongoDB-green?style=for-the-badge&logo=sqlite)](docs/deployment_guide.md)
 [![Observability](https://img.shields.io/badge/Observability-VictoriaMetrics_%7C_Grafana-purple?style=for-the-badge&logo=grafana)](docs/deployment_guide.md)
-[![Business](https://img.shields.io/badge/eTOM-Fulfilment_Assurance_Billing-blue?style=for-the-badge)](docs/deployment_guide.md)
 
-This repository contains the **Mobile Virtual Network Operator (MVNO) / Private Mobile Network** core infrastructure simulation. It is designed to act as the traffic interception node and media processing engine for the companion [AI-SpamFilter-PMN/MVNO](https://github.com/AI-SpamFilter-PMN/MVNO) filtration platform.
+Simulates an MVNO / Private Mobile Network core for the companion [AI Spam Filter](https://github.com/AI-SpamFilter-PMN/MVNO) platform. Handles SMS routing and SIP/VoIP calling, intercepts payloads in real-time, and enforces allow/block decisions from the AI filter REST API.
 
 ---
 
@@ -32,20 +31,20 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 
 ## 2. Core Functional Transactions
 
-### A. VoIP Voice Call Interception Flow
+### A. VoIP Voice Call Interception
 ![IMS Voice Call Interception Flow](docs/ims_voice_call_flow.svg)
 
-1. **SIP Invite**: User Equipment 1 (`UE_1`) initiates a call. Kamailio receives the `INVITE` signal.
-2. **Media Anchor**: Kamailio hooks `rtpengine` to proxy the media streams in-kernel and forks a raw audio copy into `/var/spool/rtpengine`.
-3. **Translation Loop**: When the call completes, `NativeVoskService.java` inside the Spring Boot Gateway detects the audio capture, transcribes it offline using native Vosk Java 21 ASR JNI bindings, and extracts voice biometrics.
-4. **AI Interception Check**: Spring Boot queries the external **AI Spam Filter REST API**. If flagged as spam, the calling MSISDN is blacklisted.
+1. UE_1 sends a `SIP INVITE`. Kamailio checks prepaid balance and EIR via the Spring Boot gateway.
+2. If allowed, Kamailio anchors media through `rtpengine` (in-kernel) and forks a PCAP copy to `/var/spool/rtpengine`.
+3. After the call, `NativeVoskService.java` transcribes the audio offline via Vosk Java 21 JNI and sends the result to the AI filter.
+4. If flagged, the caller's MSISDN is blacklisted for future calls.
 
-### B. SMS Interception Flow
+### B. SMS Interception
 ![SMS Interception Flow](docs/sms_interception_flow.svg)
 
-1. **SMS Submit**: An ESME client submits an SMS to `OsmoSMSC` via SMPP.
-2. **API Verification Check**: `OsmoSMSC` holds delivery and queries the Spring Boot gateway (`POST /api/v1/intercept/sms`).
-3. **Action Policy**: Spring Boot forwards the content to the AI classification model. If approved (`allow: true`), `OsmoSMSC` forwards it to the recipient. If spam, the message is dropped.
+1. ESME submits SMS to `OsmoSMSC` via SMPP 3.4.
+2. OsmoSMSC holds delivery and calls `POST /api/v1/intercept/sms` on the Spring Boot gateway.
+3. Gateway checks prepaid balance, then forwards content to the AI filter. `allow: true` → delivered. `allow: false` → dropped.
 
 ---
 
@@ -132,36 +131,24 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ---
 
-## 6. Stack
+## 6. Features
 
-| Layer | Components | Purpose |
-|-------|-----------|---------|
-| **5G Access** | UERANSIM (gNB + 3 UEs) | 5G SA simulation over N2/N3 |
-| **5G Core** | Open5GS (NRF, AMF, SMF, UPF, UDM, AUSF, NSSF, PCF, UDR, BSF) | 5GC network functions + MongoDB subscriber DB |
-| **MVNO Core** | Kamailio, rtpengine, OsmoSMSC | SIP routing, media anchoring, SMS store-and-forward |
-| **Interception** | Spring Boot Gateway, Vosk STT | AI filter decision point, offline speech-to-text |
-| **Observability** | VictoriaMetrics, Grafana, Vector | Metrics, dashboards, log shipping |
-
----
-
-## 7. Features
-
-| # | Feature | Implementation |
-|---|---------|---------------|
-| 1 | **Prepaid OCS** | Balance check before calls/SMS. Zero-balance blocked. |
-| 2 | **STIR/SHAKEN** | SIP `From` header vs authenticated user. Spoof blocked. |
-| 3 | **Geofencing** | LAC/CellID from OsmoSMSC logs → zone-based AI filtering. |
-| 4 | **EIR Binding** | IMEI-IMSI tracked in Spring Boot gateway. Rapid SIM swaps blocked. |
-| 5 | **DTMF Logging** | rtpengine tones captured in JSON metadata. |
-| 6 | **Voice Biometrics** | Silence ratio + spectral flatness for robocall/TTS detection. |
-| 7 | **SLA Fallback** | Local HTable whitelist/blacklist when AI filter is down. |
-| 8 | **5G SA Core** | Open5GS 10-NF 5GC + UERANSIM simulation. |
-| 9 | **SMS-over-NAS** | 5G UE → AMF → OsmoSMSC → Spring Boot Gateway (same pipeline). |
-| 10 | **MongoDB Seed** | Atomic init script avoids WebUI admin hash bug. |
+| # | Feature | How |
+|---|---------|-----|
+| 1 | **Prepaid OCS** | SQLite balance check before every call/SMS. Zero-balance → blocked. |
+| 2 | **STIR/SHAKEN** | Kamailio compares SIP `From` header to authenticated username. Mismatch → 407. |
+| 3 | **LAC/CellID Geofencing** | Vector parses cell ID from OsmoSMSC logs → Spring Boot → AI filter zone policy. |
+| 4 | **EIR SIM-Swap Detection** | In-memory IMEI→MSISDN tracker. >3 swaps in 10 min → blocked. |
+| 5 | **DTMF Logging** | rtpengine captures DTMF tones to companion JSON metadata. |
+| 6 | **Voice Biometrics** | Silence ratio + spectral flatness via Vosk numpy FFT. Flags robocall/TTS. |
+| 7 | **SLA Fallback** | Kamailio HTable whitelist/blacklist used when AI filter is unreachable. |
+| 8 | **5G SA Core** | Open5GS 10-NF 5GC + UERANSIM gNB + 3 UE simulation. |
+| 9 | **SMS-over-NAS** | 5G UE → AMF → OsmoSMSC → Spring Boot gateway (same pipeline as SMPP). |
+| 10 | **MongoDB Seed** | Atomic init script avoids Open5GS WebUI admin hash bug on first boot. |
 
 ---
 
-## 8. Documentation
+## 7. Documentation
 
 * [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Public AI Spam Filter REST API contract & JSON schemas for teammates.
 * [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
