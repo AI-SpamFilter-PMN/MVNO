@@ -1,22 +1,26 @@
 package com.mvno.intercept.filter;
 
 /**
- * DTO Record representing the response from the AI Spam Filter team's model server (http://ai-filter:8000).
+ * <h1>AI Classification Result DTO Record</h1>
  * 
- * @param isSpam True if text/call is classified as spam or phishing.
- * @param confidenceScore ML model confidence score (0.0 to 1.0).
- * @param riskCategory Classification tag ("PHISHING", "SMISHING", "SPAM", "VOIP_FRAUD", "HAM").
- * @param action Interception decision ("BLOCK", "ALLOW", "FLAG").
- * @param reason Human-readable explanation for NOC audit logging.
+ * <p>Immutable Java 21 Record mapping JSON response payloads received from the external AI Spam Model server
+ * ({@code POST http://ai-filter:8000/api/v1/classify}).</p>
+ * 
+ * <h2>JSON Response Mapping Schema</h2>
+ * <pre>{@code
+ * {
+ *   "allow": true,
+ *   "reason": "Clean message content"
+ * }
+ * }</pre>
+ * 
+ * @param allow Boolean flag indicating whether the message/call is permitted ({@code true}) or blocked ({@code false}).
+ * @param reason Human-readable diagnostic description of the classification decision (e.g. "Spam content detected").
+ * 
+ * @author MVNO Core Engineering Team
+ * @version 1.0.0
  */
 public record TranscriptionResult(
-    boolean isSpam,
-    double confidenceScore,
-    String riskCategory,
-    String action,
+    boolean allow,
     String reason
-) {
-    public boolean allow() {
-        return !"BLOCK".equalsIgnoreCase(action) && !isSpam;
-    }
-}
+) {}

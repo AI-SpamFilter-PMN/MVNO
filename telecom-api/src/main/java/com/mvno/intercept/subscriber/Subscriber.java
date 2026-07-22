@@ -1,12 +1,35 @@
 package com.mvno.intercept.subscriber;
 
 /**
- * Subscriber Profile Domain Record.
+ * <h1>Subscriber Profile Data Entity Record</h1>
  * 
- * @param username SIP/SMPP authentication username.
- * @param msisdn Phone number in E.164 format.
- * @param balance Prepaid balance in currency units ($).
- * @param imei Registered hardware IMEI number.
+ * <p>Immutable Java 21 Record mapping a single subscriber account row retrieved from SQLite database
+ * table {@code subscriber} in {@code /etc/kamailio/kamailio.db}.</p>
+ * 
+ * <h2>SQLite Schema Definition</h2>
+ * <pre>{@code
+ * CREATE TABLE subscriber (
+ *     id INTEGER PRIMARY KEY AUTOINCREMENT,
+ *     username VARCHAR(64) NOT NULL DEFAULT '',
+ *     domain VARCHAR(64) NOT NULL DEFAULT '',
+ *     password VARCHAR(64) NOT NULL DEFAULT '',
+ *     ha1 VARCHAR(128) NOT NULL DEFAULT '',
+ *     ha1b VARCHAR(128) NOT NULL DEFAULT '',
+ *     msisdn TEXT UNIQUE,
+ *     balance INTEGER DEFAULT 100,
+ *     imei TEXT,
+ *     imsi TEXT,
+ *     blocked INTEGER DEFAULT 0
+ * );
+ * }</pre>
+ * 
+ * @param username SIP Digest Authentication username string (e.g. "15551234567").
+ * @param msisdn E.164 phone number string.
+ * @param balance Prepaid account currency balance ($).
+ * @param imei 15-digit International Mobile Equipment Identity hardware serial number string.
+ * 
+ * @author MVNO Core Engineering Team
+ * @version 1.0.0
  */
 public record Subscriber(
     String username,

@@ -2,37 +2,50 @@ package com.mvno.intercept.transcription;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 import java.util.Map;
 
 /**
- * Speech-to-Text Transcription Analytics Receiver Controller.
+ * <h1>Speech-to-Text Transcription &amp; Analytics REST Receiver Controller</h1>
  * 
- * INTERFACE BOUNDARY:
- * Receives post-call speech transcription payloads, DTMF keypress events, and voice biometrics
- * generated during call processing.
+ * <p>The {@code TranscriptionController} exposes REST endpoints for receiving post-call speech transcripts,
+ * acoustic biometrics analytics, and DTMF keypress events.</p>
  * 
- * DATA MODEL RATIONALE:
- * Java 17+ / 21 Records (`TranscriptionRequest`, `BiometricsData`, `DtmfEvent`) are used instead of traditional
- * mutable JavaBeans. Records provide immutable, thread-safe value semantics, automatic `equals()`, `hashCode()`,
- * and `toString()` implementations, and clean Jackson JSON deserialization.
+ * <h2>Acoustic Biometrics &amp; Synthetic Voice Detection</h2>
+ * <ul>
+ *   <li><b>Silence Ratio:</b> Evaluates pre-recorded robocall audio pauses vs active human speech patterns.</li>
+ *   <li><b>Spectral Flatness:</b> Analyzes frequency distribution flatness via numpy FFT to flag synthetic Text-to-Speech (TTS) voice deepfakes.</li>
+ *   <li><b>DTMF Keypresses:</b> Tracks IVR touch-tone digit sequences pressed during intercepted calls.</li>
+ * </ul>
+ * 
+ * @author MVNO Core Engineering Team
+ * @version 1.0.0
  */
 @RestController
 @RequestMapping("/api/v1/transcriptions")
 public class TranscriptionController {
 
     /**
-     * Receives and logs post-call speech transcription and acoustic biometrics payloads.
+     * Receives and processes post-call speech transcription and acoustic biometrics payloads.
      * 
-     * @param req Request DTO containing SIP Call-ID, speech transcript, acoustic biometrics, and DTMF events.
-     * @return HTTP 200 OK status confirmation map.
+     * @param req The incoming {@link TranscriptionRequest} payload record.
+     * @return {@link ResponseEntity} containing a JSON status acknowledgement map.
      */
     @PostMapping
-    public ResponseEntity<Map<String, String>> receiveTranscription(@RequestBody TranscriptionRequest req) {
+    public ResponseEntity<Map<String, String>> receiveTranscription(@RequestBody final TranscriptionRequest req) {
         return ResponseEntity.ok(Map.of("status", "received"));
     }
 
-    /** Post-call transcription request payload record. */
+    /**
+     * Post-call transcription request payload Record.
+     * 
+     * @param callId Unique SIP header {@code Call-ID} string.
+     * @param audioFile Audio capture file name string.
+     * @param transcript Speech-to-text decoded string.
+     * @param biometrics Acoustic voice biometrics metrics record.
+     * @param dtmfEvents List of DTMF touch-tone keypress events.
+     */
     public record TranscriptionRequest(
         String callId,
         String audioFile,
@@ -41,14 +54,25 @@ public class TranscriptionController {
         List<DtmfEvent> dtmfEvents
     ) {}
 
-    /** Acoustic voice biometrics record (Silence ratio for robocall detection, Spectral flatness for TTS synthetic voice detection). */
+    /**
+     * Acoustic voice biometrics metrics Record.
+     * 
+     * @param silenceRatio Ratio of silence vs active audio duration (0.0 to 1.0).
+     * @param spectralFlatness Measure of noise vs tonal audio distribution (high values indicate synthetic TTS).
+     * @param durationSeconds Total call duration in seconds.
+     */
     public record BiometricsData(
         double silenceRatio,
         double spectralFlatness,
         double durationSeconds
     ) {}
 
-    /** DTMF touch-tone keypress event record. */
+    /**
+     * DTMF touch-tone keypress event Record.
+     * 
+     * @param digit Touch-tone key digit pressed (0-9, *, #).
+     * @param timestamp Unix epoch timestamp in milliseconds when the keypress occurred.
+     */
     public record DtmfEvent(
         int digit,
         long timestamp
