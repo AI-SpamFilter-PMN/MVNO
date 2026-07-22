@@ -1,49 +1,64 @@
 # ==============================================================================
-# MVNO Telecom Interception Gateway — Application Configuration
+# MVNO Interception Gateway — Application Configuration
 # ==============================================================================
-# This configuration file defines the server port, Java 21 Virtual Thread settings,
-# SQLite HikariCP database pool, AI Spam Filter REST endpoint, and Spring Actuator health probes.
+# Framework: Spring Boot 3.4.3 + Java 21 LTS + Virtual Threads (JEP 444)
+# Architecture: Single-binary Spring Boot gateway for SIP/SMS interception
 # ==============================================================================
 
 server:
-  # HTTP Port exposed by the Spring Boot Interception Gateway
   port: 8080
+  # Tomcat Virtual Threads Enablement (JEP 444):
+  # Enables Java 21 light-weight virtual threads for processing incoming HTTP requests.
+  # Each request runs on a virtual thread backed by ForkJoinPool carriers, allowing high concurrency.
+  tomcat:
+    threads:
+      max: 200
 
 spring:
-  # Java 21 Virtual Threads (JEP 444)
-  # Enables high-throughput carrier-grade concurrency without blocking OS threads.
+  application:
+    name: intercept-gateway
   threads:
     virtual:
       enabled: true
 
-  # SQLite Database Binding (Shared subscriber registry with Kamailio & OsmoMSC)
+  # ----------------------------------------------------------------------------
+  # Data Source Configuration (SQLite WAL Mode)
+  # ----------------------------------------------------------------------------
+  # RATIONALE: SQLite WAL mode (/etc/kamailio/kamailio.db) allows concurrent reads
+  # without blocking writers. Used by Spring Boot + Kamailio CSCF.
   datasource:
     url: jdbc:sqlite:/etc/kamailio/kamailio.db
     driver-class-name: org.sqlite.JDBC
     hikari:
-      pool-name: SQLitePool
       maximum-pool-size: 10
       minimum-idle: 2
       idle-timeout: 30000
-      connection-test-query: SELECT 1
+      connection-timeout: 5000
 
-# AI Spam Filter Team Integration Parameters (AI-SpamFilter-PMN)
+# ------------------------------------------------------------------------------
+# External AI Spam Model Configuration
+# ------------------------------------------------------------------------------
 ai-filter:
-  # REST endpoint URL of the Java 21 AI Spam Model server
   url: ${AI_FILTER_URL:http://ai-filter:8000/api/v1/classify}
-  # Socket timeout in seconds — set to 5s to accommodate CPU model inference latency
   timeout-seconds: 5
 
-# Spring Boot Actuator Observability & Liveness Probes
+# ------------------------------------------------------------------------------
+# Native Vosk Speech-to-Text ASR Engine (JVM JNI)
+# ------------------------------------------------------------------------------
+vosk:
+  spool-dir: /var/spool/rtpengine
+  model-path: ${VOSK_MODEL_PATH:/opt/vosk-model-small-en-us-0.15}
+
+# ------------------------------------------------------------------------------
+# Actuator Observability & Health Probes
+# ------------------------------------------------------------------------------
 management:
   endpoints:
     web:
       exposure:
-        # Expose health check, system info, and Prometheus metrics endpoints
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
-      probes:
-        # Enables /actuator/health/liveness and /actuator/health/readiness probes
-        enabled: true
       show-details: always
+      probes:
+        enabled: true

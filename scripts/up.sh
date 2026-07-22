@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# up.sh — Offline-first wrapper around podman compose
+# ==============================================================================
+# up.sh — MVNO Core Container Stack Launch Script
+# ==============================================================================
+# Provides an offline-first execution wrapper around `podman compose` / `docker compose`.
 #
-# Tries pre-loaded images first (fast, offline). Falls back to
-# building from source if any custom images are missing.
-#
-# Usage:
-#   ./scripts/up.sh              Start stack (offline-first)
-#   ./scripts/up.sh --build      Force build from source
-#   ./scripts/up.sh down         Stop stack (passthrough)
-#   ./scripts/up.sh logs -f      Follow logs (passthrough)
+# Execution Logic:
+# 1. Checks if all custom pre-built container images exist in local Podman/Docker storage.
+# 2. If present, launches the container stack instantly without internet access (`make up`).
+# 3. If any custom images are missing, falls back to building from source (`docker-compose.build.yml`).
+# ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -25,7 +25,7 @@ CUSTOM_IMAGES=(
   mvno-vosk-worker
 )
 
-# ─── Passthrough commands that need no build logic ─────
+# ─── Passthrough commands that need no build logic (down, logs, ps, stop, etc.) ─────
 case "${1:-}" in
   down|logs|ps|stop|restart|config|create)
     exec $COMPOSE_CMD -f docker-compose.yml "$@"
@@ -36,7 +36,7 @@ case "${1:-}" in
     ;;
 esac
 
-# ─── Pre-flight: check custom images ───────────────────
+# ─── Pre-flight: check if local custom images are pre-loaded ───────────────────
 MISSING=()
 for img in "${CUSTOM_IMAGES[@]}"; do
   if ! podman image exists "$img" 2>/dev/null; then
@@ -45,10 +45,11 @@ for img in "${CUSTOM_IMAGES[@]}"; do
 done
 
 if [ ${#MISSING[@]} -gt 0 ]; then
-  echo "Custom images not found: ${MISSING[*]}"
-  echo "Building from source..."
+  echo "Custom images not found in local cache: ${MISSING[*]}"
+  echo "Falling back to building from source..."
   exec $COMPOSE_CMD -f docker-compose.yml -f docker-compose.build.yml up -d --build "$@"
 fi
 
-echo "All images present, starting offline..."
+echo "All required images present. Launching offline container stack..."
 exec $COMPOSE_CMD -f docker-compose.yml up -d "$@"
+
