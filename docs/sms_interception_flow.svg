@@ -1,38 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 780" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 820" width="100%" height="100%">
   <defs>
     <style>
       .bg { fill: #080b14; }
-      .panel-client { fill: #0d1b2e; stroke: #1e6fa8; stroke-width: 1.5; }
-      .panel-core   { fill: #051a14; stroke: #00c49a; stroke-width: 1.5; }
-      .panel-gw     { fill: #1a0d2e; stroke: #9b59b6; stroke-width: 1.5; }
-      .panel-ai     { fill: #1f0a08; stroke: #e74c3c; stroke-width: 1.5; }
+      .panel-client { fill: #0d1b2e; stroke: #1e6fa8; stroke-width: 1.8; }
+      .panel-core   { fill: #051a14; stroke: #00c49a; stroke-width: 1.8; }
+      .panel-gw     { fill: #1a0d2e; stroke: #9b59b6; stroke-width: 1.8; }
+      .panel-ai     { fill: #1f0a08; stroke: #e74c3c; stroke-width: 1.8; }
 
-      .badge-num { font-family: Inter, system-ui, sans-serif; font-size: 10px; font-weight: 700; fill: #080b14; }
-      .title-main { font-family: Inter, system-ui, sans-serif; font-size: 21px; font-weight: 700; fill: #ffffff; letter-spacing: 0.3px; }
-      .title-sub  { font-family: Inter, system-ui, sans-serif; font-size: 12px; fill: #78909c; }
-      .node-name  { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 700; fill: #eceff1; }
-      .node-sub   { font-family: Inter, system-ui, sans-serif; font-size: 10px; fill: #90a4ae; }
-      .lbl        { font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 600; }
-      .branch-lbl { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 700; }
+      .badge-num { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 800; fill: #080b14; }
+      .title-main { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 22px; font-weight: 800; fill: #ffffff; letter-spacing: 0.3px; }
+      .title-sub  { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; fill: #90a4ae; }
+      .node-name  { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 700; fill: #eceff1; }
+      .node-sub   { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; fill: #90a4ae; }
+      .lbl        { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 700; }
+      .branch-lbl { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 800; }
 
-      .lifeline-client { stroke: #1e6fa8; stroke-width: 1; stroke-dasharray: 5,4; opacity: 0.6; }
-      .lifeline-core   { stroke: #00c49a; stroke-width: 1; stroke-dasharray: 5,4; opacity: 0.6; }
-      .lifeline-gw     { stroke: #9b59b6; stroke-width: 1; stroke-dasharray: 5,4; opacity: 0.6; }
-      .lifeline-ai     { stroke: #e74c3c; stroke-width: 1; stroke-dasharray: 5,4; opacity: 0.6; }
+      .lifeline-client { stroke: #1e6fa8; stroke-width: 1.2; stroke-dasharray: 5,4; opacity: 0.7; }
+      .lifeline-core   { stroke: #00c49a; stroke-width: 1.2; stroke-dasharray: 5,4; opacity: 0.7; }
+      .lifeline-gw     { stroke: #9b59b6; stroke-width: 1.2; stroke-dasharray: 5,4; opacity: 0.7; }
+      .lifeline-ai     { stroke: #e74c3c; stroke-width: 1.2; stroke-dasharray: 5,4; opacity: 0.7; }
 
-      .arrow-smpp  { stroke: #26c6da; stroke-width: 2.2; fill: none; }
-      .arrow-ocs   { stroke: #9b59b6; stroke-width: 2;   fill: none; }
-      .arrow-ai    { stroke: #ef5350; stroke-width: 2.2; fill: none; }
-      .arrow-allow { stroke: #66bb6a; stroke-width: 2.5; fill: none; }
-      .arrow-block { stroke: #ef5350; stroke-width: 2.5; fill: none; }
-      .arrow-resp  { stroke-dasharray: 5,3; }
+      .arrow-smpp  { stroke: #26c6da; stroke-width: 2.5; fill: none; }
+      .arrow-ocs   { stroke: #9b59b6; stroke-width: 2.2; fill: none; }
+      .arrow-ai    { stroke: #ef5350; stroke-width: 2.5; fill: none; }
+      .arrow-allow { stroke: #66bb6a; stroke-width: 2.8; fill: none; }
+      .arrow-block { stroke: #ef5350; stroke-width: 2.8; fill: none; }
+      .arrow-resp  { stroke-dasharray: 6,4; }
 
-      .divider { stroke: #1e2740; stroke-width: 1; }
-      .branch-allow { fill: #051a0d; stroke: #2e7d32; stroke-width: 1.5; }
-      .branch-block { fill: #1f0808; stroke: #c62828; stroke-width: 1.5; }
-      .branch-label-allow { fill: #060f07; stroke: #2e7d32; stroke-width: 1.5; }
-      .branch-label-block { fill: #0f0505; stroke: #c62828; stroke-width: 1.5; }
-      .note-box { fill: #0e1627; stroke: #263252; stroke-width: 1; }
+      .divider { stroke: #1e2740; stroke-width: 1.2; }
+      .branch-allow { fill: #051a0d; stroke: #2e7d32; stroke-width: 1.8; }
+      .branch-block { fill: #1f0808; stroke: #c62828; stroke-width: 1.8; }
+      .branch-label-allow { fill: #060f07; stroke: #2e7d32; stroke-width: 1.8; }
+      .branch-label-block { fill: #0f0505; stroke: #c62828; stroke-width: 1.8; }
+      .note-box { fill: #0e1627; stroke: #263252; stroke-width: 1.2; }
     </style>
 
     <marker id="h-smpp" viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
@@ -74,9 +74,9 @@
   </defs>
 
   <!-- Background -->
-  <rect width="1120" height="780" fill="url(#grad-bg)"/>
-  <line x1="0" y1="135" x2="1120" y2="135" class="divider"/>
-  <line x1="0" y1="755" x2="1120" y2="755" class="divider"/>
+  <rect width="1120" height="820" fill="url(#grad-bg)"/>
+  <line x1="0" y1="130" x2="1120" y2="130" class="divider"/>
+  <line x1="0" y1="790" x2="1120" y2="790" class="divider"/>
 
   <!-- Title -->
   <text x="30" y="36" class="title-main">SMS Store-and-Forward Interception Flow</text>
@@ -86,130 +86,131 @@
        X-centers: ESME=90  SMSC=280  GW=520  AI=760  RECV=1000 -->
 
   <!-- ESME / 5G UE -->
-  <rect x="20"  y="68" width="140" height="52" rx="7" class="panel-client"/>
+  <rect x="18"  y="68" width="144" height="52" rx="7" class="panel-client"/>
   <text x="90"  y="89"  text-anchor="middle" class="node-name">ESME / 5G UE</text>
   <text x="90"  y="106" text-anchor="middle" class="node-sub">Sender · SMPP 3.4 / NAS</text>
-  <line x1="90"  y1="120" x2="90"  y2="700" class="lifeline-client"/>
+  <line x1="90"  y1="120" x2="90"  y2="735" class="lifeline-client"/>
 
   <!-- OsmoSMSC -->
-  <rect x="200" y="68" width="160" height="52" rx="7" class="panel-core"/>
+  <rect x="195" y="68" width="170" height="52" rx="7" class="panel-core"/>
   <text x="280" y="89"  text-anchor="middle" class="node-name">OsmoSMSC / OsmoMSC</text>
   <text x="280" y="106" text-anchor="middle" class="node-sub">SMSC + OsmoHLR · :2775</text>
-  <line x1="280" y1="120" x2="280" y2="700" class="lifeline-core"/>
+  <line x1="280" y1="120" x2="280" y2="735" class="lifeline-core"/>
 
   <!-- telecom-api -->
-  <rect x="435" y="68" width="170" height="52" rx="7" class="panel-gw"/>
+  <rect x="430" y="68" width="180" height="52" rx="7" class="panel-gw"/>
   <text x="520" y="89"  text-anchor="middle" class="node-name">telecom-api</text>
   <text x="520" y="106" text-anchor="middle" class="node-sub">Spring Boot Gateway · :8080</text>
-  <line x1="520" y1="120" x2="520" y2="700" class="lifeline-gw"/>
+  <line x1="520" y1="120" x2="520" y2="735" class="lifeline-gw"/>
 
   <!-- AI Spam Model -->
-  <rect x="685" y="68" width="150" height="52" rx="7" class="panel-ai"/>
+  <rect x="680" y="68" width="160" height="52" rx="7" class="panel-ai"/>
   <text x="760" y="89"  text-anchor="middle" class="node-name">AI Spam Model</text>
   <text x="760" y="106" text-anchor="middle" class="node-sub">REST API · :8000</text>
-  <line x1="760" y1="120" x2="760" y2="700" class="lifeline-ai"/>
+  <line x1="760" y1="120" x2="760" y2="735" class="lifeline-ai"/>
 
   <!-- Recipient UE -->
-  <rect x="930" y="68" width="140" height="52" rx="7" class="panel-client"/>
+  <rect x="925" y="68" width="150" height="52" rx="7" class="panel-client"/>
   <text x="1000" y="89"  text-anchor="middle" class="node-name">Recipient UE</text>
   <text x="1000" y="106" text-anchor="middle" class="node-sub">Target MSISDN</text>
-  <line x1="1000" y1="120" x2="1000" y2="700" class="lifeline-client"/>
+  <line x1="1000" y1="120" x2="1000" y2="735" class="lifeline-client"/>
 
   <!-- ═══════════ SIGNALING STEPS ═══════════ -->
 
-  <!-- Step 1: submit_sm PDU (y=165, text at y=154 above arrow) -->
-  <circle cx="90" cy="165" r="9" fill="#26c6da" opacity="0.9"/>
+  <!-- Step 1: submit_sm PDU -->
+  <circle cx="90" cy="165" r="11" fill="#26c6da" opacity="0.95"/>
   <text x="90" y="169" text-anchor="middle" class="badge-num">1</text>
-  <line x1="99" y1="165" x2="271" y2="165" class="arrow-smpp" marker-end="url(#h-smpp)" filter="url(#glow-teal)"/>
-  <text x="185" y="154" text-anchor="middle" class="lbl" fill="#26c6da">submit_sm PDU / CP-DATA</text>
+  <line x1="101" y1="165" x2="269" y2="165" class="arrow-smpp" marker-end="url(#h-smpp)" filter="url(#glow-teal)"/>
+  <text x="185" y="152" text-anchor="middle" class="lbl" fill="#26c6da">submit_sm PDU / CP-DATA</text>
 
   <!-- Step 2: Delivery Hold + HLR check -->
-  <rect x="206" y="188" width="148" height="26" rx="5" class="note-box" stroke="#00c49a"/>
-  <text x="280" y="205" text-anchor="middle" class="lbl" fill="#00c49a">2. Hold · OsmoHLR Check</text>
+  <rect x="202" y="188" width="156" height="28" rx="5" class="note-box" stroke="#00c49a"/>
+  <text x="280" y="206" text-anchor="middle" class="lbl" fill="#00c49a">2. Hold · OsmoHLR Check</text>
 
   <!-- Step 3: POST /api/v1/intercept/sms -->
-  <circle cx="280" cy="235" r="9" fill="#26c6da" opacity="0.9"/>
-  <text x="280" y="239" text-anchor="middle" class="badge-num">3</text>
-  <line x1="289" y1="235" x2="511" y2="235" class="arrow-smpp" marker-end="url(#h-smpp)"/>
+  <circle cx="280" cy="238" r="11" fill="#26c6da" opacity="0.95"/>
+  <text x="280" y="242" text-anchor="middle" class="badge-num">3</text>
+  <line x1="291" y1="238" x2="509" y2="238" class="arrow-smpp" marker-end="url(#h-smpp)"/>
   <text x="400" y="225" text-anchor="middle" class="lbl" fill="#26c6da">POST /api/v1/intercept/sms</text>
 
   <!-- Step 4: Prepaid OCS Balance Check -->
-  <rect x="444" y="255" width="152" height="26" rx="5" class="note-box" stroke="#9b59b6"/>
-  <text x="520" y="272" text-anchor="middle" class="lbl" fill="#9b59b6">4. Prepaid OCS ($1/SMS)</text>
+  <rect x="440" y="258" width="160" height="28" rx="5" class="note-box" stroke="#9b59b6"/>
+  <text x="520" y="276" text-anchor="middle" class="lbl" fill="#9b59b6">4. Prepaid OCS ($1/SMS)</text>
 
   <!-- Step 5: POST /api/v1/classify -->
-  <circle cx="520" cy="302" r="9" fill="#ef5350" opacity="0.9"/>
-  <text x="520" y="306" text-anchor="middle" class="badge-num">5</text>
-  <line x1="529" y1="302" x2="751" y2="302" class="arrow-ai" marker-end="url(#h-ai)"/>
-  <text x="640" y="292" text-anchor="middle" class="lbl" fill="#ef5350">POST /classify (SMS Content)</text>
+  <circle cx="520" cy="308" r="11" fill="#ef5350" opacity="0.95"/>
+  <text x="520" y="312" text-anchor="middle" class="badge-num">5</text>
+  <line x1="531" y1="308" x2="749" y2="308" class="arrow-ai" marker-end="url(#h-ai)"/>
+  <text x="640" y="295" text-anchor="middle" class="lbl" fill="#ef5350">POST /classify (SMS Content)</text>
 
   <!-- Step 6: AI decision response -->
-  <circle cx="760" cy="336" r="9" fill="#ef5350" opacity="0.9"/>
-  <text x="760" y="340" text-anchor="middle" class="badge-num">6</text>
-  <line x1="751" y1="336" x2="529" y2="336" class="arrow-ai arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-ai-l)"/>
-  <text x="640" y="326" text-anchor="middle" class="lbl" fill="#ef5350">HTTP 200 OK { allow: true/false }</text>
+  <circle cx="760" cy="342" r="11" fill="#ef5350" opacity="0.95"/>
+  <text x="760" y="346" text-anchor="middle" class="badge-num">6</text>
+  <line x1="749" y1="342" x2="531" y2="342" class="arrow-ai arrow-resp" stroke-dasharray="6,4" marker-end="url(#h-ai-l)"/>
+  <text x="640" y="330" text-anchor="middle" class="lbl" fill="#ef5350">HTTP 200 OK { allow: true/false }</text>
 
   <!-- ══ OUTER BRANCH BOX ══ -->
-  <rect x="45" y="368" width="1030" height="340" rx="8" fill="#080d1a" stroke="#1e2740" stroke-width="1.5"/>
-  <text x="66" y="390" class="branch-lbl" fill="#90a4ae">POLICY DECISION BRANCH:</text>
+  <rect x="45" y="375" width="1030" height="370" rx="8" fill="#080d1a" stroke="#1e2740" stroke-width="1.5"/>
+  <text x="66" y="398" class="branch-lbl" fill="#90a4ae">POLICY DECISION BRANCH:</text>
 
   <!-- ── Branch A: ALLOW (x=58 w=485 right=543) ── -->
-  <rect x="58"  y="400" width="485" height="295" rx="6" class="branch-allow"/>
-  <rect x="58"  y="400" width="485" height="26"  rx="6" class="branch-label-allow"/>
-  <text x="300" y="417" text-anchor="middle" class="branch-lbl" fill="#66bb6a">✓ ALLOW  (allow: true)</text>
+  <rect x="58"  y="408" width="485" height="322" rx="6" class="branch-allow"/>
+  <rect x="58"  y="408" width="485" height="26"  rx="6" class="branch-label-allow"/>
+  <text x="300" y="425" text-anchor="middle" class="branch-lbl" fill="#66bb6a">✓ ALLOW  (allow: true)</text>
 
   <!-- ── Branch B: BLOCK (x=558 w=502 right=1060) ── -->
-  <rect x="558" y="400" width="502" height="295" rx="6" class="branch-block"/>
-  <rect x="558" y="400" width="502" height="26"  rx="6" class="branch-label-block"/>
-  <text x="809" y="417" text-anchor="middle" class="branch-lbl" fill="#ef5350">✗ BLOCK  (allow: false)</text>
+  <rect x="558" y="408" width="502" height="322" rx="6" class="branch-block"/>
+  <rect x="558" y="408" width="502" height="26"  rx="6" class="branch-label-block"/>
+  <text x="809" y="425" text-anchor="middle" class="branch-lbl" fill="#ef5350">✗ BLOCK  (allow: false)</text>
 
   <!-- ── Lifelines continuation through policy decision branch box ── -->
-  <line x1="90"   y1="368" x2="90"   y2="695" class="lifeline-client"/>
-  <line x1="280"  y1="368" x2="280"  y2="695" class="lifeline-core"/>
-  <line x1="520"  y1="368" x2="520"  y2="695" class="lifeline-gw"/>
-  <line x1="760"  y1="368" x2="760"  y2="695" class="lifeline-ai"/>
-  <line x1="1000" y1="368" x2="1000" y2="695" class="lifeline-client"/>
+  <line x1="90"   y1="375" x2="90"   y2="730" class="lifeline-client"/>
+  <line x1="280"  y1="375" x2="280"  y2="730" class="lifeline-core"/>
+  <line x1="520"  y1="375" x2="520"  y2="730" class="lifeline-gw"/>
+  <line x1="760"  y1="375" x2="760"  y2="730" class="lifeline-ai"/>
+  <line x1="1000" y1="375" x2="1000" y2="730" class="lifeline-client"/>
 
-  <!-- ════ ROW 1 — Step 7a / 7b (y=452) ════ -->
+  <!-- ════ ROW 1a — Step 7a (ALLOW): GW → SMSC: HTTP 200 OK allow:true ════ -->
+  <text x="400" y="445" text-anchor="middle" class="lbl" fill="#66bb6a">HTTP 200 OK { allow: true }</text>
+  <circle cx="520" cy="455" r="11" fill="#66bb6a" opacity="0.95"/>
+  <text   x="520" y="459" text-anchor="middle" class="badge-num" fill="#000">7a</text>
+  <line x1="509" y1="455" x2="291" y2="455" class="arrow-allow arrow-resp" stroke-dasharray="6,4" marker-end="url(#h-allow-l)"/>
 
-  <!-- 7a: ALLOW branch (telecom-api x=520 → OsmoSMSC x=280) -->
-  <text x="400" y="442" text-anchor="middle" class="lbl" fill="#66bb6a">HTTP 200 OK { allow: true }</text>
-  <circle cx="520" cy="452" r="9" fill="#66bb6a" opacity="0.9"/>
-  <text   x="520" y="456" text-anchor="middle" class="badge-num" fill="#000">7a</text>
-  <line x1="511" y1="452" x2="289" y2="452" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
+  <!-- ════ ROW 1b — Step 7b (BLOCK): GW → SMSC: HTTP 200 OK allow:false ════ -->
+  <text x="809" y="445" text-anchor="middle" class="lbl" fill="#ef5350">GW → SMSC: { allow: false, reason: "Spam" }</text>
 
-  <!-- 7b: BLOCK branch (label cleanly placed at x=809 in BLOCK box, arrow crosses from 520 to 280) -->
-  <text x="809" y="442" text-anchor="middle" class="lbl" fill="#ef5350">GW → SMSC: { allow: false, reason: "Spam" }</text>
-  <circle cx="760" cy="452" r="9" fill="#ef5350" opacity="0.9"/>
-  <text   x="760" y="456" text-anchor="middle" class="badge-num">7b</text>
-  <line x1="751" y1="452" x2="529" y2="452" class="arrow-block arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-block-l)"/>
-
-  <!-- ════ ROW 2 — Step 8a (y=505): SMSC → Recipient UE ════ -->
-  <text x="320" y="495" class="lbl" fill="#66bb6a">deliver_sm PDU / CP-DATA → Recipient UE</text>
-  <circle cx="280" cy="505" r="9" fill="#66bb6a" opacity="0.9"/>
+  <!-- ════ ROW 2a — Step 8a (ALLOW): SMSC → Recipient UE ════ -->
+  <text x="350" y="495" class="lbl" fill="#66bb6a">deliver_sm PDU / CP-DATA → Recipient UE</text>
+  <circle cx="280" cy="505" r="11" fill="#66bb6a" opacity="0.95"/>
   <text   x="280" y="509" text-anchor="middle" class="badge-num" fill="#000">8a</text>
-  <line x1="289" y1="505" x2="991" y2="505" class="arrow-allow" marker-end="url(#h-allow)"/>
+  <line x1="291" y1="505" x2="989" y2="505" class="arrow-allow" marker-end="url(#h-allow)"/>
 
-  <!-- ════ ROW 3 — Step 8b (y=525–575): BLOCK outcome box ════ -->
-  <rect x="568" y="525" width="482" height="50" rx="5" fill="#130505" stroke="#7b1818" stroke-width="1"/>
-  <text x="809" y="545" text-anchor="middle" class="lbl" fill="#ef5350">8b. SMSC drops SMS</text>
-  <text x="809" y="563" text-anchor="middle" class="lbl" fill="#ef5350">Interception logged · failure resp / RP-ERROR → ESME</text>
+  <!-- ════ ROW 2b — Step 8b (BLOCK): SMSC → ESME failure resp ════ -->
+  <text x="185" y="535" text-anchor="middle" class="lbl" fill="#ef5350">submit_sm_resp(failure) / RP-ERROR</text>
+  <circle cx="280" cy="545" r="11" fill="#ef5350" opacity="0.95"/>
+  <text   x="280" y="549" text-anchor="middle" class="badge-num">8b</text>
+  <line x1="269" y1="545" x2="101" y2="545" class="arrow-block arrow-resp" stroke-dasharray="6,4" marker-end="url(#h-block-l)"/>
 
-  <!-- ════ ROW 4 — Step 9a (y=610): SMSC → ESME submit_sm_resp(success) ════ -->
-  <text x="185" y="600" text-anchor="middle" class="lbl" fill="#66bb6a">submit_sm_resp / CP-ACK (success)</text>
-  <circle cx="280" cy="610" r="9" fill="#66bb6a" opacity="0.9"/>
-  <text   x="280" y="614" text-anchor="middle" class="badge-num" fill="#000">9a</text>
-  <line x1="271" y1="610" x2="99"  y2="610" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
+  <!-- ════ ROW 3 — Step 8b Outcome Box (BLOCK) ════ -->
+  <rect x="570" y="580" width="478" height="52" rx="5" fill="#130505" stroke="#7b1818" stroke-width="1.2"/>
+  <text x="809" y="601" text-anchor="middle" class="lbl" fill="#ef5350">8b. SMSC drops SMS · Interception Logged</text>
+  <text x="809" y="619" text-anchor="middle" class="lbl" fill="#ef5350">Audit log saved · failure notification sent to ESME</text>
+
+  <!-- ════ ROW 4 — Step 9a (ALLOW): SMSC → ESME submit_sm_resp(success) ════ -->
+  <text x="185" y="640" text-anchor="middle" class="lbl" fill="#66bb6a">submit_sm_resp / CP-ACK (success)</text>
+  <circle cx="280" cy="650" r="11" fill="#66bb6a" opacity="0.95"/>
+  <text   x="280" y="654" text-anchor="middle" class="badge-num" fill="#000">9a</text>
+  <line x1="269" y1="650" x2="101" y2="650" class="arrow-allow arrow-resp" stroke-dasharray="6,4" marker-end="url(#h-allow-l)"/>
 
   <!-- Footer legend -->
-  <line x1="30"  y1="742" x2="80"  y2="742" stroke="#26c6da" stroke-width="2.2"/>
-  <text x="88"  y="746" class="lbl" fill="#78909c" font-size="10">SMPP Signaling</text>
-  <line x1="195" y1="742" x2="245" y2="742" stroke="#9b59b6" stroke-width="2"/>
-  <text x="253" y="746" class="lbl" fill="#78909c" font-size="10">OCS Check</text>
-  <line x1="330" y1="742" x2="380" y2="742" stroke="#ef5350" stroke-width="2.2"/>
-  <text x="388" y="746" class="lbl" fill="#78909c" font-size="10">AI Classify</text>
-  <line x1="460" y1="742" x2="510" y2="742" stroke="#66bb6a" stroke-width="2.5"/>
-  <text x="518" y="746" class="lbl" fill="#78909c" font-size="10">Allowed Path</text>
-  <line x1="605" y1="742" x2="655" y2="742" stroke="#ef5350" stroke-width="2.5"/>
-  <text x="663" y="746" class="lbl" fill="#78909c" font-size="10">Blocked Path</text>
+  <line x1="30"  y1="802" x2="80"  y2="802" stroke="#26c6da" stroke-width="2.5"/>
+  <text x="88"  y="806" class="lbl" fill="#78909c" font-size="11">SMPP Signaling</text>
+  <line x1="195" y1="802" x2="245" y2="802" stroke="#9b59b6" stroke-width="2.2"/>
+  <text x="253" y="806" class="lbl" fill="#78909c" font-size="11">OCS Check</text>
+  <line x1="330" y1="802" x2="380" y2="802" stroke="#ef5350" stroke-width="2.5"/>
+  <text x="388" y="806" class="lbl" fill="#78909c" font-size="11">AI Classify</text>
+  <line x1="460" y1="802" x2="510" y2="802" stroke="#66bb6a" stroke-width="2.8"/>
+  <text x="518" y="806" class="lbl" fill="#78909c" font-size="11">Allowed Path</text>
+  <line x1="605" y1="802" x2="655" y2="802" stroke="#ef5350" stroke-width="2.8"/>
+  <text x="663" y="806" class="lbl" fill="#78909c" font-size="11">Blocked Path</text>
 </svg>
