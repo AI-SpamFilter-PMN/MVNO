@@ -191,11 +191,11 @@
   <text   x="470" y="456" text-anchor="middle" class="badge-num" fill="#000">7a</text>
   <line x1="461" y1="452" x2="264" y2="452" class="arrow-allow arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-allow-l)"/>
 
-  <!-- 7b: GW sends reject to SMSC — label above arrow, in BLOCK lane -->
-  <text x="798" y="442" text-anchor="middle" class="lbl" fill="#ef5350">GW → SMSC: { allow: false, reason: "Spam" }</text>
-  <circle cx="670" cy="452" r="9" fill="#ef5350" opacity="0.9"/>
-  <text   x="670" y="456" text-anchor="middle" class="badge-num">7b</text>
-  <line x1="661" y1="452" x2="578" y2="452" class="arrow-block arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-block-l)"/>
+  <!-- 7b: GW sends reject to SMSC (telecom-api x=470 → OsmoSMSC x=255) -->
+  <text x="362" y="442" text-anchor="middle" class="lbl" fill="#ef5350">HTTP 200 OK { allow: false, reason: "Spam" }</text>
+  <circle cx="470" cy="452" r="9" fill="#ef5350" opacity="0.9"/>
+  <text   x="470" y="456" text-anchor="middle" class="badge-num">7b</text>
+  <line x1="461" y1="452" x2="264" y2="452" class="arrow-block arrow-resp" stroke-dasharray="5,3" marker-end="url(#h-block-l)"/>
 
   <!-- ════ ROW 2 — Step 8a: SMSC → Recipient: deliver_sm: label y=480 arrow y=490 ════ -->
   <text x="292" y="480" class="lbl" fill="#66bb6a">deliver_sm PDU / CP-DATA → Recipient UE</text>
