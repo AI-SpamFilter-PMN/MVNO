@@ -1,21 +1,13 @@
 package com.mvno.intercept.subscriber;
 
 /**
- * <h1>Interception Policy Response DTO Record</h1>
+ * Interception Policy Response DTO Record
  * 
- * <p>Immutable Java 21 Record representing policy decisions returned by the Spring Boot gateway to Kamailio
- * and OsmoSMSC in response to HTTP interception queries.</p>
+ * Policy decision JSON returned to Kamailio and OsmoSMSC:
+ * { "allow": true, "reason": "Prepaid balance valid" }
  * 
- * <h2>JSON Output Schema</h2>
- * <pre>{@code
- * {
- *   "allow": true,
- *   "reason": "Subscriber balance valid and AI approved"
- * }
- * }</pre>
- * 
- * @param allow Boolean decision flag ({@code true} to forward call/SMS, {@code false} to reject/drop).
- * @param reason Human-readable diagnostic reason string (e.g. "Prepaid balance exhausted", "EIR: SIM swap detected").
+ * @param allow Decision flag (true to forward, false to drop).
+ * @param reason Diagnostic description string.
  * 
  * @author MVNO Core Engineering Team
  * @version 1.0.0
