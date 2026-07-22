@@ -8,46 +8,72 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+
 import java.util.Map;
 
 /**
- * AI Spam Model Integration & SLA Fallback Proxy Service.
+ * <h1>AI Spam Model Proxy &amp; Carrier SLA Resilience Service</h1>
  * 
- * ARCHITECTURE BOUNDARY:
- * Proxies incoming SMS and Voice Call interception events to the external AI Spam Model server
- * (`POST http://ai-filter:8000/api/v1/classify`) built by teammates Ahmed Omar & Mahmoud Salah.
+ * <p>The {@code AiFilterService} acts as the primary integration bridge between the MVNO core gateway
+ * and the external AI Spam Model microservice ({@code http://ai-filter:8000/api/v1/classify}).</p>
  * 
- * RESILIENCE & SLA CARRIER RULE:
- * In telecommunications, a failure in a secondary AI filtering subsystem must NEVER cause a carrier
- * outage or drop legitimate subscriber phone calls/SMS. If the AI model server is offline, returns an HTTP
- * error, or exceeds the 5-second socket timeout window, the try/catch block intercepts the exception and
- * gracefully returns a **Fail-Open decision (`allow: true`)**.
+ * <h2>System Integration &amp; REST Contract</h2>
+ * <p>Proxies real-time SMS content payloads and Voice Call metadata over the container bridge network.
+ * Payloads conform strictly to the schema defined in {@code docs/API_CONTRACT.md}.</p>
+ * 
+ * <h2>Carrier SLA &amp; Fault Tolerance Rule (Fail-Open)</h2>
+ * <p>In tier-1 telecommunications networks, auxiliary security/analytics services must <b>NEVER</b> cause a
+ * total service outage or block legitimate subscriber traffic during secondary system failures:</p>
+ * <ul>
+ *   <li><b>Circuit Breaker / SLA Fallback:</b> If the AI model container is offline, returns HTTP 5xx errors,
+ *       or exceeds the 5-second socket timeout window, the exception is caught and a <b>Fail-Open decision
+ *       ({@code allow: true})</b> is returned.</li>
+ *   <li><b>Audit Trail:</b> SLA fallback events are logged with {@code WARN} level to trigger NOC monitoring alerts.</li>
+ * </ul>
+ * 
+ * @author MVNO Core Engineering Team
+ * @version 1.0.0
+ * @see com.mvno.intercept.subscriber.SMSInterceptRequest
+ * @see com.mvno.intercept.subscriber.CallInterceptRequest
+ * @see com.mvno.intercept.subscriber.InterceptResponse
+ * @see com.mvno.intercept.filter.TranscriptionResult
  */
-// `@Service` marks this business logic class as a Spring-managed service bean in the ApplicationContext.
 @Service
 public class AiFilterService {
 
     private static final Logger logger = LoggerFactory.getLogger(AiFilterService.class);
+
+    /** Injected thread-safe RestClient for outbound HTTP POST requests. */
     private final RestClient restClient;
+
+    /** Target AI filter endpoint URL (property: {@code ai-filter.url}). Default: {@code http://ai-filter:8000/api/v1/classify}. */
     private final String baseUrl;
 
-    // `@Value` injects the configured property value directly into the constructor parameter with a fallback default.
-    public AiFilterService(RestClient restClient,
-                           @Value("${ai-filter.url:http://ai-filter:8000/api/v1/classify}") String baseUrl) {
+    /**
+     * Constructs the AI Filter Proxy Service with required HTTP client dependencies.
+     * 
+     * @param restClient Pre-configured Spring {@link RestClient} instance with socket timeouts.
+     * @param baseUrl Base URL of the external AI classification REST endpoint.
+     */
+    public AiFilterService(final RestClient restClient,
+                           @Value("${ai-filter.url:http://ai-filter:8000/api/v1/classify}") final String baseUrl) {
         this.restClient = restClient;
         this.baseUrl = baseUrl;
     }
 
     /**
-     * Constructs the classification payload for an SMS event and proxies it to the AI Spam Filter server.
+     * Constructs an SMS classification JSON payload and proxies it to the AI Spam Model server.
      * 
-     * @param req Incoming SMS interception request DTO.
-     * @return InterceptResponse indicating whether the SMS is allowed or blocked.
+     * <p>If the AI model approves the text, returns {@code allow: true}. If flagged as spam, returns
+     * {@code allow: false} with reason. On network/timeout failure, gracefully falls back to SLA allow.</p>
+     * 
+     * @param req The incoming SMS interception request containing sender, recipient, and text content.
+     * @return An {@link InterceptResponse} containing the policy decision and reason string.
      */
-    public InterceptResponse classifySms(SMSInterceptRequest req) {
+    public InterceptResponse classifySms(final SMSInterceptRequest req) {
         try {
-            // Immutable Map.of() constructs the JSON body matching docs/API_CONTRACT.md schema
-            var body = Map.of(
+            // Build JSON payload map matching docs/API_CONTRACT.md schema
+            final Map<String, Object> body = Map.of(
                 "event_type", "SMS",
                 "sender_msisdn", req.sender(),
                 "recipient_msisdn", req.recipient(),
@@ -55,8 +81,8 @@ public class AiFilterService {
                 "timestamp_epoch_ms", System.currentTimeMillis()
             );
 
-            // Execute POST request over HTTP bridge network to ai-filter:8000
-            var result = restClient.post()
+            // Execute synchronous POST request to AI model server
+            final TranscriptionResult result = restClient.post()
                     .uri(baseUrl)
                     .body(body)
                     .retrieve()
@@ -65,24 +91,28 @@ public class AiFilterService {
             if (result != null) {
                 return new InterceptResponse(result.allow(), result.reason());
             }
+            
+            // Handle null body response gracefully
             return new InterceptResponse(true, "AI filter returned empty response — SLA allow");
-        } catch (Exception e) {
-            // Catch connection failure, 5xx server error, or 5s socket timeout
+        } catch (final Exception e) {
+            // Carrier SLA Fail-Open: Log warning and allow SMS to proceed
             logger.warn("AI filter unreachable or timed out (>5s): {}. Falling back to SLA allow.", e.getMessage());
             return new InterceptResponse(true, "AI filter unreachable — SLA allow");
         }
     }
 
     /**
-     * Constructs the classification payload for a Voice Call event and proxies it to the AI Spam Filter server.
+     * Constructs a Voice Call setup classification JSON payload and proxies it to the AI Spam Model server.
      * 
-     * @param req Incoming Call interception request DTO.
-     * @return InterceptResponse indicating whether call setup is allowed or blocked.
+     * <p>Proxies call metadata (caller MSISDN, callee MSISDN, SIP Call-ID) to detect blacklisted robocallers.</p>
+     * 
+     * @param req The incoming Voice Call setup request containing caller, callee, and Call-ID metadata.
+     * @return An {@link InterceptResponse} containing the call setup policy decision.
      */
-    public InterceptResponse classifyCall(CallInterceptRequest req) {
+    public InterceptResponse classifyCall(final CallInterceptRequest req) {
         try {
-            // Immutable Map.of() constructs the call metadata JSON body matching docs/API_CONTRACT.md schema
-            var body = Map.of(
+            // Build JSON payload map for call metadata matching docs/API_CONTRACT.md schema
+            final Map<String, Object> body = Map.of(
                 "event_type", "VOICE_CALL",
                 "caller_msisdn", req.caller(),
                 "callee_msisdn", req.callee(),
@@ -90,8 +120,8 @@ public class AiFilterService {
                 "timestamp_epoch_ms", System.currentTimeMillis()
             );
 
-            // Execute POST request over HTTP bridge network to ai-filter:8000
-            var result = restClient.post()
+            // Execute synchronous POST request to AI model server
+            final TranscriptionResult result = restClient.post()
                     .uri(baseUrl)
                     .body(body)
                     .retrieve()
@@ -100,9 +130,10 @@ public class AiFilterService {
             if (result != null) {
                 return new InterceptResponse(result.allow(), result.reason());
             }
+
             return new InterceptResponse(true, "AI filter returned empty response — SLA allow");
-        } catch (Exception e) {
-            // Catch connection failure, 5xx server error, or 5s socket timeout
+        } catch (final Exception e) {
+            // Carrier SLA Fail-Open: Log warning and allow call setup to proceed
             logger.warn("AI filter unreachable or timed out (>5s): {}. Falling back to SLA allow.", e.getMessage());
             return new InterceptResponse(true, "AI filter unreachable — SLA allow");
         }

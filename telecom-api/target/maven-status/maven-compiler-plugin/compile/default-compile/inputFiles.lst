@@ -11,4 +11,5 @@
 /home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/subscriber/SubscriberController.java
 /home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/subscriber/SubscriberRepository.java
 /home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/subscriber/SubscriberService.java
+/home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/transcription/NativeVoskService.java
 /home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/transcription/TranscriptionController.java
