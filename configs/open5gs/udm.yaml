@@ -1,0 +1,19 @@
+logger:
+  file:
+    path: /var/log/open5gs/udm.log
+
+global:
+  max:
+    ue: 1024
+
+udm:
+  sbi:
+    server:
+      - address: 0.0.0.0
+        port: 7777
+        advertise: udm
+    client:
+      nrf:
+        - uri: http://nrf:7777
+      udr:
+        - uri: http://udr:7777
