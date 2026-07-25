@@ -6,15 +6,15 @@ This guide covers the transaction flow, software prerequisites, and complete con
 
 ## 1. Project Transaction Flow & Steps
 
-![MVNO Core Flow Chart](architecture_flow.svg)
+[![MVNO Core Flow Chart](architecture_flow.png)](architecture_flow.svg)
 
 ### IMS VoLTE / VoNR Voice Call Signaling Flow
 
-![IMS Voice Call Interception Flow](ims_voice_call_flow.svg)
+[![IMS Voice Call Interception Flow](ims_voice_call_flow.png)](ims_voice_call_flow.svg)
 
 ### SMS Store-and-Forward Interception Signaling Flow
 
-![SMS Interception Flow](sms_interception_flow.svg)
+[![SMS Interception Flow](sms_interception_flow.png)](sms_interception_flow.svg)
 
 ### Voice Transaction Steps:
 1. **SIP Invite**: `UE_1` sends an `INVITE` request to Kamailio.
