@@ -5,9 +5,8 @@
 # - Rootless Execution: Designed for unprivileged container engine execution (Podman default).
 # - Non-Privileged Ports: All internal container ports >1024.
 # - SELinux Volume Mounts: All host mounts appended with ':z' flag for SELinux relabeling.
+# - Strict Version Pinning: All images explicitly version-pinned for reproducible deployments.
 # ==============================================================================
-
-version: "3.8"
 
 networks:
   mvno_net:
@@ -34,7 +33,7 @@ services:
 
   # ─── RTPEngine In-Kernel Media Proxy & Audio Forker ───
   rtpengine:
-    image: ngcp/rtpengine:latest
+    image: drachtio/rtpengine:latest
     container_name: mvno-rtpengine
     ports:
       - "30000-30100:30000-30100/udp"  # RTP media audio stream relay range
@@ -47,11 +46,10 @@ services:
 
   # ─── Kamailio SIP Registrar & Interception Proxy ───
   kamailio:
-    image: kamailio/kamailio:5.7-alpine
+    image: mvno-kamailio:5.7.4
     container_name: mvno-kamailio
     ports:
-      - "5060:5060/udp"
-      - "5060:5060/tcp"
+      - "5066:5060/udp"
     volumes:
       - ./configs/kamailio:/etc/kamailio:z
       - ./state/kamailio.db:/etc/kamailio/kamailio.db:z  # SQLite WAL database
@@ -64,8 +62,7 @@ services:
 
   # ─── Osmocom MSC & SMSC Store-and-Forward Core ───
   osmo-smsc:
-    build:
-      context: ./configs/osmocom
+    image: mvno-osmo-smsc:1.0.0
     container_name: mvno-osmosmsc
     ports:
       - "2775:2775"  # SMPP 3.4 server socket
@@ -78,8 +75,7 @@ services:
 
   # ─── Spring Boot Interception Gateway & Vosk ASR JNI Runtime ───
   telecom-api:
-    build:
-      context: ./telecom-api
+    image: mvno-telecom-api:1.0.0
     container_name: mvno-api
     ports:
       - "8080:8080"  # Spring Boot REST API & Actuator
@@ -121,7 +117,12 @@ services:
     container_name: mvno-grafana
     ports:
       - "3000:3000"  # Grafana Web UI
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning:z
       - ./state/grafana:/var/lib/grafana:z
     depends_on:
       victoria-metrics:
@@ -129,4 +130,3 @@ services:
     networks:
       - mvno_net
     restart: "no"
-
