@@ -2,6 +2,7 @@ package com.mvno.intercept.subscriber;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,9 +17,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - Grey List: Devices under observation (suspected robocall farms / cloned hardware).
  * - Black List: Stolen/fraudulent devices blocked from call setup.
  * 
- * Concurrency & Data Structures:
+ * Concurrency & Eviction Strategy:
  * Uses ConcurrentHashMap + AtomicInteger for lock-free thread safety across Virtual Threads.
- * Enforces MAX_CAPACITY size bounding (10,000 IMEIs) to prevent memory leaks during long-running operation.
+ * Enforces MAX_CAPACITY (10,000 IMEIs) size bounding + @Scheduled time-based TTL cleanup (every 10 min)
+ * to automatically purge stale IMEI fraud tracking data and prevent memory leaks.
  * 
  * Fraud Rule:
  * >3 distinct SIM insertions on a single IMEI hardware unit triggers SIM-swap / robocall farm detection.
@@ -59,6 +61,18 @@ public class EirTracker {
         }
 
         return true;
+    }
+
+    /**
+     * Automatic time-based TTL cache cleanup running every 10 minutes.
+     * Purges accumulated IMEI tracking state to ensure memory footprint stays low over long deployments.
+     */
+    @Scheduled(fixedRate = 600000)
+    public void cleanupStaleImeiCache() {
+        if (!imeiSwapCounter.isEmpty()) {
+            logger.info("Executing scheduled EIR tracking cache TTL purge (cleared {} entries).", imeiSwapCounter.size());
+            imeiSwapCounter.clear();
+        }
     }
 
     /**

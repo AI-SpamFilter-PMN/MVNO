@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.util.Map;
 
@@ -19,8 +20,7 @@ import java.util.Map;
  * 
  * Carrier SLA Rules (Fail-Open):
  * In telecommunications, auxiliary AI/analytics failures must never cause carrier downtime.
- * If the AI filter is offline, errors, or times out (>5s), the exception is caught and an
- * SLA Fail-Open decision (allow: true) is returned.
+ * Catches RestClientException specifically on network/timeout (>5s) errors to fall back cleanly to SLA allow.
  * 
  * @author MVNO Core Engineering Team
  * @version 1.0.0
@@ -65,9 +65,12 @@ public class AiFilterService {
                 return new InterceptResponse(result.allow(), result.reason());
             }
             return new InterceptResponse(true, "AI filter returned empty response — SLA allow");
-        } catch (final Exception e) {
-            logger.warn("AI filter unreachable or timed out (>5s): {}. Falling back to SLA allow.", e.getMessage());
+        } catch (final RestClientException e) {
+            logger.warn("AI filter HTTP connection error or timeout (>5s): {}. Falling back to SLA allow.", e.getMessage());
             return new InterceptResponse(true, "AI filter unreachable — SLA allow");
+        } catch (final Exception e) {
+            logger.error("Unexpected error in SMS AI classification: {}", e.getMessage(), e);
+            return new InterceptResponse(true, "Gateway internal error — SLA allow");
         }
     }
 
@@ -97,9 +100,12 @@ public class AiFilterService {
                 return new InterceptResponse(result.allow(), result.reason());
             }
             return new InterceptResponse(true, "AI filter returned empty response — SLA allow");
-        } catch (final Exception e) {
-            logger.warn("AI filter unreachable or timed out (>5s): {}. Falling back to SLA allow.", e.getMessage());
+        } catch (final RestClientException e) {
+            logger.warn("AI filter HTTP connection error or timeout (>5s): {}. Falling back to SLA allow.", e.getMessage());
             return new InterceptResponse(true, "AI filter unreachable — SLA allow");
+        } catch (final Exception e) {
+            logger.error("Unexpected error in Call AI classification: {}", e.getMessage(), e);
+            return new InterceptResponse(true, "Gateway internal error — SLA allow");
         }
     }
 }
