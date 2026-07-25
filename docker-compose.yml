@@ -31,20 +31,6 @@ services:
       timeout: 5s
       retries: 3
 
-  # ─── Open5GS WebUI Subscriber Management ───
-  open5gs-webui:
-    image: open5gs/webui:latest
-    container_name: mvno-open5gs-webui
-    ports:
-      - "9999:3000"
-    environment:
-      - DB_URI=mongodb://mvno-mongodb:27017/open5gs
-    depends_on:
-      - mongodb
-    networks:
-      - mvno_net
-    restart: "no"
-
   # ─── Open5GS NRF (Network Repository Function) ───
   nrf:
     image: mvno-open5gs:2.8.0

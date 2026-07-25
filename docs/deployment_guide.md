@@ -54,10 +54,10 @@ Operating in a daemonless, rootless environment:
 | **Podman** | `sudo apt install podman` | Daemonless rootless engine |
 | **Docker Compose Plugin**| `sudo apt install docker-compose` | Compose orchestration via `podman compose` |
 | **Podman API Socket**| `systemctl --user enable --now podman.socket` | Required by Docker Compose Plugin to talk to Podman |
-| **Kamailio Image** | `mvno-kamailio:latest` | Custom Alpine build (adds kamailio-utils) from `configs/kamailio/Dockerfile` |
-| **rtpengine Image**| `drachtio/rtpengine:latest` | Media engine container |
-| **Osmocom Image** | `mvno-osmo-smsc:latest` | Custom Debian build from `configs/osmocom/Dockerfile` |
-| **Spring Boot Image** | `mvno-telecom-api:latest` | Custom multi-stage Maven/Temurin build from `telecom-api/Dockerfile` (Java 21 LTS + Native Vosk) |
+| **Kamailio Image** | `mvno-kamailio:5.7.4` | Custom Alpine build (adds kamailio-utils) from `configs/kamailio/Dockerfile` |
+| **rtpengine Image**| `drachtio/rtpengine:mr9.4.0.0` | Media engine container |
+| **Osmocom Image** | `mvno-osmo-smsc:1.0.0` | Custom Debian build from `configs/osmocom/Dockerfile` |
+| **Spring Boot Image** | `mvno-telecom-api:1.0.0` | Custom multi-stage Maven/Temurin build from `telecom-api/Dockerfile` (Java 21 LTS + Native Vosk) |
 | **VictoriaMetrics**| `victoriametrics/victoria-metrics` | Single-node database container |
 | **Grafana Image** | `grafana/grafana-oss` | Metric UI dashboard container |
 
@@ -135,7 +135,7 @@ networks:
 services:
   # ─── Core (Phase 1) ──────────────────────────────
   rtpengine:
-    image: drachtio/rtpengine:latest
+    image: drachtio/rtpengine:mr9.4.0.0
     container_name: mvno-rtpengine
     ports:
       - "30000-30100:30000-30100/udp"

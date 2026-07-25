@@ -187,18 +187,18 @@ detect_runtime
 
 # ─── Step 1: Pull pre-built images ─────────────────────
 PREBUILT_IMAGES=(
-    "mongo:8.0"
-  "drachtio/rtpengine:latest"
-  "victoriametrics/victoria-metrics:latest"
-  "victoriametrics/vmagent:latest"
-  "grafana/grafana-oss:latest"
+    "mongo:7.0.6"
+    "drachtio/rtpengine:mr9.4.0.0"
+    "victoriametrics/victoria-metrics:v1.101.0"
+    "victoriametrics/vmagent:v1.101.0"
+    "grafana/grafana-oss:11.6.0"
     "debian:bookworm-slim"
     "python:3.11-alpine"
     "maven:3.9-eclipse-temurin-25"
     "eclipse-temurin:25-jre"
     "alpine:3.19"
     "node:20-alpine"
-    "timberio/vector:latest-alpine"
+    "timberio/vector:0.44.0-alpine"
 )
 
 for img in "${PREBUILT_IMAGES[@]}"; do
@@ -258,25 +258,23 @@ for svc in osmo-smsc telecom-api vosk-worker; do
 done
 
 declare -A SAVE_IMAGES=(
-    ["mongo-8.0"]="mongo:8.0"
-    ["drachtio-rtpengine-latest"]="drachtio/rtpengine:latest"
-    ["mvno-kamailio"]="mvno-kamailio:latest"
-    ["victoria-metrics-latest"]="victoriametrics/victoria-metrics:latest"
-    ["vmagent-latest"]="victoriametrics/vmagent:latest"
-    ["grafana-oss-latest"]="grafana/grafana-oss:latest"
+    ["mongo-7.0.6"]="mongo:7.0.6"
+    ["drachtio-rtpengine-mr9.4.0.0"]="drachtio/rtpengine:mr9.4.0.0"
+    ["mvno-kamailio-5.7.4"]="mvno-kamailio:5.7.4"
+    ["victoria-metrics-v1.101.0"]="victoriametrics/victoria-metrics:v1.101.0"
+    ["vmagent-v1.101.0"]="victoriametrics/vmagent:v1.101.0"
+    ["grafana-oss-11.6.0"]="grafana/grafana-oss:11.6.0"
     ["debian-bookworm-slim"]="debian:bookworm-slim"
     ["python-3.11-alpine"]="python:3.11-alpine"
     ["eclipse-temurin-25-jre"]="eclipse-temurin:25-jre"
     ["alpine-3.19"]="alpine:3.19"
     ["node-20-alpine"]="node:20-alpine"
-    ["timberio-vector-latest-alpine"]="timberio/vector:latest-alpine"
-    ["mvno-osmo-smsc"]="mvno-osmo-smsc:latest"
-    ["mvno-telecom-api"]="mvno-telecom-api:latest"
+    ["timberio-vector-0.44.0-alpine"]="timberio/vector:0.44.0-alpine"
+    ["mvno-osmo-smsc-1.0.0"]="mvno-osmo-smsc:1.0.0"
+    ["mvno-telecom-api-1.0.0"]="mvno-telecom-api:1.0.0"
     ["maven-3.9-eclipse-temurin-25"]="maven:3.9-eclipse-temurin-25"
-    ["mvno-vosk-worker"]="mvno-vosk-worker:latest"
-    ["mvno-open5gs"]="mvno-open5gs:latest"
-    ["mvno-ueransim"]="mvno-ueransim:latest"
-    ["mvno-open5gs-webui"]="mvno-open5gs-webui:latest"
+    ["mvno-open5gs-2.8.0"]="mvno-open5gs:2.8.0"
+    ["mvno-ueransim-3.2.6"]="mvno-ueransim:3.2.6"
 )
 
 for name in "${!SAVE_IMAGES[@]}"; do
