@@ -25,13 +25,13 @@
     </style>
 
     <!-- Arrow markers -->
-    <marker id="arrow-head-cyan" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <marker id="arrow-head-cyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" overflow="visible">
       <path d="M 0 0 L 10 5 L 0 10 z" class="marker-cyan" />
     </marker>
-    <marker id="arrow-head-orange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <marker id="arrow-head-orange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" overflow="visible">
       <path d="M 0 0 L 10 5 L 0 10 z" class="marker-orange" />
     </marker>
-    <marker id="arrow-head-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <marker id="arrow-head-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" overflow="visible">
       <path d="M 0 0 L 10 5 L 0 10 z" class="marker-blue" />
     </marker>
   </defs>

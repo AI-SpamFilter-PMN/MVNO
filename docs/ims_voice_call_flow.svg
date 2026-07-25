@@ -33,29 +33,29 @@
     </style>
 
     <!-- Arrow heads -->
-    <marker id="h-sip"   viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+    <marker id="h-sip"   viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="7" orient="auto" overflow="visible">
       <path d="M 0 0 L 10 4 L 0 8 z" fill="#29b6f6"/>
     </marker>
-    <marker id="h-media" viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+    <marker id="h-media" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="7" orient="auto" overflow="visible">
       <path d="M 0 0 L 10 4 L 0 8 z" fill="#66bb6a"/>
     </marker>
-    <marker id="h-spool" viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+    <marker id="h-spool" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="7" orient="auto" overflow="visible">
       <path d="M 0 0 L 10 4 L 0 8 z" fill="#ab47bc"/>
     </marker>
-    <marker id="h-asr"   viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+    <marker id="h-asr"   viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="7" orient="auto" overflow="visible">
       <path d="M 0 0 L 10 4 L 0 8 z" fill="#d4e157"/>
     </marker>
-    <marker id="h-ai"    viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+    <marker id="h-ai"    viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="7" orient="auto" overflow="visible">
       <path d="M 0 0 L 10 4 L 0 8 z" fill="#ef5350"/>
     </marker>
-    <marker id="h-sip-l" viewBox="0 0 10 8" refX="2" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="h-sip-l" viewBox="0 0 10 8" refX="1" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse" overflow="visible">
       <path d="M 10 0 L 0 4 L 10 8 z" fill="#29b6f6"/>
     </marker>
-    <marker id="h-ai-l"  viewBox="0 0 10 8" refX="2" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="h-ai-l"  viewBox="0 0 10 8" refX="1" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse" overflow="visible">
       <path d="M 10 0 L 0 4 L 10 8 z" fill="#ef5350"/>
     </marker>
 
-    <marker id="h-core"   viewBox="0 0 10 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+    <marker id="h-core"   viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="7" orient="auto" overflow="visible">
       <path d="M 0 0 L 10 4 L 0 8 z" fill="#00c49a"/>
     </marker>
     <marker id="h-core-l" viewBox="0 0 10 8" refX="2" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
