@@ -3,8 +3,19 @@ WORKDIR /usr/src/app
 RUN apk add --no-cache git python3 make g++
 RUN git clone --depth 1 --branch v2.8.0 https://github.com/open5gs/open5gs.git /tmp/open5gs && \
     cp -r /tmp/open5gs/webui/* /usr/src/app/ && \
-    rm -rf /tmp/open5gs
+    rm -rf /tmp/open5gs && \
+    sed -i "s|from './reducers';|from './reducers/index.js';|g" /usr/src/app/src/modules/store.js && \
+    sed -i "s|from './sagas';|from './sagas/index.js';|g" /usr/src/app/src/modules/store.js && \
+    sed -i "s|from './auth';|from './auth/index.js';|g" /usr/src/app/src/modules/reducers/index.js && \
+    sed -i "s|from './subscriber';|from './subscriber/index.js';|g" /usr/src/app/src/modules/reducers/index.js && \
+    sed -i "s|from './account';|from './account/index.js';|g" /usr/src/app/src/modules/reducers/index.js && \
+    sed -i "s|from './auth';|from './auth/index.js';|g" /usr/src/app/src/modules/sagas/index.js && \
+    sed -i "s|from './subscriber';|from './subscriber/index.js';|g" /usr/src/app/src/modules/sagas/index.js && \
+    sed -i "s|from './account';|from './account/index.js';|g" /usr/src/app/src/modules/sagas/index.js
 RUN npm install
 EXPOSE 3000
-ENV DB_URI=mongodb://mvno-mongodb:27017/open5gs
-CMD ["npm", "run", "dev"]
+ENV DB_URI=mongodb://mongodb:27017/open5gs
+ENV HOST=0.0.0.0
+ENV PORT=3000
+ENV NODE_PATH=src:.
+CMD ["node", "server/index.js"]
