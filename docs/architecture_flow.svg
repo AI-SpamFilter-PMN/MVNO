@@ -228,8 +228,8 @@
   <text x="605" y="368" class="text-label" fill="#00e5ff">3. Audio Fork</text>
 
   <!-- 4. In-JVM ASR: Native Vosk -> telecom-api -->
-  <path d="M 935,397 L 960,397 L 960,305 L 935,305" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="965" y="370" class="text-label" fill="#00e5ff">4. In-JVM ASR</text>
+  <path d="M 825,340 L 825,300" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="835" y="325" class="text-label" fill="#00e5ff">4. In-JVM ASR</text>
 
   <!-- 5. SMS Submit & Hold: ESME -> OsmoSMSC -->
   <path d="M 235,490 L 360,490" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
