@@ -39,6 +39,8 @@ services:
       - "9999:3000"
     environment:
       - DB_URI=mongodb://mongodb:27017/open5gs
+      - HOST=0.0.0.0
+      - PORT=3000
     depends_on:
       mongodb:
         condition: service_healthy
@@ -358,7 +360,7 @@ services:
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                self.wfile.write(b'{"status":"SUCCESS","isSpam":false,"confidence":0.99}')
+                self.wfile.write(b'{"allow":true,"reason":"Clean content"}')
             def do_GET(self):
                 self.send_response(200)
                 self.end_headers()
