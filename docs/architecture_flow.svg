@@ -228,16 +228,16 @@
   <text x="605" y="368" class="text-label" fill="#00e5ff">3. Audio Fork</text>
 
   <!-- 4. In-JVM ASR: Native Vosk -> telecom-api -->
-  <path d="M 825,340 L 825,260 L 715,260" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="835" y="310" class="text-label" fill="#00e5ff">4. In-JVM ASR</text>
+  <path d="M 935,397 L 960,397 L 960,305 L 935,305" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="965" y="370" class="text-label" fill="#00e5ff">4. In-JVM ASR</text>
 
   <!-- 5. SMS Submit & Hold: ESME -> OsmoSMSC -->
   <path d="M 235,490 L 360,490" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
   <text x="260" y="480" class="text-label" fill="#00e5ff">5. submit_sm</text>
 
   <!-- 6. SMS Intercept Check: OsmoSMSC -> telecom-api -->
-  <path d="M 590,490 L 650,490 L 650,210 L 700,210" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
-  <text x="600" y="480" class="text-label" fill="#00e5ff">6. Intercept Check</text>
+  <path d="M 590,490 L 650,490 L 650,215 L 698,215" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
+  <text x="598" y="475" class="text-label" fill="#00e5ff">6. Intercept Check</text>
 
   <!-- 7. Outbound AI Classification: telecom-api -> AI Spam Platform -->
   <path d="M 945,210 L 1040,210" class="ai-arrow" marker-end="url(#arrow-head-orange)" />
