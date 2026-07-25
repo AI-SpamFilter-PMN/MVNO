@@ -52,6 +52,10 @@ public class SubscriberController {
      */
     @PostMapping("/sms")
     public ResponseEntity<InterceptResponse> interceptSms(@RequestBody final SMSInterceptRequest req) {
+        if (req == null || req.sender() == null || req.sender().isBlank()) {
+            return ResponseEntity.badRequest().body(new InterceptResponse(false, "Invalid request: missing sender MSISDN"));
+        }
+
         // Layer 1: Verify prepaid account balance ($1/SMS tariff rate)
         final int balance = subscriberService.getBalance(req.sender());
         if (balance <= 0) {
@@ -71,6 +75,10 @@ public class SubscriberController {
      */
     @PostMapping("/call")
     public ResponseEntity<InterceptResponse> interceptCall(@RequestBody final CallInterceptRequest req) {
+        if (req == null || req.caller() == null || req.caller().isBlank()) {
+            return ResponseEntity.badRequest().body(new InterceptResponse(false, "Invalid request: missing caller MSISDN"));
+        }
+
         // Layer 1: Verify caller prepaid account balance ($5/call tariff rate)
         final int balance = subscriberService.getBalance(req.caller());
         if (balance <= 0) {
