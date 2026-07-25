@@ -13,7 +13,7 @@ Simulates an MVNO / Private Mobile Network core for the companion [AI Spam Filte
 
 The core network operates as an unprivileged, rootless stack that handles real-time SMS routing and SIP/VoIP calling, intercepts the payloads, and requests allow/block decisions from the AI Spam Filter REST APIs.
 
-![MVNO Core Integration Flow Diagram](docs/architecture_flow.svg)
+[![MVNO Core Integration Flow Diagram](docs/architecture_flow.png)](docs/architecture_flow.svg)
 
 ```
 SIP Phone ──▶ Kamailio ──▶ rtpengine ──(Audio Spool)──┐
@@ -32,7 +32,7 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 ## 2. Core Functional Transactions
 
 ### A. VoIP Voice Call Interception
-![IMS Voice Call Interception Flow](docs/ims_voice_call_flow.svg)
+[![IMS Voice Call Interception Flow](docs/ims_voice_call_flow.png)](docs/ims_voice_call_flow.svg)
 
 1. UE_1 sends a `SIP INVITE`. Kamailio checks prepaid balance and EIR via the Spring Boot gateway.
 2. If allowed, Kamailio anchors media through `rtpengine` (in-kernel) and forks a PCAP copy to `/var/spool/rtpengine`.
@@ -40,7 +40,7 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 4. If flagged, the caller's MSISDN is blacklisted for future calls.
 
 ### B. SMS Interception
-![SMS Interception Flow](docs/sms_interception_flow.svg)
+[![SMS Interception Flow](docs/sms_interception_flow.png)](docs/sms_interception_flow.svg)
 
 1. ESME submits SMS to `OsmoSMSC` via SMPP 3.4.
 2. OsmoSMSC holds delivery and calls `POST /api/v1/intercept/sms` on the Spring Boot gateway.
