@@ -213,9 +213,20 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: Services binding to `127.0.0.1` bind exclusively to the container's private loopback interface (`lo`).
 * **Fix**: All containerized daemons MUST bind server sockets to `0.0.0.0` or container DNS hostnames.
 
-### Issue 8.2: Rootless Podman Port Binding & Privileged Port Boundaries
-* **Symptom**: Podman fails to bind host port `5060` or `2775` in rootless mode: `Permission denied`.
-* **Fix**: Map host ports above 1024 (e.g. `5066:5060/udp` for Kamailio) or configure `net.ipv4.ip_unprivileged_port_start=1024`.
+### Issue 8.3: Missing Kamailio Outbound HTTP REST Interception Callout
+* **Symptom**: Kamailio proxied incoming SIP `INVITE` dialogs directly to RTPEngine without querying `mvno-api:8080/api/v1/intercept/call` for policy authorization.
+* **Root Cause**: `configs/kamailio/kamailio.cfg` did not load `http_client.so` and lacked an HTTP REST callout route.
+* **Fix**: Added `loadmodule "http_client.so"` and `route[INTERCEPT]` using `http_client_query("http://mvno-api:8080/api/v1/intercept/call", ...)` before location lookup in [configs/kamailio/kamailio.cfg](file:///home/zkhattab/MVNO/configs/kamailio/kamailio.cfg).
+
+### Issue 8.4: Open5GS SBI HTTP/2 Framing Layer (Code 16) Heartbeat De-Registration
+* **Symptom**: Open5GS AMF and NFs logged `Error in the HTTP2 framing layer (16)` every 11 seconds and de-registered from NRF.
+* **Root Cause**: SBI server stanzas lacked container network `advertise: <service_name>` FQDNs, causing NRF to register `0.0.0.0:80` unroutable endpoints.
+* **Fix**: Added explicit `advertise: <container_name>` parameters across all 10 `configs/open5gs/*.yaml` configuration files on port `7777`.
+
+### Issue 8.5: Vector Log Shipper Missing Host Docker Socket Mount
+* **Symptom**: Vector container failed to scrape container logs from Podman engine.
+* **Root Cause**: `docker-compose.yml` did not mount `/var/run/docker.sock` into Vector container.
+* **Fix**: Added `/var/run/docker.sock:/var/run/docker.sock:ro` volume mount and updated restart policy to `unless-stopped` in [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml).
 
 ---
 

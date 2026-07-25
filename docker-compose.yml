@@ -24,7 +24,7 @@ services:
       - ./state/mongodb:/data/db:z
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
     healthcheck:
       test: mongosh --eval 'db.runCommand({ping:1})' --quiet
       interval: 10s
@@ -44,7 +44,7 @@ services:
         condition: service_healthy
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS NRF (Network Repository Function) ───
   nrf:
@@ -60,7 +60,7 @@ services:
         condition: service_healthy
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS AMF (Access and Mobility Management Function) ───
   amf:
@@ -76,7 +76,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS SMF (Session Management Function) ───
   smf:
@@ -94,7 +94,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS UPF (User Plane Function) ───
   upf:
@@ -114,7 +114,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS AUSF (Authentication Server Function) ───
   ausf:
@@ -130,7 +130,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS BSF (Binding Support Function) ───
   bsf:
@@ -146,7 +146,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS UDM (Unified Data Management) ───
   udm:
@@ -162,7 +162,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS UDR (Unified Data Repository) ───
   udr:
@@ -178,7 +178,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS PCF (Policy Control Function) ───
   pcf:
@@ -194,7 +194,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Open5GS NSSF (Network Slice Selection Function) ───
   nssf:
@@ -210,7 +210,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── UERANSIM gNB (5G NR Base Station Simulator) ───
   ueransim-gnb:
@@ -227,7 +227,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── UERANSIM UE-1 (Primary Subscriber IMSI 001010000000001) ───
   ueransim-ue-1:
@@ -244,7 +244,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── UERANSIM UE-2 (Spam Subscriber IMSI 001010000000002) ───
   ueransim-ue-2:
@@ -261,7 +261,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── UERANSIM UE-3 (Zero Balance Subscriber IMSI 001010000000003) ───
   ueransim-ue-3:
@@ -278,7 +278,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── RTPEngine In-Kernel Media Proxy & Audio Forker ───
   rtpengine:
@@ -296,7 +296,7 @@ services:
       - ./state/spool:/var/spool/rtpengine:z
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Kamailio SIP Registrar & Interception Proxy ───
   kamailio:
@@ -312,7 +312,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Osmocom MSC & SMSC Store-and-Forward Core ───
   osmo-smsc:
@@ -325,7 +325,7 @@ services:
       - ./state/hlr:/var/lib/osmocom:z
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Spring Boot Interception Gateway & Vosk ASR JNI Runtime ───
   telecom-api:
@@ -338,7 +338,35 @@ services:
       - ./state/spool:/var/spool/rtpengine:z
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
+
+  # ─── AI Spam Filtration System (Mock API Endpoint) ───
+  ai-filter:
+    image: python:3.11-alpine
+    container_name: mvno-ai-filter
+    ports:
+      - "8008:8000"
+    command:
+      - python3
+      - -c
+      - |
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        class H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get('Content-Length', 0))
+                if length > 0: self.rfile.read(length)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(b'{"status":"SUCCESS","isSpam":false,"confidence":0.99}')
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'OK')
+        HTTPServer(('0.0.0.0', 8000), H).serve_forever()
+    networks:
+      - mvno_net
+    restart: unless-stopped
 
   # ─── Vector Log Shipper ───
   vector:
@@ -346,9 +374,10 @@ services:
     container_name: mvno-vector
     volumes:
       - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── VictoriaMetrics Time-Series Database ───
   victoria-metrics:
@@ -360,7 +389,7 @@ services:
       - ./state/vm-data:/victoria-metrics-data:z
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── VictoriaMetrics Telemetry Scraper (vmagent) ───
   vmagent:
@@ -378,7 +407,7 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
 
   # ─── Grafana Real-Time Telecom NOC Dashboard ───
   grafana:
@@ -398,4 +427,4 @@ services:
         condition: service_started
     networks:
       - mvno_net
-    restart: "no"
+    restart: unless-stopped
