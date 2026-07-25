@@ -179,6 +179,11 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Symptom**: Grafana crashes after host reboot with `database is locked` or `disk I/O error`.
 * **Fix**: Pinned image to `grafana/grafana-oss:11.6.0` and set `GF_DATABASE_WAL=true` in `docker-compose.yml`.
 
+### Issue 6.4: PromQL Syntax Error in Grafana Stat Cards (`|| vector(0)`)
+* **Symptom**: Grafana Stat Panels displayed "No data" and red parsing error icons, while time-series line graphs below rendered live values.
+* **Root Cause**: Stat panel targets used non-standard `|| vector(0)` operator syntax instead of standard PromQL `default 0` fallback syntax.
+* **Fix**: Replaced `|| vector(0)` with `default 0` (e.g. `sum(mvno_sms_requests_total) default 0`) across [configs/grafana/provisioning/dashboards/mvno_unified_noc.json](file:///home/zkhattab/MVNO/configs/grafana/provisioning/dashboards/mvno_unified_noc.json).
+
 ---
 
 ## 7. UERANSIM 5G Radio Simulator Issues
