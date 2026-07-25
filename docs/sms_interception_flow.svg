@@ -120,7 +120,7 @@
   <!-- Step 1: submit_sm PDU: ESME → OsmoSMSC -->
   <circle cx="90" cy="165" r="11" fill="#26c6da" opacity="0.95"/>
   <text x="90" y="169" text-anchor="middle" class="badge-num">1</text>
-  <line x1="101" y1="165" x2="269" y2="165" class="arrow-smpp" marker-end="url(#h-smpp)" filter="url(#glow-teal)"/>
+  <line x1="101" y1="165" x2="269" y2="165" class="arrow-smpp" marker-end="url(#h-smpp)" />
   <text x="185" y="152" text-anchor="middle" class="lbl" fill="#26c6da">submit_sm PDU / CP-DATA</text>
 
   <!-- Step 2: Delivery Hold + HLR check -->

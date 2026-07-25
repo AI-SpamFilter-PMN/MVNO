@@ -135,7 +135,7 @@
   <!-- Step 1: SIP INVITE UE1 → Kamailio -->
   <circle cx="80" cy="165" r="11" fill="#29b6f6" opacity="0.95"/>
   <text x="80" y="169" text-anchor="middle" class="badge-num">1</text>
-  <line x1="91" y1="165" x2="229" y2="165" class="arrow-sip" marker-end="url(#h-sip)" filter="url(#glow-blue)"/>
+  <line x1="91" y1="165" x2="229" y2="165" class="arrow-sip" marker-end="url(#h-sip)" />
   <text x="160" y="152" text-anchor="middle" class="lbl" fill="#29b6f6">SIP INVITE (SDP Offer)</text>
 
   <!-- Step 2: POST /api/v1/intercept/call -->
