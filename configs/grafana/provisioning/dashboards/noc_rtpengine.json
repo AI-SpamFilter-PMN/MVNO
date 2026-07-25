@@ -3,6 +3,7 @@
   "__requires": [],
   "title": "NOC RTPEngine",
   "uid": "noc-rtpengine",
+  "tags": ["mvno", "rtpengine", "media-plane", "noc"],
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
@@ -45,7 +46,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }, "unit": "short" }, "overrides": [] },
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
       "id": 6,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },

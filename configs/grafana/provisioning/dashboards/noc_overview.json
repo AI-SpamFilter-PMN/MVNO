@@ -3,6 +3,7 @@
   "__requires": [],
   "title": "NOC Overview",
   "uid": "noc-overview",
+  "tags": ["mvno", "telecom", "noc", "overview"],
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },

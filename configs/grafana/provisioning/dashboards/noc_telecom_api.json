@@ -3,6 +3,7 @@
   "__requires": [],
   "title": "NOC Telecom API",
   "uid": "noc-telecom-api",
+  "tags": ["mvno", "telecom-api", "control-plane", "noc"],
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
