@@ -184,6 +184,11 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: Stat panel targets used non-standard `|| vector(0)` operator syntax instead of standard PromQL `default 0` fallback syntax.
 * **Fix**: Replaced `|| vector(0)` with `default 0` (e.g. `sum(mvno_sms_requests_total) default 0`) across [configs/grafana/provisioning/dashboards/mvno_unified_noc.json](file:///home/zkhattab/MVNO/configs/grafana/provisioning/dashboards/mvno_unified_noc.json).
 
+### Issue 6.5: Legacy Metric Schema Mismatches in Subsystem Dashboards
+* **Symptom**: `noc_rtpengine.json` panels rendered "No data" for throughput and error rate, while `noc_telecom_api.json` and `noc_overview.json` rendered rate `0`.
+* **Root Cause**: Panels queried outdated metric names (`rtpengine_packets_received_bytes_total`, `rtpengine_calls_total`) instead of exported RTPEngine 9.4 metrics (`rtpengine_bytes_total`, `rtpengine_packets_total`, `rtpengine_packet_errors_total`).
+* **Fix**: Aligned panel targets across `noc_overview.json`, `noc_telecom_api.json`, and `noc_rtpengine.json` with exact Prometheus metrics exported by `mvno-api` and `rtpengine`.
+
 ---
 
 ## 7. UERANSIM 5G Radio Simulator Issues
