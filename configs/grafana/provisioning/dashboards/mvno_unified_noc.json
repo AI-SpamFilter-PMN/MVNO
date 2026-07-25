@@ -32,7 +32,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
       "id": 1,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_sms_requests_total) || vector(0)", "refId": "A" }],
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_sms_requests_total) default 0", "refId": "A" }],
       "title": "Total SMS Requests",
       "type": "stat"
     },
@@ -42,7 +42,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
       "id": 2,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_call_requests_total) || vector(0)", "refId": "A" }],
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_call_requests_total) default 0", "refId": "A" }],
       "title": "Total Voice Call Requests",
       "type": "stat"
     },
@@ -52,7 +52,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
       "id": 3,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_eir_sim_swap_detected_total) || vector(0)", "refId": "A" }],
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_eir_sim_swap_detected_total) default 0", "refId": "A" }],
       "title": "SIM Swaps Detected",
       "type": "stat"
     },
@@ -62,7 +62,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
       "id": 4,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_sms_blocked_total + mvno_call_blocked_total) || vector(0)", "refId": "A" }],
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "(sum(mvno_sms_blocked_total) + sum(mvno_call_blocked_total)) default 0", "refId": "A" }],
       "title": "Total Interceptions Blocked",
       "type": "stat"
     },
@@ -72,7 +72,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
       "id": 5,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size || vector(0)", "refId": "A" }],
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size default 0", "refId": "A" }],
       "title": "Active EIR Cache Size",
       "type": "stat"
     },
