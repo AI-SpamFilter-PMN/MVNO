@@ -12,48 +12,61 @@
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions_total", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions", "refId": "A" }
       ],
       "title": "Active RTP Sessions",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
       "id": 2,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rate(rtpengine_packets_received_bytes_total[5m])", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions_total", "refId": "A" }
       ],
-      "title": "RTP Throughput (RX)",
+      "title": "Total Managed Sessions",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "cps" }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
       "id": 3,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rate(rtpengine_calls_total[5m])", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total", "refId": "A" }
       ],
-      "title": "Call Rate (5m)",
+      "title": "RTP Media Bytes Total",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "id": 6,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_ports_free", "refId": "A" }
+      ],
+      "title": "Available Media Ports",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "id": 4,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rate(rtpengine_packets_received_bytes_total[1m])", "legendFormat": "RX", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rate(rtpengine_packets_sent_bytes_total[1m])", "legendFormat": "TX", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total", "legendFormat": "Media Bytes Total", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packets_total", "legendFormat": "Packets Total", "refId": "B" }
       ],
-      "title": "RTP Throughput",
+      "title": "RTP Media Throughput & Packets",
       "type": "timeseries"
     },
     {
@@ -63,13 +76,13 @@
       "id": 5,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rate(rtpengine_errors_total[1m])", "legendFormat": "Errors", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rate(rtpengine_packets_dropped_total[1m])", "legendFormat": "Dropped", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packet_errors_total", "legendFormat": "Packet Errors", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_closed_sessions_total", "legendFormat": "Closed Sessions", "refId": "B" }
       ],
-      "title": "RTP Errors & Drops",
+      "title": "RTP Packet Errors & Closed Sessions",
       "type": "timeseries"
     }
   ],
   "schemaVersion": 40,
-  "version": 1
+  "version": 2
 }
