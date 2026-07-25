@@ -279,10 +279,15 @@ services:
 
   # ─── RTPEngine In-Kernel Media Proxy & Audio Forker ───
   rtpengine:
-    image: localhost/drachtio/rtpengine:mr9.4.0.0
+    image: drachtio/rtpengine:mr9.4.0.0
     container_name: mvno-rtpengine
+    command:
+      - rtpengine
+      - --config-file=/etc/rtpengine/rtpengine.conf
+      - --listen-http=9900
     ports:
       - "30000-30100:30000-30100/udp"
+      - "9900:9900"
     volumes:
       - ./configs/rtpengine:/etc/rtpengine:z
       - ./state/spool:/var/spool/rtpengine:z
