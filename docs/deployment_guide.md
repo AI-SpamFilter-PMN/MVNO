@@ -147,7 +147,7 @@ services:
     restart: "no"
 
   kamailio:
-    image: mvno-kamailio:latest
+    image: mvno-kamailio:5.7.4
     container_name: mvno-kamailio
     ports:
       - "5060:5060/udp"
@@ -162,7 +162,7 @@ services:
     restart: "no"
 
   osmo-hlr:
-    image: mvno-osmo-smsc:latest
+    image: mvno-osmo-smsc:1.0.0
     container_name: mvno-osmo-hlr
     command: osmo-hlr -c /etc/osmocom/osmo-hlr.cfg
     volumes:
@@ -173,7 +173,7 @@ services:
     restart: "no"
 
   osmo-smsc:
-    image: mvno-osmo-smsc:latest
+    image: mvno-osmo-smsc:1.0.0
     container_name: mvno-osmo-smsc
     command: osmo-msc -c /etc/osmocom/osmo-smsc.cfg
     ports:
@@ -187,7 +187,7 @@ services:
     restart: "no"
 
   telecom-api:
-    image: mvno-telecom-api:latest
+    image: mvno-telecom-api:1.0.0
     container_name: mvno-api
     ports:
       - "8080:8080"
@@ -204,7 +204,7 @@ services:
     restart: "no"
 
   vector:
-    image: timberio/vector:latest-alpine
+    image: timberio/vector:0.36.0-alpine
     container_name: mvno-vector
     volumes:
       - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
@@ -218,7 +218,7 @@ services:
 
   # ─── Observability (Phase 1) ──────────────────────
   victoria-metrics:
-    image: victoriametrics/victoria-metrics:latest
+    image: victoriametrics/victoria-metrics:v1.101.0
     container_name: mvno-victoriametrics
     ports:
       - "8428:8428"
@@ -229,7 +229,7 @@ services:
     restart: "no"
 
   vmagent:
-    image: victoriametrics/vmagent:latest
+    image: victoriametrics/vmagent:v1.101.0
     container_name: mvno-vmagent
     volumes:
       - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
@@ -240,7 +240,7 @@ services:
     restart: "no"
 
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:11.6.0
     container_name: mvno-grafana
     ports:
       - "3000:3000"
