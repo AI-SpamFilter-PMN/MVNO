@@ -275,6 +275,37 @@ services:
 | **MongoDB** (Phase 3+) | `27017` | TCP | Open5GS subscriber metadata | Native bind (no changes) |
 | **Open5GS NRF** (Phase 3+) | `7777` | TCP | 5GC service registry | Native bind (no changes) |
 | **Vector** | — | — | Log shipper (no exposed ports) | Internal only |
+| **Open5GS WebUI** | `9999` | TCP | Subscriber & SIM Management WebUI | Native bind (`9999:3000`) |
+
+---
+
+## 5. Web Dashboards & Admin Access Credentials
+
+### 📊 Grafana Real-Time Telecom NOC Dashboard
+- **Web UI URL:** `http://localhost:3000`
+- **Username:** `admin`
+- **Password:** `admin`
+- **Provisioned NOC Dashboards:**
+  1. `MVNO Interception Core — Unified Master NOC Dashboard` (`uid: mvno-unified-noc`)
+  2. `NOC Overview` (`uid: noc-overview`)
+  3. `NOC Telecom API` (`uid: noc-telecom-api`)
+  4. `NOC RTPEngine` (`uid: noc-rtpengine`)
+- **Verification Status:** Validated via HTTP `POST /login` (`HTTP 200 OK`, `grafana_session` cookie issued).
+
+### 📱 Open5GS 5G SA Subscriber Management WebUI
+- **Web UI URL:** `http://localhost:9999`
+- **Username:** `admin`
+- **Password:** `1423`
+- **Database Binding:** `mongodb://mvno-mongodb:27017/open5gs`
+- **Admin Account Hashing:** Account document seeded in MongoDB collection `open5gs.accounts`:
+  ```json
+  {
+    "username": "admin",
+    "password": "$2b$12$L6PO5GJQfMmHt6Uall2OxODicgdosZohXDvwS1HPt/Q.WXUD92Y7S",
+    "roles": ["admin"]
+  }
+  ```
+- **Verification Status:** Validated bcrypt cost 12 hash salt for password `1423` seeded directly into MongoDB `open5gs` database.
 
 ---
 

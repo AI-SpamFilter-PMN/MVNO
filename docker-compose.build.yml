@@ -14,63 +14,10 @@ services:
 
   telecom-api:
     build:
-      context: .
-      dockerfile: telecom-api/Dockerfile
+      context: ./telecom-api
+      dockerfile: Dockerfile
 
-  vosk-worker:
+  open5gs-webui:
     build:
       context: .
-      dockerfile: vosk-worker/Dockerfile
-
-  nrf:
-    build: ./configs/open5gs
-
-  amf:
-    build: ./configs/open5gs
-
-  smf:
-    build: ./configs/open5gs
-
-  upf:
-    build: ./configs/open5gs
-
-  udm:
-    build: ./configs/open5gs
-
-  ausf:
-    build: ./configs/open5gs
-
-  nssf:
-    build: ./configs/open5gs
-
-  pcf:
-    build: ./configs/open5gs
-
-  udr:
-    build: ./configs/open5gs
-
-  bsf:
-    build: ./configs/open5gs
-
-  webui:
-    build: ./configs/open5gs/webui
-
-  ueransim-gnb:
-    build:
-      context: .
-      dockerfile: configs/ueransim/Dockerfile
-
-  ueransim-ue-1:
-    build:
-      context: .
-      dockerfile: configs/ueransim/Dockerfile
-
-  ueransim-ue-2:
-    build:
-      context: .
-      dockerfile: configs/ueransim/Dockerfile
-
-  ueransim-ue-3:
-    build:
-      context: .
-      dockerfile: configs/ueransim/Dockerfile
+      dockerfile: configs/open5gs/Dockerfile.webui

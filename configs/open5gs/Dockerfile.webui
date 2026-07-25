@@ -1,0 +1,10 @@
+FROM node:20-alpine
+WORKDIR /usr/src/app
+RUN apk add --no-cache git python3 make g++
+RUN git clone --depth 1 --branch v2.8.0 https://github.com/open5gs/open5gs.git /tmp/open5gs && \
+    cp -r /tmp/open5gs/webui/* /usr/src/app/ && \
+    rm -rf /tmp/open5gs
+RUN npm install
+EXPOSE 3000
+ENV DB_URI=mongodb://mvno-mongodb:27017/open5gs
+CMD ["npm", "run", "dev"]
