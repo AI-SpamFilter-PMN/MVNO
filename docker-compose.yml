@@ -31,6 +31,20 @@ services:
       timeout: 5s
       retries: 3
 
+  # ─── Open5GS WebUI Subscriber Management ───
+  open5gs-webui:
+    image: open5gs/webui:latest
+    container_name: mvno-open5gs-webui
+    ports:
+      - "9999:3000"
+    environment:
+      - DB_URI=mongodb://mvno-mongodb:27017/open5gs
+    depends_on:
+      - mongodb
+    networks:
+      - mvno_net
+    restart: "no"
+
   # ─── Open5GS NRF (Network Repository Function) ───
   nrf:
     image: mvno-open5gs:2.8.0
@@ -344,7 +358,11 @@ services:
   vmagent:
     image: victoriametrics/vmagent:v1.101.0
     container_name: mvno-vmagent
-    command: ["-remoteWrite.url=http://victoria-metrics:8428/api/v1/write"]
+    ports:
+      - "8429:8429"
+    command:
+      - "-remoteWrite.url=http://victoria-metrics:8428/api/v1/write"
+      - "-promscrape.config=/etc/prometheus/prometheus.yml"
     volumes:
       - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
     depends_on:
