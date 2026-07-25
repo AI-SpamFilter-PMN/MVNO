@@ -15,9 +15,9 @@ networks:
 services:
   # ─── MongoDB Subscriber DB (5G Core Open5GS metadata store) ───
   mongodb:
-    image: mongo:8.0
+    image: mongo:7.0
     container_name: mvno-mongodb
-    command: mongod --wiredTigerCacheSizeGB 0.25  # Cap WiredTiger cache to 256MB RAM
+    command: mongod --wiredTigerCacheSizeGB 0.25
     ports:
       - "27017:27017"
     volumes:
@@ -31,15 +31,247 @@ services:
       timeout: 5s
       retries: 3
 
+  # ─── Open5GS NRF (Network Repository Function) ───
+  nrf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-nrf
+    environment:
+      COMPONENT_NAME: nrf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/nrf.yaml:/etc/open5gs/nrf.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Open5GS AMF (Access and Mobility Management Function) ───
+  amf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-amf
+    environment:
+      COMPONENT_NAME: amf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/amf.yaml:/etc/open5gs/amf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Open5GS SMF (Session Management Function) ───
+  smf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-smf
+    environment:
+      COMPONENT_NAME: smf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/smf.yaml:/etc/open5gs/smf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Open5GS UPF (User Plane Function) ───
+  upf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-upf
+    environment:
+      COMPONENT_NAME: upf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/upf.yaml:/etc/open5gs/upf.yaml:z
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Open5GS AUSF (Authentication Server Function) ───
+  ausf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-ausf
+    environment:
+      COMPONENT_NAME: ausf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/ausf.yaml:/etc/open5gs/ausf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Open5GS BSF (Binding Support Function) ───
+  bsf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-bsf
+    environment:
+      COMPONENT_NAME: bsf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/bsf.yaml:/etc/open5gs/bsf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Open5GS UDM (Unified Data Management) ───
+  udm:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-udm
+    environment:
+      COMPONENT_NAME: udm
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/udm.yaml:/etc/open5gs/udm.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Open5GS UDR (Unified Data Repository) ───
+  udr:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-udr
+    environment:
+      COMPONENT_NAME: udr
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/udr.yaml:/etc/open5gs/udr.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Open5GS PCF (Policy Control Function) ───
+  pcf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-pcf
+    environment:
+      COMPONENT_NAME: pcf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/pcf.yaml:/etc/open5gs/pcf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Open5GS NSSF (Network Slice Selection Function) ───
+  nssf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-nssf
+    environment:
+      COMPONENT_NAME: nssf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/nssf.yaml:/etc/open5gs/nssf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── UERANSIM gNB (5G NR Base Station Simulator) ───
+  ueransim-gnb:
+    image: mvno-ueransim:3.2.6
+    container_name: mvno-ueransim-gnb
+    command: ["nr-gnb", "-c", "/etc/ueransim/gnb.yaml"]
+    volumes:
+      - ./configs/ueransim/gnb.yaml:/etc/ueransim/gnb.yaml:z
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    depends_on:
+      amf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── UERANSIM UE-1 (Primary Subscriber IMSI 001010000000001) ───
+  ueransim-ue-1:
+    image: mvno-ueransim:3.2.6
+    container_name: mvno-ueransim-ue-1
+    command: ["nr-ue", "-c", "/etc/ueransim/ue.yaml"]
+    volumes:
+      - ./configs/ueransim/ue.yaml:/etc/ueransim/ue.yaml:z
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    depends_on:
+      ueransim-gnb:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── UERANSIM UE-2 (Spam Subscriber IMSI 001010000000002) ───
+  ueransim-ue-2:
+    image: mvno-ueransim:3.2.6
+    container_name: mvno-ueransim-ue-2
+    command: ["nr-ue", "-c", "/etc/ueransim/ue.yaml"]
+    volumes:
+      - ./configs/ueransim/ue-spam.yaml:/etc/ueransim/ue.yaml:z
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    depends_on:
+      ueransim-gnb:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── UERANSIM UE-3 (Zero Balance Subscriber IMSI 001010000000003) ───
+  ueransim-ue-3:
+    image: mvno-ueransim:3.2.6
+    container_name: mvno-ueransim-ue-3
+    command: ["nr-ue", "-c", "/etc/ueransim/ue.yaml"]
+    volumes:
+      - ./configs/ueransim/ue-zero.yaml:/etc/ueransim/ue.yaml:z
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    depends_on:
+      ueransim-gnb:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: "no"
+
   # ─── RTPEngine In-Kernel Media Proxy & Audio Forker ───
   rtpengine:
-    image: drachtio/rtpengine:latest
+    image: localhost/drachtio/rtpengine:mr9.4.0.0
     container_name: mvno-rtpengine
     ports:
-      - "30000-30100:30000-30100/udp"  # RTP media audio stream relay range
+      - "30000-30100:30000-30100/udp"
     volumes:
       - ./configs/rtpengine:/etc/rtpengine:z
-      - ./state/spool:/var/spool/rtpengine:z  # Shared PCAP audio spool directory
+      - ./state/spool:/var/spool/rtpengine:z
     networks:
       - mvno_net
     restart: "no"
@@ -52,7 +284,7 @@ services:
       - "5066:5060/udp"
     volumes:
       - ./configs/kamailio:/etc/kamailio:z
-      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z  # SQLite WAL database
+      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
     depends_on:
       rtpengine:
         condition: service_started
@@ -65,10 +297,10 @@ services:
     image: mvno-osmo-smsc:1.0.0
     container_name: mvno-osmosmsc
     ports:
-      - "2775:2775"  # SMPP 3.4 server socket
+      - "2775:2775"
     volumes:
       - ./configs/osmocom:/etc/osmocom:z
-      - ./state/hlr:/var/lib/osmocom:z  # SQLite HLR database
+      - ./state/hlr:/var/lib/osmocom:z
     networks:
       - mvno_net
     restart: "no"
@@ -78,10 +310,20 @@ services:
     image: mvno-telecom-api:1.0.0
     container_name: mvno-api
     ports:
-      - "8080:8080"  # Spring Boot REST API & Actuator
+      - "8080:8080"
     volumes:
-      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z  # Shared SQLite WAL access
-      - ./state/spool:/var/spool/rtpengine:z            # Shared audio spool for Vosk ASR JNI
+      - ./state:/etc/kamailio:z
+      - ./state/spool:/var/spool/rtpengine:z
+    networks:
+      - mvno_net
+    restart: "no"
+
+  # ─── Vector Log Shipper ───
+  vector:
+    image: timberio/vector:0.44.0-alpine
+    container_name: mvno-vector
+    volumes:
+      - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
     networks:
       - mvno_net
     restart: "no"
@@ -91,7 +333,7 @@ services:
     image: victoriametrics/victoria-metrics:v1.101.0
     container_name: mvno-victoriametrics
     ports:
-      - "8428:8428"  # PromQL query & ingestion API
+      - "8428:8428"
     volumes:
       - ./state/vm-data:/victoria-metrics-data:z
     networks:
@@ -102,6 +344,7 @@ services:
   vmagent:
     image: victoriametrics/vmagent:v1.101.0
     container_name: mvno-vmagent
+    command: ["-remoteWrite.url=http://victoria-metrics:8428/api/v1/write"]
     volumes:
       - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
     depends_on:
@@ -116,7 +359,7 @@ services:
     image: grafana/grafana-oss:11.6.0
     container_name: mvno-grafana
     ports:
-      - "3000:3000"  # Grafana Web UI
+      - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin

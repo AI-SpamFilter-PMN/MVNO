@@ -1,6 +1,8 @@
 package com.mvno.intercept.subscriber;
 
 import com.mvno.intercept.filter.AiFilterService;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,10 +28,23 @@ public class SubscriberController {
 
     private final SubscriberService subscriberService;
     private final AiFilterService aiFilterService;
+    private final Counter smsRequests;
+    private final Counter smsBlocked;
+    private final Counter callRequests;
+    private final Counter callBlocked;
+    private final Counter callBlockedEir;
+    private final Counter subscriberLookups;
 
-    public SubscriberController(final SubscriberService subscriberService, final AiFilterService aiFilterService) {
+    public SubscriberController(final SubscriberService subscriberService, final AiFilterService aiFilterService,
+            final MeterRegistry meterRegistry) {
         this.subscriberService = subscriberService;
         this.aiFilterService = aiFilterService;
+        this.smsRequests = meterRegistry.counter("mvno.sms.requests");
+        this.smsBlocked = meterRegistry.counter("mvno.sms.blocked");
+        this.callRequests = meterRegistry.counter("mvno.call.requests");
+        this.callBlocked = meterRegistry.counter("mvno.call.blocked");
+        this.callBlockedEir = meterRegistry.counter("mvno.call.blocked.eir");
+        this.subscriberLookups = meterRegistry.counter("mvno.subscriber.lookups");
     }
 
     /**
@@ -40,6 +55,7 @@ public class SubscriberController {
      */
     @GetMapping("/subscriber/{msisdn}")
     public ResponseEntity<SubscriberResponse> getSubscriber(@PathVariable final String msisdn) {
+        subscriberLookups.increment();
         final int balance = subscriberService.getBalance(msisdn);
         return ResponseEntity.ok(new SubscriberResponse(msisdn, balance));
     }
@@ -52,18 +68,21 @@ public class SubscriberController {
      */
     @PostMapping("/sms")
     public ResponseEntity<InterceptResponse> interceptSms(@RequestBody final SMSInterceptRequest req) {
+        smsRequests.increment();
         if (req == null || req.sender() == null || req.sender().isBlank()) {
             return ResponseEntity.badRequest().body(new InterceptResponse(false, "Invalid request: missing sender MSISDN"));
         }
 
-        // Layer 1: Verify prepaid account balance ($1/SMS tariff rate)
         final int balance = subscriberService.getBalance(req.sender());
         if (balance <= 0) {
+            smsBlocked.increment();
             return ResponseEntity.ok(new InterceptResponse(false, "Prepaid balance exhausted"));
         }
 
-        // Layer 2: Forward SMS text content to AI Spam Filter server
         final InterceptResponse result = aiFilterService.classifySms(req);
+        if (!result.allow()) {
+            smsBlocked.increment();
+        }
         return ResponseEntity.ok(result);
     }
 
@@ -75,24 +94,27 @@ public class SubscriberController {
      */
     @PostMapping("/call")
     public ResponseEntity<InterceptResponse> interceptCall(@RequestBody final CallInterceptRequest req) {
+        callRequests.increment();
         if (req == null || req.caller() == null || req.caller().isBlank()) {
             return ResponseEntity.badRequest().body(new InterceptResponse(false, "Invalid request: missing caller MSISDN"));
         }
 
-        // Layer 1: Verify caller prepaid account balance ($5/call tariff rate)
         final int balance = subscriberService.getBalance(req.caller());
         if (balance <= 0) {
+            callBlocked.increment();
             return ResponseEntity.ok(new InterceptResponse(false, "Prepaid balance exhausted"));
         }
 
-        // Layer 2: Verify Equipment Identity Register (EIR) hardware binding
         if (req.imei() != null && !req.imei().isBlank()
                 && !subscriberService.checkEirBinding(req.imei(), req.caller())) {
+            callBlockedEir.increment();
             return ResponseEntity.ok(new InterceptResponse(false, "EIR: SIM swap detected"));
         }
 
-        // Layer 3: Forward call metadata to AI Spam Filter server
         final InterceptResponse result = aiFilterService.classifyCall(req);
+        if (!result.allow()) {
+            callBlocked.increment();
+        }
         return ResponseEntity.ok(result);
     }
 
