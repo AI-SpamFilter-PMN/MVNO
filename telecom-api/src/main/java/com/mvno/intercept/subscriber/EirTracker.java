@@ -45,6 +45,7 @@ public class EirTracker {
     private static final int MAX_CAPACITY = 10000;
     private final ConcurrentHashMap<String, AtomicInteger> imeiSwapCounter = new ConcurrentHashMap<>();
     private final Counter simSwapDetections;
+    private final Object evictionLock = new Object();
 
     /**
      * Evaluates device binding and verifies hardware IMEI rapidly against SIM swap anomaly rules.
@@ -58,12 +59,16 @@ public class EirTracker {
             return true;
         }
 
-        // Bounded capacity eviction: prune low-activity IMEIs rather than wiping active fraud state
+        // Thread-safe Bounded capacity eviction: prune low-activity IMEIs rather than wiping active fraud state
         if (imeiSwapCounter.size() >= MAX_CAPACITY) {
-            logger.warn("EIR Tracker memory limit reached ({} IMEIs). Pruning low-activity entries.", MAX_CAPACITY);
-            imeiSwapCounter.entrySet().removeIf(entry -> entry.getValue().get() <= 1);
-            if (imeiSwapCounter.size() >= MAX_CAPACITY) {
-                imeiSwapCounter.keySet().stream().limit(MAX_CAPACITY / 2).forEach(imeiSwapCounter::remove);
+            synchronized (evictionLock) {
+                if (imeiSwapCounter.size() >= MAX_CAPACITY) {
+                    logger.warn("EIR Tracker memory limit reached ({} IMEIs). Pruning low-activity entries.", MAX_CAPACITY);
+                    imeiSwapCounter.entrySet().removeIf(entry -> entry.getValue().get() <= 1);
+                    if (imeiSwapCounter.size() >= MAX_CAPACITY) {
+                        imeiSwapCounter.keySet().stream().limit(MAX_CAPACITY / 2).forEach(imeiSwapCounter::remove);
+                    }
+                }
             }
         }
 

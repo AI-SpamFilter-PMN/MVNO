@@ -125,133 +125,9 @@ The `docker-compose.yml` is configured for **rootless Podman** execution:
 
 #### [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml)
 
-**Phase 1 (SMS + Voice, no 5G)** — core services only. MongoDB and Open5GS NFs are added in Phase 3.
+> [!NOTE]
+> The single authoritative container stack definition is maintained in [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml). It orchestrates 26 rootless microservices across the 5G Core, IMS signaling, SMSC, Gateway API, and observability plane with IPAM subnets and healthchecks.
 
-```yaml
-networks:
-  mvno_net:
-    driver: bridge
-
-services:
-  # ─── Core (Phase 1) ──────────────────────────────
-  rtpengine:
-    image: drachtio/rtpengine:mr9.4.0.0
-    container_name: mvno-rtpengine
-    ports:
-      - "30000-30100:30000-30100/udp"
-    volumes:
-      - ./configs/rtpengine/rtpengine.conf:/etc/rtpengine.conf:z
-      - ./state/spool:/var/spool/rtpengine:z
-    networks:
-      - mvno_net
-    restart: "no"
-
-  kamailio:
-    image: mvno-kamailio:5.7.4
-    container_name: mvno-kamailio
-    ports:
-      - "5060:5060/udp"
-      - "5060:5060/tcp"
-    volumes:
-      - ./configs/kamailio:/etc/kamailio:z
-      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
-    depends_on:
-      - rtpengine
-    networks:
-      - mvno_net
-    restart: "no"
-
-  osmo-hlr:
-    image: mvno-osmo-smsc:1.0.0
-    container_name: mvno-osmo-hlr
-    command: osmo-hlr -c /etc/osmocom/osmo-hlr.cfg
-    volumes:
-      - ./configs/osmocom/osmo-hlr.cfg:/etc/osmocom/osmo-hlr.cfg:z
-      - ./state/hlr:/var/lib/osmocom:z
-    networks:
-      - mvno_net
-    restart: "no"
-
-  osmo-smsc:
-    image: mvno-osmo-smsc:1.0.0
-    container_name: mvno-osmo-smsc
-    command: osmo-msc -c /etc/osmocom/osmo-smsc.cfg
-    ports:
-      - "2775:2775"
-    volumes:
-      - ./configs/osmocom/osmo-smsc.cfg:/etc/osmocom/osmo-smsc.cfg:z
-    depends_on:
-      - osmo-hlr
-    networks:
-      - mvno_net
-    restart: "no"
-
-  telecom-api:
-    image: mvno-telecom-api:1.0.0
-    container_name: mvno-api
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health/liveness"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 30s
-    networks:
-      - mvno_net
-    restart: "no"
-
-  vector:
-    image: timberio/vector:0.36.0-alpine
-    container_name: mvno-vector
-    volumes:
-      - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
-      - /var/log:/var/log:z
-    command: ["--config", "/etc/vector/vector.toml"]
-    depends_on:
-      - telecom-api
-    networks:
-      - mvno_net
-    restart: "no"
-
-  # ─── Observability (Phase 1) ──────────────────────
-  victoria-metrics:
-    image: victoriametrics/victoria-metrics:v1.101.0
-    container_name: mvno-victoriametrics
-    ports:
-      - "8428:8428"
-    volumes:
-      - ./state/vm-data:/victoria-metrics-data:z
-    networks:
-      - mvno_net
-    restart: "no"
-
-  vmagent:
-    image: victoriametrics/vmagent:v1.101.0
-    container_name: mvno-vmagent
-    volumes:
-      - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
-    depends_on:
-      - victoria-metrics
-    networks:
-      - mvno_net
-    restart: "no"
-
-  grafana:
-    image: grafana/grafana-oss:11.6.0
-    container_name: mvno-grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./state/grafana:/var/lib/grafana:z
-    depends_on:
-      - victoria-metrics
-    networks:
-      - mvno_net
-    restart: "no"
-```
 
 **Phase 3+ additions** (when adding 5G core):
 - Add `mongodb` service before Open5GS NFs
@@ -265,7 +141,7 @@ services:
 
 | Component | Target Port | Protocol | Usage | Podman Rootless Mode |
 | :--- | :--- | :--- | :--- | :--- |
-| **Kamailio** | `5060` | UDP / TCP | SIP signaling | Native bind (no changes) |
+| **Kamailio** | `5066 (host) → 5060 (container)` | UDP / TCP | SIP signaling | Host port 5066 mapped to container port 5060 |
 | **rtpengine** | `30000-30100` | UDP | Media plane (RTP) | Native bind (no changes) |
 | **OsmoSMSC** | `2775` | TCP | SMPP SMS delivery | Native bind (no changes) |
 | **Spring Boot** | `8080` | TCP | Interception REST API + actuator health | Native bind (no changes) |
@@ -334,6 +210,7 @@ Link the signaling server (Kamailio) with the packet forwarding proxy (rtpengine
    ```ini
    listen-ng = 0.0.0.0:22222
    ```
+   > **Media Plane Performance Note**: RTPEngine operates in userspace daemon mode under unprivileged rootless Podman execution (`--foreground`). For kernel-bypass hardware acceleration (`xt_RTPENGINE`), mount `/dev/rtpengine` character device with root privileges.
 2. **Configure Kamailio module**: In `configs/kamailio/kamailio.cfg`, load the module and point it to the rtpengine container:
    ```kamailio
    loadmodule "rtpengine.so"
@@ -388,13 +265,13 @@ Connect the lightweight time-series stack to scrape metrics:
    scrape_configs:
      - job_name: 'telecom-api'
        static_configs:
-         - targets: ['telecom-api:8080']
-     - job_name: 'kamailio'
-       static_configs:
-         - targets: ['kamailio:5060']
+         - targets: ['mvno-api:8080']
      - job_name: 'rtpengine'
        static_configs:
-         - targets: ['rtpengine:22223']
+         - targets: ['rtpengine:9900']
+     - job_name: 'vmagent'
+       static_configs:
+         - targets: ['vmagent:8429']
    ```
 2. **Set ingestion write-path**: Point `vmagent` to push all aggregated telemetry to the VictoriaMetrics TSDB single-binary database at `victoria-metrics:8428`.
 

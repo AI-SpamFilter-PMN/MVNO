@@ -22,7 +22,7 @@ source = '''
 # VRL Regex Parsing: Extract E.164 phone numbers (MSISDN) from raw signaling logs
 if contains(to_string!(.message), "INVITE") {
   .event_type = "SIP_INVITE"
-  caps = parse_regex(.message, r'from: sip:(?P<caller>\d+)@')??
+  caps = parse_regex(.message, r'(?i)from: sip:(?P<caller>\d+)@')??
   if caps != null {
     .caller_msisdn = caps.caller
   }

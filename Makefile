@@ -25,8 +25,8 @@ ps:
 
 # Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
-	@mkdir -p state/mongodb state/spool state/hlr state/vm-data state/grafana state/logs/kamailio state/logs/osmocom
-	@sqlite3 state/kamailio.db \
+	@mkdir -p state/mongodb state/spool state/hlr state/kamailio state/vm-data state/grafana state/logs/kamailio state/logs/osmocom
+	@sqlite3 state/kamailio/kamailio.db \
 		"CREATE TABLE IF NOT EXISTS version (id INTEGER PRIMARY KEY, table_name TEXT UNIQUE, table_version INTEGER);" \
 		"INSERT OR IGNORE INTO version VALUES (1, 'version', 1);" \
 		"CREATE TABLE IF NOT EXISTS subscriber ( \
@@ -48,6 +48,7 @@ init-db:
 				'', '', '15557654321', 0);" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
+	@cp -f state/kamailio/kamailio.db state/kamailio.db
 	@sqlite3 state/hlr/hlr.db \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"

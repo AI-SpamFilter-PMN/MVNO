@@ -40,6 +40,9 @@
 networks:
   mvno_net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 10.89.0.0/24
 
 services:
   # ─── MongoDB Subscriber DB (5G Core Open5GS metadata store) ───
@@ -257,6 +260,12 @@ services:
     depends_on:
       amf:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "cat /proc/net/sctp/assocs 2>/dev/null | grep -q 38412"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - mvno_net
     restart: unless-stopped
@@ -338,7 +347,7 @@ services:
       - "5066:5060/udp"
     volumes:
       - ./configs/kamailio:/etc/kamailio:z
-      - ./state/kamailio.db:/etc/kamailio/kamailio.db:z
+      - ./state/kamailio/kamailio.db:/etc/kamailio/kamailio.db:z
     depends_on:
       rtpengine:
         condition: service_started
@@ -354,6 +363,12 @@ services:
     volumes:
       - ./configs/osmocom:/etc/osmocom:z
       - ./state/hlr:/var/lib/osmocom:z
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c 'echo > /dev/tcp/localhost/4222' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       mvno_net:
         ipv4_address: 10.89.0.45
@@ -370,6 +385,12 @@ services:
       - ./state/hlr:/var/lib/osmocom:z
     depends_on:
       - osmo-hlr
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c 'echo > /dev/tcp/localhost/2775' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - mvno_net
     restart: unless-stopped
@@ -381,8 +402,14 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./state:/etc/kamailio:z
+      - ./state/kamailio:/etc/kamailio:z
       - ./state/spool:/var/spool/rtpengine:z
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - mvno_net
     restart: unless-stopped
@@ -421,7 +448,7 @@ services:
     container_name: mvno-vector
     volumes:
       - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock:ro,z
     networks:
       - mvno_net
     restart: unless-stopped

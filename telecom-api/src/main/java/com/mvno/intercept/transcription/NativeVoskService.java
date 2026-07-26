@@ -15,6 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import jakarta.annotation.PreDestroy;
+
 /**
  * Native Vosk Speech-to-Text (ASR) Engine Service
  * 
@@ -59,6 +61,18 @@ public class NativeVoskService {
         }
     }
 
+    @PreDestroy
+    public void destroyModel() {
+        if (voskModel != null) {
+            try {
+                voskModel.close();
+                logger.info("Native Vosk JNI off-heap memory model resources closed successfully.");
+            } catch (final Exception e) {
+                logger.error("Error closing native Vosk ASR model: {}", e.getMessage());
+            }
+        }
+    }
+
     /**
      * Decodes 16kHz mono WAV audio file in JVM memory and returns transcribed text string.
      * 
@@ -98,7 +112,10 @@ public class NativeVoskService {
                 return;
             }
 
-            try (final DirectoryStream<Path> stream = Files.newDirectoryStream(spoolPath, "*.wav")) {
+            try (final DirectoryStream<Path> stream = Files.newDirectoryStream(spoolPath, entry -> {
+                String name = entry.getFileName().toString().toLowerCase();
+                return name.endsWith(".wav") || name.endsWith(".pcap") || name.endsWith(".raw");
+            })) {
                 for (final Path path : stream) {
                     final File file = path.toFile();
                     if (System.currentTimeMillis() - file.lastModified() > 3000) {
