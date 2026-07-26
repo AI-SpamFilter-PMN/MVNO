@@ -5,7 +5,7 @@
 # SQLite WAL database initialization, VTY control socket assertions, and REST API testing.
 # ==============================================================================
 
-.PHONY: up down logs ps init-db clean rebuild test test-sms test-call test-api test-vty
+.PHONY: up down logs ps init-db init-native-db up-native clean rebuild test test-sms test-call test-api test-vty
 
 # Launches all rootless container services using scripts/up.sh
 up:
@@ -64,6 +64,13 @@ init-db:
 	@sqlite3 state/hlr/hlr.db \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
+
+# Alias for native systemd database initialization
+init-native-db: init-db
+
+# Starts native systemd services for non-containerized deployments
+up-native:
+	@sudo systemctl start kamailio rtpengine osmo-msc osmo-hlr
 	@echo "Databases initialized."
 
 test-api:

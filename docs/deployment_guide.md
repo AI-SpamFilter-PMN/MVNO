@@ -53,6 +53,23 @@ Operating in a daemonless, rootless environment:
 | :--- | :--- | :--- |
 | **Podman** | `sudo apt install podman` | Daemonless rootless engine |
 | **Docker Compose Plugin**| `sudo apt install docker-compose` | Compose orchestration via `podman compose` |
+
+### Kernel Prerequisites (5G NGAP Signaling)
+
+5G N2 interface signaling between UERANSIM gNB (`mvno-ueransim-gnb`) and Open5GS AMF (`mvno-amf`) over TCP/SCTP port 38412 requires the **SCTP kernel module** enabled on the host operating system:
+
+```bash
+# 1. Load SCTP kernel module
+sudo modprobe sctp
+
+# 2. Verify SCTP module state
+lsmod | grep sctp
+
+# 3. Install SCTP development headers & tools (pick your distro)
+sudo apt install -y lksctp-tools      # Debian/Ubuntu
+sudo dnf install -y lksctp-tools      # Fedora/RHEL
+sudo pacman -S --needed lksctp-tools  # Arch/CachyOS
+```
 | **Podman API Socket**| `systemctl --user enable --now podman.socket` | Required by Docker Compose Plugin to talk to Podman |
 | **Kamailio Image** | `mvno-kamailio:5.7.4` | Custom Alpine build (adds kamailio-utils) from `configs/kamailio/Dockerfile` |
 | **rtpengine Image**| `drachtio/rtpengine:mr9.4.0.0` | Media engine container |
