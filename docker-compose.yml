@@ -41,6 +41,7 @@ services:
       - DB_URI=mongodb://mongodb:27017/open5gs
       - HOST=0.0.0.0
       - PORT=3000
+      - NODE_PATH=src
     depends_on:
       mongodb:
         condition: service_healthy

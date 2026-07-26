@@ -223,10 +223,10 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: SBI server stanzas lacked container network `advertise: <service_name>` FQDNs, causing NRF to register `0.0.0.0:80` unroutable endpoints.
 * **Fix**: Added explicit `advertise: <container_name>` parameters across all 10 `configs/open5gs/*.yaml` configuration files on port `7777`.
 
-### Issue 8.5: Vector Log Shipper Missing Host Docker Socket Mount
-* **Symptom**: Vector container failed to scrape container logs from Podman engine.
-* **Root Cause**: `docker-compose.yml` did not mount `/var/run/docker.sock` into Vector container.
-* **Fix**: Added `/var/run/docker.sock:/var/run/docker.sock:ro` volume mount and updated restart policy to `unless-stopped` in [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml).
+### Issue 8.6: Open5GS WebUI Next.js Module Resolution Failure (`modules/store.js`)
+* **Symptom**: HTTP 500 error on `http://localhost:9999` with `Module not found: Can't resolve 'modules/store.js' in '/usr/src/app/pages'`.
+* **Root Cause**: Open5GS WebUI Next.js server bound to `127.0.0.1` inside container (blocking host port forward) and Webpack lacked `NODE_PATH=src` module resolution paths for `src/` subdirectories (`modules`, `containers`, `components`, `helpers`).
+* **Fix**: Added `HOST=0.0.0.0`, `PORT=3000`, and `NODE_PATH=src` in `docker-compose.yml`, and created symlinks pointing `src/*` into `/usr/src/app/node_modules` and `/usr/src/app/pages` in [configs/open5gs/Dockerfile.webui](file:///home/zkhattab/MVNO/configs/open5gs/Dockerfile.webui).
 
 ---
 
