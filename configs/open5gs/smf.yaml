@@ -2,23 +2,29 @@ logger:
   file:
     path: /var/log/open5gs/smf.log
 
+default:
+  no_tls: true
+
 global:
   max:
     ue: 1024
 
+# SMF: Session Management Function (3GPP Rel-16 5G SA Core)
+# Allocates UE IPv4/IPv6 addresses, manages PDU sessions, and controls UPF via PFCP.
 smf:
-  sbi:
+  sbi: # SBI: Service-Based Interface (HTTP/2 Rel-16 microservices protocol)
     server:
       - address: 0.0.0.0
         port: 7777
+        no_tls: true # no_tls: Disables TLS framing for cleartext HTTP/2 (h2c) within isolated container network
         advertise: smf
     client:
-      nrf:
+      nrf: # NRF: Network Repository Function (Registers SMF service profile with NRF)
         - uri: http://nrf:7777
-  pfcp:
+  pfcp: # PFCP: Packet Forwarding Control Protocol (3GPP TS 29.244 interface to UPF)
     server:
       - address: 0.0.0.0
-    client:
+    client: # SMF acts as the sole PFCP client initiator to UPF per 3GPP standards
       upf:
         - address: upf
   gtpc:

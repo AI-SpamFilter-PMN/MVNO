@@ -1,13 +1,19 @@
 {
   "__inputs": [],
   "__requires": [],
-  "title": "NOC Overview",
+  "title": "NOC Overview Command Center",
   "uid": "noc-overview",
-  "tags": ["mvno", "telecom", "noc", "overview"],
+  "tags": ["mvno", "telecom", "noc", "overview", "sota"],
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#00F2FE" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
       "id": 1,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
@@ -20,7 +26,13 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#7928CA" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
       "id": 2,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
@@ -33,7 +45,20 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00E676", "value": null },
+              { "color": "#FF0844", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
       "id": 3,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
@@ -46,7 +71,13 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#FFD600" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
       "id": 4,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
@@ -59,7 +90,35 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "SMS" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#00F2FE", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Call" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#7928CA", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "SMS Blocked" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF0844", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Call Blocked" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF9100", "mode": "fixed" } }]
+          }
+        ]
+      },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "id": 5,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
@@ -74,10 +133,30 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "EIR Tracked IMEIs" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#00E676", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "SIM Swaps" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF0844", "mode": "fixed" } }]
+          }
+        ]
+      },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "id": 6,
-      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" } },
       "targets": [
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size", "legendFormat": "EIR Tracked IMEIs", "refId": "A" },
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_sim_swap_detected_total", "legendFormat": "SIM Swaps", "refId": "B" }

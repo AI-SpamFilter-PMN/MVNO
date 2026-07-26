@@ -228,6 +228,31 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: Open5GS WebUI Next.js server bound to `127.0.0.1` inside container (blocking host port forward) and Webpack lacked `NODE_PATH=src` module resolution paths for `src/` subdirectories (`modules`, `containers`, `components`, `helpers`).
 * **Fix**: Added `HOST=0.0.0.0`, `PORT=3000`, and `NODE_PATH=src` in `docker-compose.yml`, and created symlinks pointing `src/*` into `/usr/src/app/node_modules` and `/usr/src/app/pages` in [configs/open5gs/Dockerfile.webui](file:///home/zkhattab/MVNO/configs/open5gs/Dockerfile.webui).
 
+### Issue 8.7: Open5GS WebUI React 15 JSX Transpilation & Node 18 Runtime (`ReferenceError: React is not defined`)
+* **Symptom**: HTTP 500 internal server error on `http://localhost:9999` with `ReferenceError: React is not defined` at `Auth.render` or Node ESM syntax errors (`Cannot use import statement outside a module`).
+* **Root Cause**: Next.js 3 compiles `pages/` but does not transpile `src/` modules imported via `NODE_PATH=src`. Node 19+ strict ESM loader threw SyntaxError on `import` statements outside modules, and React 15 JSX transpilation required `var React = require('react')` injection.
+* **Fix**: Rebased container on official `node:18-bookworm-slim` base image, added Babel 7 CLI + `@babel/preset-env` + `@babel/preset-react` + `@babel/plugin-transform-class-properties` + `@babel/plugin-transform-modules-commonjs` transpilation step in [configs/open5gs/Dockerfile.webui](file:///home/zkhattab/MVNO/configs/open5gs/Dockerfile.webui), and injected `var React = require('react')` to compiled JSX files. Verified `curl http://localhost:9999` returns `HTTP 200 OK` (`<title>Open5gs - Login</title>`).
+
+### Issue 8.8: Open5GS UPF PFCP Client Address Target Resolution (`No Heartbeat from SMF`)
+* **Symptom**: System journal reported `[pfcp] WARNING: No Heartbeat from SMF` and `[smf] ERROR: Cannot find PFCP-Node: type [1] node_id NULL from [127.0.0.1]:8805`.
+* **Root Cause**: `configs/open5gs/upf.yaml` lacked `pfcp.client.smf` section, defaulting PFCP client heartbeat target to loopback `127.0.0.1:8805` instead of container network hostname `smf`.
+* **Fix**: Added `pfcp.client.smf: - address: smf` to [configs/open5gs/upf.yaml](file:///home/zkhattab/MVNO/configs/open5gs/upf.yaml). PFCP heartbeats between SMF and UPF are now associated and healthy across `mvno-net`.
+
+### Issue 8.9: Open5GS SBI Cleartext HTTP/2 (`no_tls: true`) Configuration Across All NFs
+* **Symptom**: Open5GS NRF, AMF, SMF, and AUSF logged `nghttp2_session_mem_recv() failed (-903: Received bad client magic byte string)` and `Error in the HTTP2 framing layer (16)`.
+* **Root Cause**: Open5GS SBI server stanzas default to TLS (HTTPS) unless `no_tls: true` is explicitly configured. SBI clients connecting via `http://` failed TLS framing negotiation.
+* **Fix**: Added `no_tls: true` under `sbi.server` across all 9 `configs/open5gs/*.yaml` files. All NFs now register successfully with NRF.
+
+### Issue 8.10: Open5GS UPF PFCP State Machine Dual-Initiator Collision
+* **Symptom**: SMF & UPF logged `PFCP[REQ] has already been associated` and `invalid step[0] type[6]`.
+* **Root Cause**: `configs/open5gs/upf.yaml` erroneously configured `pfcp.client.smf`, causing UPF to initiate PFCP association back to SMF simultaneously, colliding with SMF's PFCP association request.
+* **Fix**: Removed `pfcp.client` section from [configs/open5gs/upf.yaml](file:///home/zkhattab/MVNO/configs/open5gs/upf.yaml). SMF acts as sole PFCP client initiator per 3GPP TS 29.244.
+
+### Issue 8.11: EIR SIM-Swap Fraud State Erasure Across Cache Purges
+* **Symptom**: Active SIM-swap blocks were bypassed after scheduled 10-minute cache purges or capacity eviction.
+* **Root Cause**: `EirTracker.java` called `imeiSwapCounter.clear()`, wiping active fraud states (`swaps > 3`) along with idle IMEIs.
+* **Fix**: Refactored [EirTracker.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/subscriber/EirTracker.java) to selectively prune low-activity entries (`removeIf(entry -> entry.getValue().get() <= 1)`) and instrumented Micrometer Prometheus metrics.
+
 ---
 
 ## 9. Master Verification & Verification Checklist
@@ -244,4 +269,4 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 | **EIR SIM-Swap Block** | 4 rapid calls on single IMEI | `{"allow":false,"reason":"EIR: SIM swap detected"}` | ✅ **PASS** |
 | **vmagent Scraper Targets** | `GET :8429/api/v1/targets` | `3/3 targets health: UP` | ✅ **PASS** |
 | **VictoriaMetrics TSDB** | `GET :8428/api/v1/query?query=mvno_sms_requests_total` | `seriesFetched: 1`, `value: [ts, "2"]` | ✅ **PASS** |
-| **Grafana NOC Dashboard UI** | `GET :3000/login` | `HTTP 200 OK` | ✅ **PASS** |
+| **Open5GS WebUI Login UI** | `GET :9999/` | `HTTP 200 OK` (`<title>Open5gs - Login</title>`) | ✅ **PASS** |

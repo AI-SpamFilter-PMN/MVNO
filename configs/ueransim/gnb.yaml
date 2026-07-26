@@ -1,15 +1,18 @@
+# gNB: next-Generation NodeB (5G NR Radio Access Network Base Station Simulator)
+# MCC: Mobile Country Code (001 Test), MNC: Mobile Network Code (01)
+# NCI: gNB Cell Identity (0x000000010), TAC: Tracking Area Code (1)
 mcc: '001'
 mnc: '01'
 nci: '0x000000010'
 idLength: 32
 tac: 1
 linkIp: 0.0.0.0
-ngapIp: 0.0.0.0
-gtpIp: 0.0.0.0
+ngapIp: 0.0.0.0 # NGAP: NG Application Protocol (SCTP control plane to AMF)
+gtpIp: 0.0.0.0  # GTP-U: GPRS Tunnelling Protocol User Plane (UDP 2152 to UPF)
 ignoreStreamIds: true
-amfConfigs:
+amfConfigs: # AMF: Access and Mobility Management Function (port 38412)
   - address: amf
     port: 38412
-slices:
-  - sst: 1
-    sd: 0x000001
+slices: # Network Slices supported by gNB
+  - sst: 1        # SST: Slice/Service Type 1 (eMBB: enhanced Mobile Broadband)
+    sd: 0x000001  # SD: Slice Differentiator 0x000001

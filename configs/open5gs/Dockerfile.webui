@@ -1,21 +1,32 @@
-FROM node:20-alpine
+# Open5GS 5G SA Subscriber Management WebUI Dockerfile
+# Base Image: node:18-bookworm-slim (Official Open5GS WebUI recommended Node.js 18 LTS runtime)
+FROM node:18-bookworm-slim
 WORKDIR /usr/src/app
-RUN apk add --no-cache git python3 make g++
+
+# Step 1: Install build tools required for native C/C++ node-gyp bindings
+RUN apt-get update && apt-get install -y git python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+# Step 2: Shallow clone open5gs repository pinned explicitly to version tag v2.8.0
 RUN git clone --depth 1 --branch v2.8.0 https://github.com/open5gs/open5gs.git /tmp/open5gs && \
     cp -r /tmp/open5gs/webui/* /usr/src/app/ && \
     rm -rf /tmp/open5gs
-RUN npm install && \
-    ln -s /usr/src/app/src/modules /usr/src/app/node_modules/modules && \
-    ln -s /usr/src/app/src/containers /usr/src/app/node_modules/containers && \
-    ln -s /usr/src/app/src/components /usr/src/app/node_modules/components && \
-    ln -s /usr/src/app/src/helpers /usr/src/app/node_modules/helpers && \
-    ln -s /usr/src/app/src/modules /usr/src/app/pages/modules && \
-    ln -s /usr/src/app/src/containers /usr/src/app/pages/containers && \
-    ln -s /usr/src/app/src/components /usr/src/app/pages/components && \
-    ln -s /usr/src/app/src/helpers /usr/src/app/pages/helpers
+
+# Step 3: Clean dependency installation, Babel 7 transpilation of src to CommonJS, and Next.js asset build
+RUN npm clean-install && \
+    npm install --save-dev @babel/cli@7.23.9 @babel/core@7.23.9 @babel/preset-env@7.23.9 @babel/preset-react@7.23.3 @babel/plugin-transform-class-properties@7.23.3 @babel/plugin-transform-modules-commonjs@7.23.3 && \
+    ./node_modules/.bin/babel src --out-dir src --presets=@babel/preset-env,@babel/preset-react --plugins=@babel/plugin-transform-class-properties,@babel/plugin-transform-modules-commonjs && \
+    node -e "const fs=require('fs'),path=require('path');function walk(d){fs.readdirSync(d,{withFileTypes:true}).forEach(e=>{const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(p.endsWith('.js')){let c=fs.readFileSync(p,'utf8');if(c.includes('React.createElement')&&!c.includes('var React =')&&!c.includes('const React =')){fs.writeFileSync(p,'var React = require(\'react\');\n'+c);}}});}walk('src');" && \
+    sed -i 's/if (dev) {/if (true) {/g' server/index.js && \
+    NODE_PATH=src npm run build
+
+# Step 4: Expose internal port 3000 (mapped externally to 9999 for rootless Podman compliance)
 EXPOSE 3000
+
+# Step 5: Environment configuration — MongoDB binding and network interface binding (0.0.0.0)
 ENV DB_URI=mongodb://mongodb:27017/open5gs
 ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV NODE_PATH=src
-CMD ["node", "server/index.js"]
+
+# Step 6: Launch production Express/Next.js server
+CMD ["sh", "-c", "NODE_PATH=src npm run start"]

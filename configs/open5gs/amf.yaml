@@ -2,49 +2,56 @@ logger:
   file:
     path: /var/log/open5gs/amf.log
 
+default:
+  no_tls: true
+
 global:
   max:
     ue: 1024
 
+# AMF: Access and Mobility Management Function (3GPP Rel-16 5G SA Core)
+# Terminates NGAP (NG Application Protocol over SCTP port 38412) from gNB and NAS (Non-Access Stratum) from UEs.
 amf:
   amf_name: "MVNO-AMF"
-  guami:
-    - plmn_id:
+  guami: # GUAMI: Globally Unique AMF Identifier
+    - plmn_id: # PLMN: Public Land Mobile Network (MCC: Mobile Country Code 001, MNC: Mobile Network Code 01)
         mcc: '001'
         mnc: '01'
       amf_id:
         region: 2
         set: 2
-  tai:
+  tai: # TAI: Tracking Area Identifier
     - plmn_id:
         mcc: '001'
         mnc: '01'
-      tac: 1
+      tac: 1 # TAC: Tracking Area Code 1
   plmn_support:
     - plmn_id:
         mcc: '001'
         mnc: '01'
-      s_nssai:
-        - sst: 1
-          sd: 0x000001
+      s_nssai: # S-NSSAI: Single Network Slice Selection Assistance Information
+        - sst: 1 # SST: Slice/Service Type 1 (eMBB: enhanced Mobile Broadband)
+          sd: 0x000001 # SD: Slice Differentiator
   security:
-    integrity_order : [ NIA2, NIA1, NIA0 ]
-    ciphering_order : [ NEA0, NEA1, NEA2 ]
+    integrity_order : [ NIA2, NIA1, NIA0 ] # 5G Integrity Protection Algorithms (NIA: 5G Integrity Alg)
+    ciphering_order : [ NEA0, NEA1, NEA2 ] # 5G Encryption Algorithms (NEA: 5G Encryption Alg)
   network_name:
     full: MVNO
     short: MVNO
   time:
     t3512:
       value: 540
-  sbi:
+  sbi: # SBI: Service-Based Interface (HTTP/2 3GPP Rel-16 REST microservices)
     server:
       - address: 0.0.0.0
         port: 7777
+        no_tls: true # Disables TLS framing for cleartext HTTP/2 (h2c) inside isolated bridge network
         advertise: amf
     client:
-      nrf:
+      nrf: # NRF: Network Repository Function (Registers AMF profile and discovers AUSF/UDM)
         - uri: http://nrf:7777
-  ngap:
+          no_tls: true
+  ngap: # NGAP: NG Application Protocol (SCTP port 38412 interface to gNB base station)
     server:
       - address: 0.0.0.0
         port: 38412
