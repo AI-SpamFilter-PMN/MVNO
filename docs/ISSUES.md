@@ -253,6 +253,26 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: `EirTracker.java` called `imeiSwapCounter.clear()`, wiping active fraud states (`swaps > 3`) along with idle IMEIs.
 * **Fix**: Refactored [EirTracker.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/subscriber/EirTracker.java) to selectively prune low-activity entries (`removeIf(entry -> entry.getValue().get() <= 1)`) and instrumented Micrometer Prometheus metrics.
 
+### Issue 8.12: Split-Brain SQLite Database File Mount (`kamailio` vs `telecom-api`)
+* **Symptom**: Kamailio registered subscribers to `./state/kamailio.db` while `telecom-api` read from `./state/kamailio/kamailio.db`, causing subscriber data divergence.
+* **Root Cause**: In `docker-compose.yml`, `kamailio` mounted single file `./state/kamailio.db:/etc/kamailio/kamailio.db:z` while `telecom-api` mounted directory `./state/kamailio:/etc/kamailio:z`.
+* **Fix**: Unified volume mount in [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml) for `kamailio` service to `./state/kamailio/kamailio.db:/etc/kamailio/kamailio.db:z` and updated [Makefile](file:///home/zkhattab/MVNO/Makefile) `init-db` target.
+
+### Issue 8.13: RTPEngine PCAP vs Fork Audio Recording Method Mismatch with Vosk ASR
+* **Symptom**: Native Vosk ASR service polled for `*.wav` files in `/var/spool/rtpengine`, while RTPEngine recorded in binary PCAP format (`recording-method=pcap`).
+* **Root Cause**: PCAP streams were encapsulated in ethernet/IP frame headers rather than raw audio streams.
+* **Fix**: Updated [rtpengine.conf](file:///home/zkhattab/MVNO/configs/rtpengine/rtpengine.conf) to `recording-method=fork` and expanded [NativeVoskService.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/transcription/NativeVoskService.java) `DirectoryStream` filter to match `*.wav`, `*.pcap`, and `*.raw` streams.
+
+### Issue 8.14: Rootless Podman Docker Socket Path Permission for Vector
+* **Symptom**: Vector container failed to collect docker logs with `No such file or directory: /var/run/docker.sock`.
+* **Root Cause**: Rootless Podman exposes user-level socket at `/run/user/1000/podman/podman.sock` instead of root system path `/var/run/docker.sock`.
+* **Fix**: Updated `vector` volume mount in [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml) to `/run/user/1000/podman/podman.sock:/var/run/docker.sock:ro,z`.
+
+### Issue 8.15: Stale Java Container Tags in `bootstrap.sh`
+* **Symptom**: Offline bootstrap save step (`bootstrap.sh --offline`) skipped saving Java image archives.
+* **Root Cause**: `SAVE_IMAGES` array in `bootstrap.sh` contained stale `eclipse-temurin:25-jre` tags while `PREBUILT_IMAGES` used Java 21 LTS (`eclipse-temurin:21-jre`).
+* **Fix**: Updated `SAVE_IMAGES` array tags in [scripts/bootstrap.sh](file:///home/zkhattab/MVNO/scripts/bootstrap.sh) to `eclipse-temurin-21-jre` and `maven-3.9-eclipse-temurin-21`.
+
 ---
 
 ## 9. Master Verification & Verification Checklist
