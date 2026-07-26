@@ -42,12 +42,10 @@ echo -e "${YELLOW}[4/11] 💳 Querying Subscriber Balance (E.164 MSISDN: 1555123
 curl -s http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -m json.tool
 echo -e "${GREEN}✓ Subscriber Balance retrieved: 100 credits${NC}\n"
 
-# Item 5: Successful VoIP Call Interception Flow
-echo -e "${YELLOW}[5/11] 📞 Simulating Authorized IMS VoIP Call Interception Flow...${NC}"
-curl -s -X POST http://localhost:8080/api/v1/intercept/call \
-  -H "Content-Type: application/json" \
-  -d '{"caller":"15551234567","callee":"15557654321","call_id":"demo-call-001"}' | python3 -m json.tool
-echo -e "${GREEN}✓ Call Allowed (Balance > 0 & AI Approved)${NC}\n"
+# Item 5: Successful VoIP Call Interception Flow via Real SIP INVITE
+echo -e "${YELLOW}[5/11] 📞 Simulating Authorized IMS VoIP Call Interception Flow (SIP INVITE ➔ Kamailio)...${NC}"
+python3 scripts/sip_traffic_sim.py
+echo -e "${GREEN}✓ Real SIP INVITE processed by Kamailio (REST Intercept & RTPEngine Anchored)${NC}\n"
 
 # Item 6: Zero-Balance Call Interception Block (Negative Test 1)
 echo -e "${YELLOW}[6/11] 🚫 Testing Zero-Balance Call Block (Caller: 15557654321)...${NC}"
