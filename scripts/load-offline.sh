@@ -37,8 +37,9 @@ detect_runtime() {
         if docker info &>/dev/null 2>&1; then
             DOCKER_CMD="docker"
         elif sg docker -c "docker info" &>/dev/null 2>&1; then
-            docker_cmd() { sg docker -c "docker $*"; }
-            DOCKER_CMD="docker_cmd"
+            docker_wrapper() { sg docker -c "docker $*"; }
+            DOCKER_CMD="docker_wrapper"
+            export -f docker_wrapper 2>/dev/null || true
         else
             echo "ERROR: Docker daemon not accessible. Try: newgrp docker"
             exit 1

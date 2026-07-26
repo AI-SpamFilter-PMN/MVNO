@@ -18,7 +18,7 @@ VENDOR_DIR="$PROJECT_DIR/vendor"
 LOG_DIR="$VENDOR_DIR/logs"
 
 UERANSIM_VERSION="3.2.6"
-OPEN5GS_VERSION="2.7.0"
+OPEN5GS_VERSION="2.8.0"
 OPEN5GS_DIR="$PROJECT_DIR/configs/open5gs"
 
 # ─── Accumulators ───────────────────────────────────────
@@ -104,14 +104,15 @@ detect_runtime() {
             COMPOSE_CMD="docker compose"
         elif sg docker -c "docker info" &>/dev/null 2>&1; then
             echo "  Docker accessible via sg docker"
-            docker_cmd()  { sg docker -c "docker $*"; }
-            compose_cmd() { sg docker -c "docker compose $*"; }
-            DOCKER_CMD="docker_cmd"
-            COMPOSE_CMD="compose_cmd"
+            docker_wrapper() { sg docker -c "docker $*"; }
+            compose_wrapper() { sg docker -c "docker compose $*"; }
+            DOCKER_CMD="docker_wrapper"
+            COMPOSE_CMD="compose_wrapper"
+            export -f docker_wrapper compose_wrapper 2>/dev/null || true
         else
-            echo "  [WARN] Docker daemon not accessible — builds may fail"
-            DOCKER_CMD="docker"
-            COMPOSE_CMD="docker compose"
+            echo "  [FATAL] Docker daemon not accessible even with sg docker"
+            echo "  Try: sudo usermod -aG docker $USER && newgrp docker"
+            exit 1
         fi
         echo "Runtime: docker (found at $(command -v docker))"
         install_packages docker-buildx 2>/dev/null || true

@@ -2,35 +2,35 @@
 # ==============================================================================
 # vty.sh — Osmocom VTY Control Socket Automation Helper
 # ==============================================================================
-# Osmocom cellular daemons (osmo-msc, osmo-hlr, osmo-bsc) expose a Cisco-style
+# Osmocom cellular daemons (osmo-msc, osmo-hlr) expose a Cisco-style
 # Virtual TeleTYpe (VTY) text interface over raw TCP sockets:
 # - osmo-hlr VTY: port 4258
 # - osmo-msc VTY: port 4254
 #
-# Technical Detail:
-# Uses bash built-in socket redirection `/dev/tcp/localhost/<port>` to issue
-# VTY configuration and query commands non-interactively without netcat/telnet.
+# Usage:
+#   ./scripts/vty.sh mvno-osmo-hlr 4258 "show subscribers all"
+#   ./scripts/vty.sh mvno-osmosmsc 4254 "show msc"
 # ==============================================================================
-set -e
+
+set -euo pipefail
+
+if [ "$#" -lt 3 ]; then
+    echo "Usage: $0 <container_name> <vty_port> <command1> [command2 ...]"
+    exit 1
+fi
 
 CONTAINER="$1"
 PORT="$2"
 shift 2
 
-podman exec "$CONTAINER" bash -c '
-port='$PORT'
-{
-  sleep 1
-  echo enable
-  sleep 1
-' '
-  for cmd; do
-    printf "  echo %q\n" "$cmd"
-    printf "  sleep 1\n"
-    printf "  echo %q >&3\n" "$cmd"
-  done
-' '
-  sleep 1
-} | timeout 3 bash 2>/dev/null || true
-' _ "$@"
-
+# Execute non-interactive VTY session via native /dev/tcp socket redirection
+podman exec "$CONTAINER" bash -c "
+exec 3<>/dev/tcp/localhost/$PORT
+echo enable >&3
+sleep 1
+for cmd in \"\$@\"; do
+    echo \"\$cmd\" >&3
+    sleep 1
+done
+dd bs=8192 count=1 <&3 2>/dev/null
+" _ "$@"
