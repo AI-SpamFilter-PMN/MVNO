@@ -273,6 +273,11 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: `SAVE_IMAGES` array in `bootstrap.sh` contained stale `eclipse-temurin:25-jre` tags while `PREBUILT_IMAGES` used Java 21 LTS (`eclipse-temurin:21-jre`).
 * **Fix**: Updated `SAVE_IMAGES` array tags in [scripts/bootstrap.sh](file:///home/zkhattab/MVNO/scripts/bootstrap.sh) to `eclipse-temurin-21-jre` and `maven-3.9-eclipse-temurin-21`.
 
+### Issue 8.16: Osmocom VTY Script Container Engine Portability (`vty.sh`)
+* **Symptom**: `scripts/vty.sh` hardcoded `podman` engine invocation and relied strictly on container `/dev/tcp` socket redirection.
+* **Root Cause**: Non-bash container shells (Alpine/busybox) lack `/dev/tcp` socket redirection syntax, causing execution failure on minimalist images.
+* **Fix**: Refactored [scripts/vty.sh](file:///home/zkhattab/MVNO/scripts/vty.sh) with container runtime auto-detection (`podman`/`docker`) and added `nc -w 3 127.0.0.1 <port>` socket redirection fallback.
+
 ---
 
 ## 9. Master Verification & Verification Checklist

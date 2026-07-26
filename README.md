@@ -93,9 +93,10 @@ curl http://localhost:8080/api/v1/intercept/subscriber/15551234567
 curl http://localhost:8080/api/v1/intercept/subscriber/15557654321
 # Expected: {"msisdn":"15557654321","balance":0}    ← zero-balance blocked
 
-# 6. Test interception
+# 6. Test interception & execute automated presentation runbook
 make test-sms    # SMS via SMPP → Spring Boot → AI Filter
 make test-call   # SIP call → rtpengine → Vosk STT → Spring Boot
+./scripts/testing/demo_runbook.sh  # Complete 11-step graduation project live presentation
 ```
 
 ### Method B: Native (systemd)
@@ -121,13 +122,16 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | Service | Container Name | Port | Protocol | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
 | **Spring Boot Gateway** | `mvno-api` | `8080` | HTTP / REST | Interception policy control & subscriber API |
-| **Kamailio CSCF** | `mvno-kamailio` | `5060` | UDP / TCP | SIP signaling & registrar proxy |
+| **Kamailio CSCF** | `mvno-kamailio` | `5066 (host) → 5060` | UDP / TCP | SIP signaling & registrar proxy |
 | **rtpengine NG** | `mvno-rtpengine` | `22222` | UDP | In-kernel media proxy control port |
 | **rtpengine Media** | `mvno-rtpengine` | `30000-30100`| UDP | RTP media audio stream relay range |
 | **OsmoSMSC / MSC** | `mvno-osmosmsc` | `2775` | TCP / SMPP | Short Message Peer-to-Peer (SMPP 3.4) |
+| **OsmoHLR** | `mvno-osmo-hlr` | `4222` | TCP / GSUP | Standalone subscriber location database |
 | **VictoriaMetrics** | `mvno-victoriametrics`| `8428` | HTTP | Telemetry TSDB & PromQL query API |
+| **vmagent Scraper** | `mvno-vmagent` | `8429` | HTTP | Telemetry scraper target health API |
 | **Grafana NOC** | `mvno-grafana` | `3000` | HTTP | Real-time telecom NOC dashboard UI |
-| **AI Spam Model** | `ai-filter` | `8000` | HTTP / REST | External AI Spam Model Server |
+| **Open5GS WebUI** | `mvno-open5gs-webui`| `9999` | HTTP | Subscriber SIM & Profile Management UI |
+| **AI Spam Model** | `ai-filter` | `8008 (host) → 8000` | HTTP / REST | External AI Spam Model Server |
 
 ---
 

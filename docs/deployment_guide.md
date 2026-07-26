@@ -580,7 +580,7 @@ services:
 | **OsmoSMSC** | `2775` | TCP | SMPP SMS delivery | Native bind (no changes) |
 | **Spring Boot** | `8080` | TCP | Interception REST API + actuator health | Native bind (no changes) |
 | **VictoriaMetrics** | `8428` | TCP | Metrics ingestion | Native bind (no changes) |
-| **vmagent** | `8429` | TCP | Metrics scraping agent | Internal (no host port) |
+| **vmagent** | `8429` | TCP | Metrics scraping agent target API | Mapped to host port `8429` for target inspection |
 | **Grafana** | `3000` | TCP | NOC dashboard | Native bind (no changes) |
 | **MongoDB** (Phase 3+) | `27017` | TCP | Open5GS subscriber metadata | Native bind (no changes) |
 | **Open5GS NRF** (Phase 3+) | `7777` | TCP | 5GC service registry | Native bind (no changes) |
