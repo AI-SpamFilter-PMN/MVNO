@@ -1,7 +1,7 @@
 {
   "__inputs": [],
   "__requires": [],
-  "title": "MVNO Interception Core — Unified Master NOC Dashboard",
+  "title": "MVNO Interception Core — Unified Master NOC Command Center",
   "uid": "mvno-unified-noc",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -9,7 +9,7 @@
   "liveNow": true,
   "refresh": "5s",
   "schemaVersion": 39,
-  "tags": ["mvno", "telecom", "noc", "interception", "security"],
+  "tags": ["mvno", "telecom", "noc", "interception", "security", "sota"],
   "time": {
     "from": "now-15m",
     "to": "now"
@@ -23,65 +23,149 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 100,
-      "title": "⚡ OVERVIEW KPSI STATS",
+      "title": "⚡ HIGH-DENSITY KPI HERO OVERVIEW",
       "type": "row"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#00F2FE" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#00F2FE", "value": null }] }
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
       "id": 1,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
       "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_sms_requests_total) default 0", "refId": "A" }],
       "title": "Total SMS Requests",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] } }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#7928CA" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#7928CA", "value": null }] }
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
       "id": 2,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
       "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_call_requests_total) default 0", "refId": "A" }],
       "title": "Total Voice Call Requests",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] } }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00E676", "value": null },
+              { "color": "#FF0844", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
       "id": 3,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
       "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_eir_sim_swap_detected_total) default 0", "refId": "A" }],
-      "title": "SIM Swaps Detected",
+      "title": "EIR SIM-Swaps Detected",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }] } }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#FF9100" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#FF9100", "value": null }] }
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
       "id": 4,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
       "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "(sum(mvno_sms_blocked_total) + sum(mvno_call_blocked_total)) default 0", "refId": "A" }],
-      "title": "Total Interceptions Blocked",
+      "title": "Interceptions Blocked",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#00E676" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#00E676", "value": null }] }
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
       "id": 5,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
       "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size default 0", "refId": "A" }],
       "title": "Active EIR Cache Size",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#FF0844", "value": null },
+              { "color": "#00E676", "value": 3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
       "id": 6,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
       "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(up)", "refId": "A" }],
       "title": "Active Scrape Targets",
       "type": "stat"
@@ -89,13 +173,50 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 105,
+      "title": "🌐 DYNAMIC CANVAS TOPOLOGY & TELECOM DATA FLOW",
+      "type": "row"
+    },
+    {
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 6 },
+      "id": 106,
+      "options": {
+        "content": "<div style=\"display: flex; align-items: center; justify-content: space-around; padding: 15px; background: rgba(15, 23, 42, 0.6); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px);\">\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(0,242,254,0.15), rgba(0,242,254,0.05)); border: 1px solid #00F2FE; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(0,242,254,0.2);\">\n    <div style=\"font-size: 24px;\">📱</div>\n    <div style=\"font-weight: bold; color: #00F2FE; margin-top: 4px; font-size: 14px;\">UERANSIM RAN</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">UE &amp; gNB (3GPP Rel-16)<br>PLMN: 001/01 | TAC: 1</div>\n  </div>\n  <div style=\"font-size: 22px; color: #00F2FE; font-weight: bold;\">➔</div>\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(121,40,202,0.15), rgba(121,40,202,0.05)); border: 1px solid #7928CA; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(121,40,202,0.2);\">\n    <div style=\"font-size: 24px;\">⚙️</div>\n    <div style=\"font-weight: bold; color: #7928CA; margin-top: 4px; font-size: 14px;\">5G SA Core</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">AMF | SMF | UPF | NRF<br>NGAP &amp; PFCP 8805</div>\n  </div>\n  <div style=\"font-size: 22px; color: #7928CA; font-weight: bold;\">➔</div>\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,230,118,0.05)); border: 1px solid #00E676; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(0,230,118,0.2);\">\n    <div style=\"font-size: 24px;\">📞</div>\n    <div style=\"font-weight: bold; color: #00E676; margin-top: 4px; font-size: 14px;\">SIP/IMS Proxy</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">Kamailio &amp; RTPEngine<br>UDP 5066 &amp; RTP 22222</div>\n  </div>\n  <div style=\"font-size: 22px; color: #00E676; font-weight: bold;\">➔</div>\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(255,145,0,0.15), rgba(255,145,0,0.05)); border: 1px solid #FF9100; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(255,145,0,0.2);\">\n    <div style=\"font-size: 24px;\">🛡️</div>\n    <div style=\"font-weight: bold; color: #FF9100; margin-top: 4px; font-size: 14px;\">Telecom Gateway</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">Spring Boot | EIR Tracker<br>Prepaid OCS Check</div>\n  </div>\n  <div style=\"font-size: 22px; color: #FF9100; font-weight: bold;\">➔</div>\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(255,8,68,0.15), rgba(255,8,68,0.05)); border: 1px solid #FF0844; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(255,8,68,0.2);\">\n    <div style=\"font-size: 24px;\">🤖</div>\n    <div style=\"font-weight: bold; color: #FF0844; margin-top: 4px; font-size: 14px;\">AI Classifier</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">FastAPI Model Server<br>POST /api/v1/classify</div>\n  </div>\n</div>",
+        "mode": "html"
+      },
+      "title": "MVNO Core Interception Path Topology Flow",
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
       "id": 101,
       "title": "📡 TELECOM TRAFFIC & INTERCEPTION THROUGHPUT",
       "type": "row"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "SMS Requests Total" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#00F2FE", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "SMS Blocked Total" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF0844", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
       "id": 7,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
@@ -107,7 +228,31 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Call Requests Total" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#7928CA", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Call Blocked Total" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF9100", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Call Blocked (EIR Fraud)" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF0844", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
       "id": 8,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
@@ -120,14 +265,34 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
       "id": 102,
       "title": "🛡️ SECURITY & ANTI-FRAUD DECISION PIPELINE",
       "type": "row"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 15 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "SIM Swap Anomalies" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF0844", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Tracked IMEIs" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#00E676", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 23 },
       "id": 9,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
@@ -139,7 +304,23 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 15 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "OCS Subscriber Queries" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FFD600", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 23 },
       "id": 10,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
@@ -150,14 +331,25 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
       "id": 103,
       "title": "🖥️ INFRASTRUCTURE & MEDIA PLANE HEALTH",
       "type": "row"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 23 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 31 },
       "id": 11,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
@@ -170,7 +362,18 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 23 },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 31 },
       "id": 12,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [

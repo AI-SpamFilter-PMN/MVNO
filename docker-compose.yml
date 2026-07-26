@@ -1,11 +1,40 @@
 # ==============================================================================
 # MVNO Interception Core — Main Microservices Orchestration (Docker/Podman Compose)
 # ==============================================================================
-# Architecture & Security Design:
+# Architecture, Security Design & Acronym Reference Legend:
+#
+# ─── 5G Standalone (5G SA) Core Functions (3GPP Rel-16 Open5GS):
+# - NRF  (Network Repository Function): Service discovery directory for 5G NF registration.
+# - AMF  (Access & Mobility Management Function): Terminates NGAP (SCTP) from gNB and NAS from UEs.
+# - SMF  (Session Management Function): Allocates UE IPv4/IPv6, manages PDU sessions, controls UPF via PFCP.
+# - UPF  (User Plane Function): Packet forwarding engine handling GTP-U encapsulation and packet routing.
+# - AUSF (Authentication Server Function): Performs 5G AKA subscriber authentication via UDM credentials.
+# - UDM  (Unified Data Management): Stores subscriber authentication vector & profile subscription metadata.
+# - UDR  (Unified Data Repository): Underlying database storage interface for UDM and PCF.
+# - PCF  (Policy Control Function): Defines QoS policies, charging parameters, and slice selection.
+# - BSF  (Binding Support Function): Binds Rx/N5 session requests to specific PDU session SMFs.
+# - NSSF (Network Slice Selection Function): Manages Network Slicing (SST: Slice/Service Type, SD: Slice Differentiator).
+#
+# ─── Radio Access Network (RAN) & Device Simulation (UERANSIM):
+# - gNB  (next-Generation NodeB): 5G NR base station simulator communicating with AMF over SCTP NGAP.
+# - UE   (User Equipment): Mobile subscriber device simulator generating 5G NAS control traffic.
+#
+# ─── Telecom Protocols & Interface Acronyms:
+# - SBI  (Service-Based Interface): RESTful HTTP/2 3GPP Rel-16 microservices interface over port 7777.
+#        WHY 'no_tls: true'?: Disables TLS overhead for cleartext HTTP/2 (h2c) inside isolated bridge network.
+# - PFCP (Packet Forwarding Control Protocol): 3GPP TS 29.244 interface between SMF & UPF over port 8805.
+#        WHY NO UPF CLIENT?: SMF is sole initiator per 3GPP specs; removing UPF client prevents dual-initiator collisions.
+# - NGAP (NG Application Protocol): Control plane protocol between gNB and AMF over SCTP port 38412.
+# - NAS  (Non-Access Stratum): Control plane signaling protocol between UE and AMF (Registration, Security).
+# - GSUP (Generic Subscriber Update Protocol): Osmocom internal subscriber protocol over TCP port 4222.
+# - SMPP (Short Message Peer-to-Peer): SMSC gateway protocol v3.4 over TCP port 2775.
+# - EIR  (Equipment Identity Register): Hardware IMEI tracking module to prevent SIM-swap fraud.
+#
+# ─── Security & Container Rules:
 # - Rootless Execution: Designed for unprivileged container engine execution (Podman default).
 # - Non-Privileged Ports: All internal container ports >1024.
-# - SELinux Volume Mounts: All host mounts appended with ':z' flag for SELinux relabeling.
-# - Strict Version Pinning: All images explicitly version-pinned for reproducible deployments.
+# - SELinux Volume Mounts: Host mounts appended with ':z' flag for SELinux context relabeling.
+# - Strict Version Pinning: All images explicitly version-pinned for reproducible air-gapped deployments.
 # ==============================================================================
 
 networks:
@@ -317,6 +346,19 @@ services:
       - mvno_net
     restart: unless-stopped
 
+  # ─── Osmocom Home Location Register (HLR) Core ───
+  osmo-hlr:
+    image: mvno-osmo-smsc:1.0.0
+    container_name: mvno-osmo-hlr
+    command: osmo-hlr -c /etc/osmocom/osmo-hlr.cfg
+    volumes:
+      - ./configs/osmocom:/etc/osmocom:z
+      - ./state/hlr:/var/lib/osmocom:z
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.45
+    restart: unless-stopped
+
   # ─── Osmocom MSC & SMSC Store-and-Forward Core ───
   osmo-smsc:
     image: mvno-osmo-smsc:1.0.0
@@ -326,6 +368,8 @@ services:
     volumes:
       - ./configs/osmocom:/etc/osmocom:z
       - ./state/hlr:/var/lib/osmocom:z
+    depends_on:
+      - osmo-hlr
     networks:
       - mvno_net
     restart: unless-stopped

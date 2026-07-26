@@ -6,7 +6,7 @@
 # - osmo-hlr: Home Location Register (SQLite subscriber database storage)
 # ==============================================================================
 
-FROM debian:bookworm-slim
+FROM debian:12.10-slim
 
 # Install prerequisite tools for GPG keyring fetching
 RUN apt-get update && apt-get install -y --no-install-recommends \
