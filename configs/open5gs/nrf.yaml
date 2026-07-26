@@ -2,17 +2,23 @@ logger:
   file:
     path: /var/log/open5gs/nrf.log
 
+default:
+  no_tls: true
+
 global:
   max:
     ue: 1024
 
+# NRF: Network Repository Function (3GPP Rel-16 5G SA Core)
+# Central service discovery directory where all 5G NFs register their FQDN/IP endpoints and profiles.
 nrf:
   serving:
-    - plmn_id:
+    - plmn_id: # PLMN: Public Land Mobile Network (MCC: Mobile Country Code 001, MNC: Mobile Network Code 01)
         mcc: '001'
         mnc: '01'
-  sbi:
+  sbi: # SBI: Service-Based Interface (HTTP/2 Rel-16 REST microservices directory over port 7777)
     server:
       - address: 0.0.0.0
         port: 7777
+        no_tls: true # Disables TLS framing for cleartext HTTP/2 (h2c) inside container bridge network
         advertise: nrf

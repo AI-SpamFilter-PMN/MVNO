@@ -6,11 +6,13 @@ global:
   max:
     ue: 1024
 
+# UPF: User Plane Function (3GPP Rel-16 5G SA Core)
+# Handles packet routing, GTP-U (GPRS Tunnelling Protocol User Plane) encapsulation, and interception.
 upf:
-  pfcp:
-    server:
+  pfcp: # PFCP: Packet Forwarding Control Protocol (3GPP TS 29.244 interface)
+    server: # UPF acts solely as PFCP server waiting for SMF association (prevents dual-initiator state machine collisions)
       - address: 0.0.0.0
-  gtpu:
+  gtpu: # GTP-U: GPRS Tunnelling Protocol User Plane (UDP 2152 user plane tunnel interface)
     server:
       - address: 0.0.0.0
   session:
