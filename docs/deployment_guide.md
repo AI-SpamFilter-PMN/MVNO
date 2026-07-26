@@ -125,8 +125,442 @@ The `docker-compose.yml` is configured for **rootless Podman** execution:
 
 #### [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml)
 
-> [!NOTE]
-> The single authoritative container stack definition is maintained in [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml). It orchestrates 26 rootless microservices across the 5G Core, IMS signaling, SMSC, Gateway API, and observability plane with IPAM subnets and healthchecks.
+```yaml
+networks:
+  mvno_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.89.0.0/24
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mvno-mongodb
+    command: mongod --wiredTigerCacheSizeGB 0.25
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./state/mongodb:/data/db:z
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  open5gs-webui:
+    image: mvno-open5gs-webui:2.8.0
+    container_name: mvno-open5gs-webui
+    ports:
+      - "9999:3000"
+    environment:
+      - DB_URI=mongodb://mongodb:27017/open5gs
+      - HOST=0.0.0.0
+      - PORT=3000
+      - NODE_PATH=src
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  nrf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-nrf
+    environment:
+      COMPONENT_NAME: nrf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/nrf.yaml:/etc/open5gs/nrf.yaml:z
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  amf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-amf
+    environment:
+      COMPONENT_NAME: amf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/amf.yaml:/etc/open5gs/amf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  smf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-smf
+    environment:
+      COMPONENT_NAME: smf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/smf.yaml:/etc/open5gs/smf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+      upf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  upf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-upf
+    environment:
+      COMPONENT_NAME: upf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/upf.yaml:/etc/open5gs/upf.yaml:z
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  ausf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-ausf
+    environment:
+      COMPONENT_NAME: ausf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/ausf.yaml:/etc/open5gs/ausf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  bsf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-bsf
+    environment:
+      COMPONENT_NAME: bsf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/bsf.yaml:/etc/open5gs/bsf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  udm:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-udm
+    environment:
+      COMPONENT_NAME: udm
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/udm.yaml:/etc/open5gs/udm.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  udr:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-udr
+    environment:
+      COMPONENT_NAME: udr
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/udr.yaml:/etc/open5gs/udr.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  pcf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-pcf
+    environment:
+      COMPONENT_NAME: pcf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/pcf.yaml:/etc/open5gs/pcf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  nssf:
+    image: mvno-open5gs:2.8.0
+    container_name: mvno-nssf
+    environment:
+      COMPONENT_NAME: nssf
+      DB_URI: mongodb://mongodb/open5gs
+    volumes:
+      - ./configs/open5gs/nssf.yaml:/etc/open5gs/nssf.yaml:z
+    depends_on:
+      nrf:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  ueransim-gnb:
+    image: mvno-ueransim:3.2.6
+    container_name: mvno-ueransim-gnb
+    command: ["nr-gnb", "-c", "/etc/ueransim/gnb.yaml"]
+    volumes:
+      - ./configs/ueransim/gnb.yaml:/etc/ueransim/gnb.yaml:z
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    depends_on:
+      amf:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "cat /proc/net/sctp/assocs 2>/dev/null | grep -q 38412"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  ueransim-ue-1:
+    image: mvno-ueransim:3.2.6
+    container_name: mvno-ueransim-ue-1
+    command: ["nr-ue", "-c", "/etc/ueransim/ue.yaml"]
+    volumes:
+      - ./configs/ueransim/ue.yaml:/etc/ueransim/ue.yaml:z
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    depends_on:
+      ueransim-gnb:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  ueransim-ue-2:
+    image: mvno-ueransim:3.2.6
+    container_name: mvno-ueransim-ue-2
+    command: ["nr-ue", "-c", "/etc/ueransim/ue.yaml"]
+    volumes:
+      - ./configs/ueransim/ue-spam.yaml:/etc/ueransim/ue.yaml:z
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    depends_on:
+      ueransim-gnb:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  ueransim-ue-3:
+    image: mvno-ueransim:3.2.6
+    container_name: mvno-ueransim-ue-3
+    command: ["nr-ue", "-c", "/etc/ueransim/ue.yaml"]
+    volumes:
+      - ./configs/ueransim/ue-zero.yaml:/etc/ueransim/ue.yaml:z
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    depends_on:
+      ueransim-gnb:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  rtpengine:
+    image: drachtio/rtpengine:mr9.4.0.0
+    container_name: mvno-rtpengine
+    command:
+      - rtpengine
+      - --config-file=/etc/rtpengine/rtpengine.conf
+      - --listen-http=9900
+    ports:
+      - "30000-30100:30000-30100/udp"
+      - "9900:9900"
+    volumes:
+      - ./configs/rtpengine:/etc/rtpengine:z
+      - ./state/spool:/var/spool/rtpengine:z
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  kamailio:
+    image: mvno-kamailio:5.7.4
+    container_name: mvno-kamailio
+    ports:
+      - "5066:5060/udp"
+    volumes:
+      - ./configs/kamailio:/etc/kamailio:z
+      - ./state/kamailio/kamailio.db:/etc/kamailio/kamailio.db:z
+    depends_on:
+      rtpengine:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  osmo-hlr:
+    image: mvno-osmo-smsc:1.0.0
+    container_name: mvno-osmo-hlr
+    command: osmo-hlr -c /etc/osmocom/osmo-hlr.cfg
+    volumes:
+      - ./configs/osmocom:/etc/osmocom:z
+      - ./state/hlr:/var/lib/osmocom:z
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c 'echo > /dev/tcp/localhost/4222' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.45
+    restart: unless-stopped
+
+  osmo-smsc:
+    image: mvno-osmo-smsc:1.0.0
+    container_name: mvno-osmosmsc
+    ports:
+      - "2775:2775"
+    volumes:
+      - ./configs/osmocom:/etc/osmocom:z
+      - ./state/hlr:/var/lib/osmocom:z
+    depends_on:
+      - osmo-hlr
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c 'echo > /dev/tcp/localhost/2775' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  telecom-api:
+    image: mvno-telecom-api:1.0.0
+    container_name: mvno-api
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./state/kamailio:/etc/kamailio:z
+      - ./state/spool:/var/spool/rtpengine:z
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  ai-filter:
+    image: python:3.11-alpine
+    container_name: mvno-ai-filter
+    ports:
+      - "8008:8000"
+    command:
+      - python3
+      - -c
+      - |
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        class H(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get('Content-Length', 0))
+                if length > 0: self.rfile.read(length)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(b'{"allow":true,"reason":"Clean content"}')
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'OK')
+        HTTPServer(('0.0.0.0', 8000), H).serve_forever()
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  vector:
+    image: timberio/vector:0.44.0-alpine
+    container_name: mvno-vector
+    volumes:
+      - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock:ro,z
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:v1.101.0
+    container_name: mvno-victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - ./state/vm-data:/victoria-metrics-data:z
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  vmagent:
+    image: victoriametrics/vmagent:v1.101.0
+    container_name: mvno-vmagent
+    ports:
+      - "8429:8429"
+    command:
+      - "-remoteWrite.url=http://victoria-metrics:8428/api/v1/write"
+      - "-promscrape.config=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./configs/victoria-metrics/scrape.yml:/etc/prometheus/prometheus.yml:z
+    depends_on:
+      victoria-metrics:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:11.6.0
+    container_name: mvno-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning:z
+      - ./state/grafana:/var/lib/grafana:z
+    depends_on:
+      victoria-metrics:
+        condition: service_started
+    networks:
+      - mvno_net
+    restart: unless-stopped
+```
 
 
 **Phase 3+ additions** (when adding 5G core):
