@@ -44,7 +44,7 @@ echo -e "${GREEN}✓ Subscriber Balance retrieved: 100 credits${NC}\n"
 
 # Item 5: Successful VoIP Call Interception Flow via Real SIP INVITE
 echo -e "${YELLOW}[5/11] 📞 Simulating Authorized IMS VoIP Call Interception Flow (SIP INVITE ➔ Kamailio)...${NC}"
-python3 scripts/sip_traffic_sim.py
+python3 scripts/testing/sip_traffic_sim.py
 echo -e "${GREEN}✓ Real SIP INVITE processed by Kamailio (REST Intercept & RTPEngine Anchored)${NC}\n"
 
 # Item 6: Zero-Balance Call Interception Block (Negative Test 1)
