@@ -404,6 +404,7 @@ services:
     volumes:
       - ./state/kamailio:/etc/kamailio:z
       - ./state/spool:/var/spool/rtpengine:z
+      - ./vendor/vosk/vosk-model-small-en-us-0.15:/opt/vosk-model-small-en-us-0.15:ro,z
     healthcheck:
       test: ["CMD-SHELL", "timeout 3 bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
       interval: 30s
@@ -448,7 +449,7 @@ services:
     container_name: mvno-vector
     volumes:
       - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
-      - /run/user/1000/podman/podman.sock:/var/run/docker.sock:ro,z
+      - /run/user/${PODMAN_USER_UID:-1000}/podman/podman.sock:/var/run/docker.sock:ro,z
     networks:
       - mvno_net
     restart: unless-stopped

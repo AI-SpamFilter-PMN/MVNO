@@ -40,7 +40,8 @@ spring:
 # ------------------------------------------------------------------------------
 ai-filter:
   url: ${AI_FILTER_URL:http://ai-filter:8000/api/v1/classify}
-  timeout-seconds: 5
+  connect-timeout-seconds: ${AI_FILTER_CONNECT_TIMEOUT_SECONDS:1}
+  read-timeout-seconds: ${AI_FILTER_READ_TIMEOUT_SECONDS:5}
 
 # ------------------------------------------------------------------------------
 # Native Vosk Speech-to-Text ASR Engine (JVM JNI)

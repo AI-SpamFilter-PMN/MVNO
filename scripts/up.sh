@@ -33,6 +33,8 @@ detect_runtime() {
 
 detect_runtime
 
+export PODMAN_USER_UID=$(id -u)
+
 CUSTOM_IMAGES=(
   mvno-kamailio
   mvno-open5gs

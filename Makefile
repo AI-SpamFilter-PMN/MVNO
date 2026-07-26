@@ -5,7 +5,7 @@
 # SQLite WAL database initialization, VTY control socket assertions, and REST API testing.
 # ==============================================================================
 
-.PHONY: up down logs ps init-db test test-sms test-call test-api test-vty
+.PHONY: up down logs ps init-db clean rebuild test test-sms test-call test-api test-vty
 
 # Launches all rootless container services using scripts/up.sh
 up:
@@ -13,15 +13,24 @@ up:
 
 # Stops and removes all container services
 down:
-	podman compose -f docker-compose.yml down
+	./scripts/up.sh down
 
 # Streams live container logs across all microservices
 logs:
-	podman compose -f docker-compose.yml logs -f
+	./scripts/up.sh logs
 
 # Displays running container status
 ps:
-	podman ps
+	./scripts/up.sh ps
+
+# Completely resets runtime container volumes and state directory
+clean:
+	./scripts/up.sh down -v
+	rm -rf state/kamailio/* state/spool/* state/hlr/* state/vm-data/* state/grafana/*
+
+# Rebuilds all custom images from source, initializes databases, and starts the stack
+rebuild: clean init-db
+	./scripts/up.sh --build
 
 # Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
@@ -49,6 +58,9 @@ init-db:
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
 	@cp -f state/kamailio/kamailio.db state/kamailio.db
+	@if [ -f state/hlr/hlr.db ]; then \
+		sqlite3 state/hlr/hlr.db "INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (1, '001010000000001', '15551234567');" 2>/dev/null || true; \
+	fi
 	@sqlite3 state/hlr/hlr.db \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
@@ -69,9 +81,9 @@ test-sms:
 
 test-vty:
 	@echo "=== Verifying OsmoHLR subscriber ==="
-	@podman exec mvno-osmo-hlr bash -c 'exec 3<>/dev/tcp/localhost/4258; echo enable >&3; sleep 1; echo "show subscribers all" >&3; sleep 1; dd bs=1024 count=1 <&3 2>/dev/null' | grep -q "001010000000001" && echo "  ✓ HLR subscriber found" || echo "  ✗ HLR subscriber not found"
+	@./scripts/vty.sh mvno-osmo-hlr 4258 "show subscribers all" | grep -q "001010000000001" && echo "  ✓ HLR subscriber found" || echo "  ✗ HLR subscriber not found"
 	@echo "=== Verifying OsmoMSC SMPP listener ==="
-	@podman exec mvno-osmosmsc bash -c 'exec 3<>/dev/tcp/localhost/4254; echo enable >&3; sleep 1; echo "write terminal" >&3; sleep 1; dd bs=8192 count=1 <&3 2>/dev/null' | strings | grep -q "esme mvno-api-route" && echo "  ✓ SMPP ESME configured" || echo "  ✗ SMPP ESME not found"
+	@./scripts/vty.sh mvno-osmosmsc 4254 "write terminal" | grep -q "esme mvno-api-route" && echo "  ✓ SMPP ESME configured" || echo "  ✗ SMPP ESME not found"
 
 test: test-vty test-api test-sms test-call
 

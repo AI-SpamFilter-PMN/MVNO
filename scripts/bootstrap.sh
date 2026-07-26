@@ -157,7 +157,7 @@ detect_runtime() {
 # ─── Pre-flight: check required tools, create dirs ──────
 preflight() {
     local missing=()
-    for tool in wget sha256sum; do
+    for tool in wget unzip sha256sum; do
         command -v "$tool" &>/dev/null || missing+=("$tool")
     done
     if ! command -v pip3 &>/dev/null && ! command -v pip &>/dev/null; then
@@ -171,7 +171,7 @@ preflight() {
     fi
     command -v pip3 &>/dev/null && PIP_CMD="pip3" || PIP_CMD="pip"
 
-    mkdir -p "$VENDOR_DIR"/{pip/{telecom-api,vosk-worker},vosk,ueransim,docker,checksums,open5gs-webui,logs}
+    mkdir -p "$VENDOR_DIR"/{pip/telecom-api,vosk,ueransim,docker,checksums,open5gs-webui,logs}
     echo "Vendor directory: $VENDOR_DIR"
 }
 
@@ -214,7 +214,10 @@ try_log "maven:telecom-api" "
 "
 
 # ─── Step 3: Download Vosk model ────────────────────────
-try_log "vosk-model" "wget -q --show-progress -O '$VENDOR_DIR/vosk/vosk-model-small-en-us-0.15.zip' https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
+try_log "vosk-model" "
+    wget -q --show-progress -O '$VENDOR_DIR/vosk/vosk-model-small-en-us-0.15.zip' https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip &&
+    unzip -o -q '$VENDOR_DIR/vosk/vosk-model-small-en-us-0.15.zip' -d '$VENDOR_DIR/vosk/'
+"
 
 # ─── Step 4: Download UERANSIM source ───────────────────
 try_log "ueransim-source" "wget -q --show-progress -O '$VENDOR_DIR/ueransim/UERANSIM-${UERANSIM_VERSION}.tar.gz' 'https://github.com/aligungr/UERANSIM/archive/refs/tags/v${UERANSIM_VERSION}.tar.gz'"

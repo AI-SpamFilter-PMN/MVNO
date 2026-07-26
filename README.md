@@ -66,10 +66,11 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 Recommended for sandbox development. Rootless-compliant out-of-the-box.
 
 ```bash
-# 1. Prerequisites (pick your distro — no Python needed, Vosk is Java 21 JNI)
-sudo pacman -S --needed podman docker-compose sqlite3   # Arch/CachyOS
-sudo apt install -y podman docker-compose sqlite3       # Debian/Ubuntu
-sudo dnf install -y podman docker-compose sqlite3       # Fedora
+# 1. Prerequisites (pick your distro — SCTP kernel module required for 5G NGAP)
+sudo apt install -y podman docker-compose-v2 sqlite3 lksctp-tools  # Debian/Ubuntu
+sudo dnf install -y podman docker-compose sqlite3 lksctp-tools        # Fedora/RHEL
+sudo pacman -S --needed podman docker-compose sqlite3                # Arch/CachyOS
+sudo modprobe sctp                                                    # Load SCTP kernel module
 
 # 2. Enable Podman API socket (required for Docker Compose Plugin)
 systemctl --user enable --now podman.socket

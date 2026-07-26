@@ -21,3 +21,15 @@ services:
     build:
       context: .
       dockerfile: configs/open5gs/Dockerfile.webui
+
+  nrf:
+    build:
+      context: ./configs/open5gs
+      dockerfile: Dockerfile
+    image: mvno-open5gs:2.8.0
+
+  ueransim-gnb:
+    build:
+      context: ./configs/ueransim
+      dockerfile: Dockerfile
+    image: mvno-ueransim:3.2.6

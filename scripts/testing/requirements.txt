@@ -1,0 +1,3 @@
+# Python Dependencies for MVNO Core Testing & Traffic Simulation
+requests>=2.31.0
+smpplib>=2.2.0

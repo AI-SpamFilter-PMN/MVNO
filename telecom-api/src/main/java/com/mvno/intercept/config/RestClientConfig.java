@@ -14,10 +14,9 @@ import java.time.Duration;
  * Configures Spring Boot 3.4 RestClient for outbound HTTP REST queries to the external
  * AI Spam Model server (http://ai-filter:8000/api/v1/classify).
  * 
- * Carrier SLA & Timeout Enforcement:
- * - Connect Timeout: Enforces strict TCP socket connect timeout (5s default).
- * - Read Timeout: Enforces response read timeout (5s default).
- * - Fail-Open Policy: Stalls throw SocketTimeoutException, triggering SLA Fail-Open fallback (allowing traffic).
+ * Carrier SLA & Split Timeout Enforcement:
+ * - Connect Timeout: 1,000ms (1s default) — fails fast on unreachable host.
+ * - Read Timeout: 5,000ms (5s default) — window for AI model inference prediction.
  * 
  * @author MVNO Core Engineering Team
  * @version 1.0.0
@@ -25,20 +24,22 @@ import java.time.Duration;
 @Configuration
 public class RestClientConfig {
 
-    @Value("${ai-filter.timeout-seconds:5}")
-    private int timeoutSeconds;
+    @Value("${ai-filter.connect-timeout-seconds:1}")
+    private int connectTimeoutSeconds;
+
+    @Value("${ai-filter.read-timeout-seconds:5}")
+    private int readTimeoutSeconds;
 
     /**
-     * Constructs and registers a RestClient bean configured with 5-second socket timeouts.
+     * Constructs and registers a RestClient bean configured with split connect & read timeouts.
      * 
      * @return Configured RestClient instance.
      */
     @Bean
     public RestClient restClient() {
         final SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        final int timeoutMillis = (int) Duration.ofSeconds(timeoutSeconds).toMillis();
-        factory.setConnectTimeout(timeoutMillis);
-        factory.setReadTimeout(timeoutMillis);
+        factory.setConnectTimeout((int) Duration.ofSeconds(connectTimeoutSeconds).toMillis());
+        factory.setReadTimeout((int) Duration.ofSeconds(readTimeoutSeconds).toMillis());
 
         return RestClient.builder()
                 .requestFactory(factory)
