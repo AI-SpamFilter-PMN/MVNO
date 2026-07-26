@@ -122,7 +122,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 4.1: Invalid `recording-format=wav` Parameter
 * **Symptom**: RTPEngine ignores recording format setting; WAV files are not generated.
 * **Root Cause**: `rtpengine` only supports `eth` (PCAP) or `raw` PCAP recording formats. It does not perform inline WAV encoding.
-* **Fix**: Set `recording-format = eth` in `configs/rtpengine/rtpengine.conf`. PCAP → WAV conversion is performed downstream by `vosk-worker` via `ffmpeg`.
+* **Fix**: Set `recording-method = fork` in `configs/rtpengine/rtpengine.conf`. Audio stream transcription is performed in-process inside `telecom-api` by `NativeVoskService.java`.
 
 ### Issue 4.2: Entrypoint `sed -i` Volume Mount Crash
 * **Symptom**: RTPEngine container crashes on boot with `sed: cannot rename /etc/sedtzTmbD: Device or resource busy` (Exit 255).

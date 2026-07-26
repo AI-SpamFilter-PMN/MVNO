@@ -366,7 +366,7 @@ These additional telecom core enhancements further elevate the project's securit
 ### 18. Dynamic Vosk Language Model Hot-Caching
 *   **Concept**: Loading heavy multilingual speech models simultaneously wastes RAM.
 *   **Lightweight Implementation**:
-    - Configure `vosk_worker.py` to parse the dialed country code.
+    - Configure `NativeVoskService.java` to parse the dialed country code.
     - If the call is local (English), load only the 40MB `vosk-model-small-en-us` model.
     - If the call is international (e.g., to an Arabic country code), load the corresponding small language model dynamically.
     - Keep only one model loaded in RAM at a time, performing hot-unloads of the inactive model to stay within your host VM's memory limits.

@@ -4,7 +4,7 @@
 # Detects OS & container runtime (docker/podman), installs what's missing,
 # then downloads everything needed for fully offline builds:
 #   - Docker images (pulled + custom-built, saved as tarballs)
-#   - pip wheels (for telecom-api, vosk-worker)
+#   - pip wheels (for Python testing utilities)
 #   - Vosk speech model
 #   - UERANSIM source tarball
 #   - Open5GS WebUI source
