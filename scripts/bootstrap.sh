@@ -104,8 +104,8 @@ detect_runtime() {
             COMPOSE_CMD="docker compose"
         elif sg docker -c "docker info" &>/dev/null 2>&1; then
             echo "  Docker accessible via sg docker"
-            docker_wrapper() { sg docker -c "docker $*"; }
-            compose_wrapper() { sg docker -c "docker compose $*"; }
+            docker_wrapper() { sg docker -c "docker \"$@\""; }
+            compose_wrapper() { sg docker -c "docker compose \"$@\""; }
             DOCKER_CMD="docker_wrapper"
             COMPOSE_CMD="compose_wrapper"
             export -f docker_wrapper compose_wrapper 2>/dev/null || true
@@ -212,7 +212,6 @@ try_log "maven:telecom-api" "
     cd '$PROJECT_DIR/telecom-api' &&
     ./mvnw -B dependency:go-offline -Dmaven.repo.local='$VENDOR_DIR/maven/repository'
 "
-try_log "pip:vosk-worker" "$PIP_CMD download vosk>=0.3.45 soundfile>=0.12.1 numpy>=1.26.0 httpx>=0.27.0 -d '$VENDOR_DIR/pip/vosk-worker/'"
 
 # ─── Step 3: Download Vosk model ────────────────────────
 try_log "vosk-model" "wget -q --show-progress -O '$VENDOR_DIR/vosk/vosk-model-small-en-us-0.15.zip' https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
@@ -250,7 +249,7 @@ done
 
 # ─── Step 7: Save all images as tarballs ────────────────
 # Tag compose-built images with stable names
-for svc in osmo-smsc telecom-api vosk-worker; do
+for svc in osmo-smsc telecom-api; do
     tag="mvno-${svc}"
     existing=$($DOCKER_CMD images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E "^${tag}:|^mvno_${svc}:" | head -1)
     if [ -n "$existing" ]; then
