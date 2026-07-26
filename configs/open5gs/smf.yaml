@@ -21,9 +21,10 @@ smf:
     client:
       nrf: # NRF: Network Repository Function (Registers SMF service profile with NRF)
         - uri: http://nrf:7777
+          no_tls: true
   pfcp: # PFCP: Packet Forwarding Control Protocol (3GPP TS 29.244 interface to UPF)
     server:
-      - address: 0.0.0.0
+      - address: smf
     client: # SMF acts as the sole PFCP client initiator to UPF per 3GPP standards
       upf:
         - address: upf

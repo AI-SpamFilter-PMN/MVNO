@@ -16,6 +16,7 @@ udr:
     client:
       nrf:
         - uri: http://nrf:7777
+          no_tls: true
       mongodb:
         - name: mongodb
           uri: mongodb://mongodb/open5gs

@@ -12,6 +12,9 @@ global:
 # NRF: Network Repository Function (3GPP Rel-16 5G SA Core)
 # Central service discovery directory where all 5G NFs register their FQDN/IP endpoints and profiles.
 nrf:
+  time:
+    nf_instance:
+      heartbeat: 30
   serving:
     - plmn_id: # PLMN: Public Land Mobile Network (MCC: Mobile Country Code 001, MNC: Mobile Network Code 01)
         mcc: '001'

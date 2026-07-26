@@ -16,5 +16,6 @@ udm:
     client:
       nrf:
         - uri: http://nrf:7777
+          no_tls: true
       udr:
         - uri: http://udr:7777

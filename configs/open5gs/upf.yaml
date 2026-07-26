@@ -11,7 +11,7 @@ global:
 upf:
   pfcp: # PFCP: Packet Forwarding Control Protocol (3GPP TS 29.244 interface)
     server: # UPF acts solely as PFCP server waiting for SMF association (prevents dual-initiator state machine collisions)
-      - address: 0.0.0.0
+      - address: upf
   gtpu: # GTP-U: GPRS Tunnelling Protocol User Plane (UDP 2152 user plane tunnel interface)
     server:
       - address: 0.0.0.0

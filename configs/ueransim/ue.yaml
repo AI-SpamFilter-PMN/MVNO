@@ -25,6 +25,7 @@ sessions:
       sst: 1
 configured-nssai:
   - sst: 1
+    sd: 0x000001
 default-nssai:
   - sst: 1
     sd: 1
