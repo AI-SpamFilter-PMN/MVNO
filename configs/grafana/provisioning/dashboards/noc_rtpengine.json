@@ -3,66 +3,125 @@
   "__requires": [],
   "title": "NOC RTPEngine",
   "uid": "noc-rtpengine",
-  "tags": ["mvno", "rtpengine", "media-plane", "noc"],
+  "tags": ["mvno", "rtpengine", "media-plane", "noc", "sota"],
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#00F2FE", "value": null }]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
       "id": 1,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions default 0", "refId": "A" }
       ],
       "title": "Active RTP Sessions",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#00E676", "value": null }]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
       "id": 2,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions_total", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions_total default 0", "refId": "A" }
       ],
       "title": "Total Managed Sessions",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#7928CA", "value": null }]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
       "id": 3,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total default 0", "refId": "A" }
       ],
       "title": "RTP Media Bytes Total",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }, "unit": "short" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#FF0844", "value": null },
+              { "color": "#FF9100", "value": 10 },
+              { "color": "#00E676", "value": 50 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
       "id": 6,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_ports_free", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_ports_free default 0", "refId": "A" }
       ],
       "title": "Available Media Ports",
       "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 25,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Media Bytes Total" }, "properties": [{ "id": "color", "value": { "fixedColor": "#00F2FE", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Packets Total" }, "properties": [{ "id": "color", "value": { "fixedColor": "#00E676", "mode": "fixed" } }] }
+        ]
+      },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "id": 4,
-      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total", "legendFormat": "Media Bytes Total", "refId": "A" },
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packets_total", "legendFormat": "Packets Total", "refId": "B" }
@@ -72,10 +131,25 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
-      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 25,
+            "gradientMode": "opacity",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Packet Errors" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF0844", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Closed Sessions" }, "properties": [{ "id": "color", "value": { "fixedColor": "#7928CA", "mode": "fixed" } }] }
+        ]
+      },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "id": 5,
-      "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packet_errors_total", "legendFormat": "Packet Errors", "refId": "A" },
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_closed_sessions_total", "legendFormat": "Closed Sessions", "refId": "B" }
