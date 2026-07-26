@@ -1,5 +1,6 @@
 package com.mvno.intercept.subscriber;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +12,7 @@ class EirTrackerTest {
 
     @BeforeEach
     void setUp() {
-        eirTracker = new EirTracker();
+        eirTracker = new EirTracker(new SimpleMeterRegistry());
         eirTracker.reset();
     }
 

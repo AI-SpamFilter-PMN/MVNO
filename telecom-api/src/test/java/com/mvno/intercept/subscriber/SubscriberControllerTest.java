@@ -1,6 +1,7 @@
 package com.mvno.intercept.subscriber;
 
 import com.mvno.intercept.filter.AiFilterService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -20,7 +21,7 @@ class SubscriberControllerTest {
     void setUp() {
         subscriberService = Mockito.mock(SubscriberService.class);
         aiFilterService = Mockito.mock(AiFilterService.class);
-        controller = new SubscriberController(subscriberService, aiFilterService);
+        controller = new SubscriberController(subscriberService, aiFilterService, new SimpleMeterRegistry());
     }
 
     @Test
