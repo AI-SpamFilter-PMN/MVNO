@@ -69,9 +69,13 @@ init-db:
 init-native-db: init-db
 
 # Starts native systemd services for non-containerized deployments
-up-native:
-	@sudo systemctl start kamailio rtpengine osmo-msc osmo-hlr
-	@echo "Databases initialized."
+up-native: init-db
+	@echo "Starting native systemd telecom core services..."
+	@sudo systemctl start kamailio ngcp-rtpengine osmo-msc osmo-hlr 2>/dev/null || sudo systemctl start kamailio rtpengine osmo-msc osmo-hlr
+	@sudo systemctl is-active --quiet kamailio && echo "  ✓ kamailio service active" || echo "  ✗ kamailio service inactive"
+	@sudo systemctl is-active --quiet ngcp-rtpengine || sudo systemctl is-active --quiet rtpengine && echo "  ✓ rtpengine service active" || echo "  ✗ rtpengine service inactive"
+	@sudo systemctl is-active --quiet osmo-msc && echo "  ✓ osmo-msc service active" || echo "  ✗ osmo-msc service inactive"
+	@sudo systemctl is-active --quiet osmo-hlr && echo "  ✓ osmo-hlr service active" || echo "  ✗ osmo-hlr service inactive"
 
 test-api:
 	@echo "Testing API health..."
