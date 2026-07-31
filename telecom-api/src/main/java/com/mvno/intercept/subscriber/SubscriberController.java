@@ -87,31 +87,55 @@ public class SubscriberController {
     }
 
     /**
-     * Evaluates SIP Voice Call setup authorization for incoming SIP INVITE requests from Kamailio.
-     * 
-     * @param req Call interception request DTO.
-     * @return InterceptResponse decision.
+     * Evaluates SIP Voice Call setup authorization for incoming SIP INVITE requests (POST JSON).
      */
     @PostMapping("/call")
     public ResponseEntity<InterceptResponse> interceptCall(@RequestBody final CallInterceptRequest req) {
+        return processCallIntercept(req, null, null, null, null);
+    }
+
+    /**
+     * Evaluates SIP Voice Call setup authorization for incoming SIP INVITE requests (GET Query Params).
+     */
+    @GetMapping("/call")
+    public ResponseEntity<InterceptResponse> interceptCallGet(
+            @RequestParam(required = false) final String caller,
+            @RequestParam(required = false) final String callee,
+            @RequestParam(required = false, name = "call_id") final String callId,
+            @RequestParam(required = false) final String imei) {
+        return processCallIntercept(null, caller, callee, callId, imei);
+    }
+
+    private ResponseEntity<InterceptResponse> processCallIntercept(
+            final CallInterceptRequest req,
+            final String caller,
+            final String callee,
+            final String callId,
+            final String imei) {
         callRequests.increment();
-        if (req == null || req.caller() == null || req.caller().isBlank()) {
+        final String effectiveCaller = (req != null && req.caller() != null && !req.caller().isBlank()) ? req.caller() : caller;
+        final String effectiveCallee = (req != null && req.callee() != null && !req.callee().isBlank()) ? req.callee() : callee;
+        final String effectiveCallId = (req != null && req.callId() != null && !req.callId().isBlank()) ? req.callId() : callId;
+        final String effectiveImei = (req != null && req.imei() != null && !req.imei().isBlank()) ? req.imei() : imei;
+
+        if (effectiveCaller == null || effectiveCaller.isBlank()) {
             return ResponseEntity.badRequest().body(new InterceptResponse(false, "Invalid request: missing caller MSISDN"));
         }
 
-        final int balance = subscriberService.getBalance(req.caller());
+        final int balance = subscriberService.getBalance(effectiveCaller);
         if (balance <= 0) {
             callBlocked.increment();
             return ResponseEntity.ok(new InterceptResponse(false, "Prepaid balance exhausted"));
         }
 
-        if (req.imei() != null && !req.imei().isBlank()
-                && !subscriberService.checkEirBinding(req.imei(), req.caller())) {
+        if (effectiveImei != null && !effectiveImei.isBlank()
+                && !subscriberService.checkEirBinding(effectiveImei, effectiveCaller)) {
             callBlockedEir.increment();
             return ResponseEntity.ok(new InterceptResponse(false, "EIR: SIM swap detected"));
         }
 
-        final InterceptResponse result = aiFilterService.classifyCall(req);
+        final CallInterceptRequest fullReq = new CallInterceptRequest(effectiveCaller, effectiveCallee, effectiveCallId, effectiveImei);
+        final InterceptResponse result = aiFilterService.classifyCall(fullReq);
         if (!result.allow()) {
             callBlocked.increment();
         }

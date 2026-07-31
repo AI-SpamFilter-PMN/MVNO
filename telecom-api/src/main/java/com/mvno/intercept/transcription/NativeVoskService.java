@@ -118,15 +118,14 @@ public class NativeVoskService {
                 return name.endsWith(".wav");
             })) {
                 final Path archiveDir = spoolPath.resolve("archived");
+                if (!Files.exists(archiveDir)) {
+                    Files.createDirectories(archiveDir);
+                }
                 for (final Path path : stream) {
                     final File file = path.toFile();
-                    if (System.currentTimeMillis() - file.lastModified() > 3000) {
+                    if (!file.isDirectory() && System.currentTimeMillis() - file.lastModified() > 3000) {
                         final String text = transcribeWav(file);
                         logger.info("Native Java 21 Vosk ASR Transcribed [{}]: {}", file.getName(), text);
-                        
-                        if (!Files.exists(archiveDir)) {
-                            Files.createDirectories(archiveDir);
-                        }
                         Files.move(path, archiveDir.resolve(path.getFileName()), StandardCopyOption.REPLACE_EXISTING);
                     }
                 }

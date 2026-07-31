@@ -33,7 +33,7 @@ This document outlines upcoming architectural enhancements, operational backlog 
 
 - [ ] **Remote Branch Cleanup**: Delete 8 merged feature branches on `origin` (`feature/5g-core-open5gs`, `feature/telecom-gateway-api`, etc.).
 - [ ] **Orphaned State File Cleanup**: Create automated cleanup utility for orphaned temporary database lock files (`*.db-shm`, `*.db-wal`) in `./state/`.
-- [ ] **VictoriaMetrics Self-Scrape Job**: Add `victoria-metrics` (`victoria-metrics:8428/metrics`) scrape job to `configs/victoria-metrics/scrape.yml` to collect `vm_*` internal TSDB metrics and `vmagent_remotewrite_*` pipeline stats.
+- [x] **VictoriaMetrics Self-Scrape Job**: Add `victoria-metrics` (`victoria-metrics:8428/metrics`) scrape job to `configs/victoria-metrics/scrape.yml` to collect `vm_*` internal TSDB metrics and `vmagent_remotewrite_*` pipeline stats.
 - [ ] **VictoriaMetrics System NOC Dashboard**: Create `noc_victoriametrics.json` Grafana dashboard (cache entries, ingestion rate `vm_rows_added_total`, disk usage `vm_fsdata_bytes`, `vmagent` remoteWrite stats).
 - [ ] **vmagent RemoteWrite Alert Panel**: Add a `vmagent_remotewrite_blocks_failed_total` alerting panel to `noc_overview.json` to make telemetry write failures immediately visible at a glance.
 - [ ] **Kamailio JSON-Regex Hardening (F13)**: Hardening SIP body regex parsing in Kamailio routing script for multi-part boundary headers.
