@@ -93,7 +93,7 @@
 
   <!-- OsmoSMSC -->
   <rect x="195" y="68" width="170" height="52" rx="7" class="panel-core"/>
-  <text x="280" y="89"  text-anchor="middle" class="node-name">OsmoSMSC / OsmoMSC</text>
+  <text x="280" y="89"  text-anchor="middle" class="node-name">OsmoSMSC + OsmoHLR</text>
   <text x="280" y="106" text-anchor="middle" class="node-sub">SMSC + OsmoHLR · :2775</text>
   <line x1="280" y1="120" x2="280" y2="885" class="lifeline-core"/>
 
@@ -135,7 +135,7 @@
 
   <!-- Step 4: Prepaid OCS Balance Check (internal note) -->
   <rect x="440" y="258" width="160" height="28" rx="5" class="note-box" stroke="#9b59b6"/>
-  <text x="520" y="276" text-anchor="middle" class="lbl" fill="#9b59b6">4. Prepaid OCS ($1/SMS)</text>
+  <text x="520" y="276" text-anchor="middle" class="lbl" fill="#9b59b6">4. Prepaid OCS Check</text>
 
   <!-- Step 5: POST /classify: telecom-api → AI Spam Model -->
   <circle cx="520" cy="308" r="11" fill="#ef5350" opacity="0.95"/>
@@ -198,8 +198,8 @@
 
   <!-- ─────────── BLOCK path: 7b → 8b → 9b ─────────── -->
 
-  <!-- 7b: telecom-api → OsmoSMSC: { allow: false, reason: "Spam" } -->
-  <text x="395" y="682" text-anchor="middle" class="lbl" fill="#ef5350">GW → SMSC: { allow: false, reason: "Spam" }</text>
+  <!-- 7b: telecom-api → OsmoSMSC: { allow: false, reason: "OCS / EIR Block" } -->
+  <text x="395" y="682" text-anchor="middle" class="lbl" fill="#ef5350">GW → SMSC: { allow: false, reason: "OCS / EIR Block" }</text>
   <circle cx="520" cy="692" r="11" fill="#ef5350" opacity="0.95"/>
   <text   x="520" y="696" text-anchor="middle" class="badge-num">7b</text>
   <line x1="509" y1="692" x2="291" y2="692" class="arrow-block arrow-resp" stroke-dasharray="6,4" marker-end="url(#h-block-l)"/>

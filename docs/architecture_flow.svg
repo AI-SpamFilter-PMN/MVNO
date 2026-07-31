@@ -83,7 +83,7 @@
       <rect width="180" height="110" class="box" />
       <text x="12" y="24" class="text-title">5G SA UE (UERANSIM)</text>
       <text x="12" y="46" class="text-body">• 5G gNB + UE Simulation</text>
-      <text x="12" y="64" class="text-body">• NAS SMS over N1/N2</text>
+      <text x="12" y="64" class="text-body">• 5G SA Registration · PDU Session</text>
       <text x="12" y="82" class="text-body">• Open5GS 10-NF Core</text>
       <text x="12" y="98" class="text-link">N2 / N3 Interface</text>
     </g>
@@ -101,7 +101,7 @@
       <text x="12" y="42" class="text-body">• SIP Registrar / Proxy</text>
       <text x="12" y="60" class="text-body">• SQLite contact db</text>
       <text x="12" y="78" class="text-body">• PIKE rate-limiting</text>
-      <text x="12" y="94" class="text-body">• STIR/SHAKEN validation</text>
+      <text x="12" y="94" class="text-body">• Digest Authentication</text>
       <text x="12" y="108" class="text-link">UDP / TCP 5060</text>
     </g>
 
@@ -110,7 +110,7 @@
       <rect width="200" height="115" class="box" />
       <text x="12" y="22" class="text-title">rtpengine</text>
       <text x="12" y="42" class="text-body">• In-kernel RTP proxy</text>
-      <text x="12" y="60" class="text-body">• PCAP Audio Spooler</text>
+      <text x="12" y="60" class="text-body">• WAV Audio Spooler</text>
       <text x="12" y="78" class="text-body">• DTMF RFC2833 capture</text>
       <text x="12" y="94" class="text-body">• HTTP control engine</text>
       <text x="12" y="108" class="text-link">NG Control: UDP 22222</text>
@@ -119,11 +119,11 @@
     <!-- OsmoSMSC -->
     <g transform="translate(15, 395)">
       <rect width="200" height="115" class="box" />
-      <text x="12" y="22" class="text-title">OsmoSMSC / OsmoMSC</text>
+      <text x="12" y="22" class="text-title">OsmoSMSC + OsmoHLR</text>
       <text x="12" y="42" class="text-body">• Store &amp; Forward SMSC</text>
       <text x="12" y="60" class="text-body">• Standalone OsmoHLR</text>
       <text x="12" y="78" class="text-body">• Delivery hold hook</text>
-      <text x="12" y="94" class="text-body">• Geofencing LAC/CellID</text>
+      <text x="12" y="94" class="text-body">• SMPP 3.4 Interception</text>
       <text x="12" y="108" class="text-link">SMPP: TCP 2775</text>
     </g>
   </g>
@@ -177,7 +177,7 @@
     <g transform="translate(15, 55)">
       <rect width="210" height="185" class="box" stroke="#ff5722" />
       <text x="12" y="24" class="text-title" fill="#ff7043">AI Spam Model Server</text>
-      <text x="12" y="46" class="text-body">• Java 21 REST Model Server</text>
+      <text x="12" y="46" class="text-body">• Python REST Model Server (mock)</text>
       <text x="12" y="66" class="text-body">• SMS Spam Classifier</text>
       <text x="12" y="86" class="text-body">• Voice Biometric Evaluator</text>
       <text x="12" y="106" class="text-body">• Real-time allow/block decision</text>
