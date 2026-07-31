@@ -90,12 +90,13 @@ test-api:
 	@curl -s http://localhost:8080/actuator/health | python3 -m json.tool
 	@echo ""
 	@echo "Testing subscriber endpoint..."
-	@curl -s http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -m json.tool
+	@curl -s -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -m json.tool
 
 test-sms:
 	@echo "Testing SMS intercept..."
 	@curl -s -X POST http://localhost:8080/api/v1/intercept/sms \
 		-H "Content-Type: application/json" \
+		-H "X-API-Key: mvno-demo-key-2026" \
 		-d '{"sender":"15551234567","recipient":"15557654321","content":"Test SMS"}' | python3 -m json.tool
 
 test-vty:
@@ -111,4 +112,5 @@ test-call:
 	@echo "Testing call intercept..."
 	@curl -s -X POST http://localhost:8080/api/v1/intercept/call \
 		-H "Content-Type: application/json" \
+		-H "X-API-Key: mvno-demo-key-2026" \
 		-d '{"caller":"15551234567","callee":"15557654321","call_id":"test-123","imei":"356938035643809"}' | python3 -m json.tool

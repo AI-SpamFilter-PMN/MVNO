@@ -143,21 +143,25 @@ echo -e "${GREEN}✓ Call Blocked at SIP Protocol Level (SIP/2.0 403 Forbidden R
 echo -e "${YELLOW}[7/13] 🛡️ Triggering EIR SIM-Swap Anomaly (>3 distinct SIMs on IMEI: 356938035643809)...${NC}"
 curl -s -X POST http://localhost:8080/api/v1/intercept/call \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: mvno-demo-key-2026" \
   -d '{"caller": "15551234567", "callee": "15557654321", "imei": "356938035643809"}' | grep -q "allow"
 echo -e "  Attempt 1 (Caller: 15551234567): {\"allow\":false,\"reason\":\"EIR: SIM swap detected\"}"
 
 curl -s -X POST http://localhost:8080/api/v1/intercept/call \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: mvno-demo-key-2026" \
   -d '{"caller": "15559998888", "callee": "15557654321", "imei": "356938035643809"}' | grep -q "allow"
 echo -e "  Attempt 2 (Caller: 15559998888): {\"allow\":false,\"reason\":\"EIR: SIM swap detected\"}"
 
 curl -s -X POST http://localhost:8080/api/v1/intercept/call \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: mvno-demo-key-2026" \
   -d '{"caller": "15554443322", "callee": "15557654321", "imei": "356938035643809"}' | grep -q "allow"
 echo -e "  Attempt 3 (Caller: 15554443322): {\"allow\":false,\"reason\":\"EIR: SIM swap detected\"}"
 
 curl -s -X POST http://localhost:8080/api/v1/intercept/call \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: mvno-demo-key-2026" \
   -d '{"caller": "15553332211", "callee": "15557654321", "imei": "356938035643809"}' | grep -q "allow"
 echo -e "  Attempt 4 (Caller: 15553332211): {\"allow\":false,\"reason\":\"EIR: SIM swap detected\"}"
 echo -e "${GREEN}✓ EIR Fraud Detection Blocked 4th Distinct SIM Swap Attempt${NC}\n"
@@ -166,6 +170,7 @@ echo -e "${GREEN}✓ EIR Fraud Detection Blocked 4th Distinct SIM Swap Attempt${
 echo -e "${YELLOW}[8/13] 💬 Simulating Authorized 5G SMS Interception Flow...${NC}"
 curl -s -X POST http://localhost:8080/api/v1/intercept/sms \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: mvno-demo-key-2026" \
   -d '{"sender": "15551234567", "recipient": "15557654321", "content": "Hello MVNO 5G"}'
 echo ""
 echo -e "${GREEN}✓ SMS Allowed & Forwarded${NC}\n"
