@@ -51,7 +51,7 @@ services:
     container_name: mvno-mongodb
     command: mongod --wiredTigerCacheSizeGB 0.25
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - ./state/mongodb:/data/db:z
     networks:

@@ -45,4 +45,4 @@ This document outlines upcoming architectural enhancements, operational backlog 
 ## 3. Security Notes & Warnings
 
 > [!WARNING]
-> **Unauthenticated MongoDB Host Port Exposure**: Port `27017` is published locally for Open5GS WebUI and debugging without authentication enabled. Production deployments must enforce MongoDB authentication (`security.authorization: enabled`) and restrict host port bindings.
+> **Unauthenticated MongoDB Host Port Exposure**: Port `27017` is published on the loopback interface only (`127.0.0.1:27017` in `docker-compose.yml`) for Open5GS WebUI and debugging without authentication enabled. Production deployments must enforce MongoDB authentication (`security.authorization: enabled`).
