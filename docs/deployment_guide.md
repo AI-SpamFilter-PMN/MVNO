@@ -159,6 +159,11 @@ services:
       - "127.0.0.1:27017:27017"
     volumes:
       - ./state/mongodb:/data/db:z
+    healthcheck:
+      test: mongosh --eval 'db.runCommand({ping:1})' --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - mvno_net
     restart: unless-stopped
@@ -678,14 +683,15 @@ Link the signaling server (Kamailio) with the packet forwarding proxy (rtpengine
    ```
 
 ### Step 3: Link Interception Webhooks (Core ↔ Spring Boot Gateway)
-Configure the signaling systems to call the API Gateway for approval before routing traffic:
-1. **SMS Interception**: In `osmo-smsc.cfg`, the Spring Boot gateway acts as an SMPP ESME client. Configure the gateway's SMPP connection in the application settings. The gateway connects to `osmo-smsc:2775` and issues `SUBSCRIBE_SM` for delivery reports. The actual SMS routing happens via the gateway's `/api/v1/intercept/sms` REST endpoint, called by a Kamailio HTTP POST.
+Configure the signaling systems to call the API Gateway for approval before routing traffic. **All `/api/v1/intercept/**` calls require the `X-API-Key: mvno-demo-key-2026` header** (missing/mismatched key → `401 Unauthorized`; demo default from `intercept.api-key`, env override `X_API_KEY`).
+1. **SMS Interception**: `osmo-smsc` holds delivery and calls the gateway's `POST /api/v1/intercept/sms` REST endpoint (the gateway is a pure REST consumer — it does **not** act as an SMPP ESME client and issues no `SUBSCRIBE_SM`). The ESME routing is configured in `osmo-smsc.cfg`; the outbound HTTP callout carries the `X-API-Key` header.
 
-2. **Call Interception**: In `kamailio.cfg`, the gateway is queried via HTTP POST during the INVITE handling:
+2. **Call Interception**: In `kamailio.cfg`, `route[INTERCEPT]` queries the gateway via HTTP **GET** with query parameters and an explicit `X-API-Key` header during INVITE handling (4-arg `http_client_query` form — empty post-data means GET):
    ```kamailio
    # http_client.so is loaded and used in kamailio.cfg for HTTP REST callouts.
    # The gateway URL uses the container hostname:
-   #   http://mvno-api:8080/api/v1/intercept/call
+   #   http://mvno-api:8080/api/v1/intercept/call?caller=<fU>&callee=<rU>
+   # with header: X-API-Key: mvno-demo-key-2026
    ```
    See `configs/kamailio/kamailio.cfg` `route[INTERCEPT]` for the full implementation.
 
@@ -738,8 +744,8 @@ All developer lifecycle operations are in the `Makefile`:
 | `make ps` | `podman ps` | List running containers |
 | `make logs` | `podman compose logs -f` | Stream all container logs |
 | `make test-api` | `curl /actuator/health/liveness` | Verify gateway health |
-| `make test-sms` | SMPP test via Python `smpplib` | End-to-end SMS intercept test |
-| `make test-call` | SIPp scenario | SIP call intercept test |
+| `make test-sms` | `curl -X POST /api/v1/intercept/sms` (JSON body + `X-API-Key` header) | End-to-end SMS intercept test |
+| `make test-call` | `curl -X POST /api/v1/intercept/call` (JSON body + `X-API-Key` header) | Call intercept test |
 | `make clean` | `rm -rf state/*` | Wipe all state data |
 | `make rebuild` | `clean + init-db + up` | Full teardown and rebuild |
 

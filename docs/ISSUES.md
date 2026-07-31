@@ -322,7 +322,7 @@ This section defines the multi-agent integration boundaries across team reposito
 - **Container Service Name**: `ai-filter` (attached to `mvno_net` bridge network).
 - **Listening Socket**: `0.0.0.0:8000` inside container.
 - **REST Contract**: `POST /api/v1/classify`
-- **Request Payload**: `{ "event_type": "SMS" | "VOICE_CALL", "sender_msisdn": string, "recipient_msisdn": string, "content_text": string, "timestamp_epoch_ms": long, "call_id": string }`
+- **Request Payload** (event-typed): `{ "event_type": "SMS", "sender_msisdn", "recipient_msisdn", "content_text", "timestamp_epoch_ms" }` for SMS; `{ "event_type": "VOICE_CALL", "caller_msisdn", "callee_msisdn", "call_id", "timestamp_epoch_ms" }` for voice (no `content_text`, no `call_id` on SMS — verified against `AiFilterService.java`)
 - **Response Payload**: `{ "allow": boolean, "reason": string }`
 - **SLA Bound**: Response time $\le 5.0\text{s}$ (Fail-open SLA fallback on timeout).
 

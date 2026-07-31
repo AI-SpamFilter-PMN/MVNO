@@ -15,7 +15,7 @@ X-API-Key: mvno-demo-key-2026
 - Missing or mismatched key → `HTTP 401 Unauthorized`.
 - Demo key default from `intercept.api-key` property (env override: `X_API_KEY`).
 - Not required for `/actuator/*` health/metrics endpoints (scrape-safe).
-- **Exempt endpoints**: `GET /api/v1/classify` (outbound to `ai-filter`), SMPP/SIP protocols are authenticated at their own layers.
+- **Scope**: only `/api/v1/intercept/**` is key-protected. `POST /api/v1/classify` (outbound to `ai-filter`) and `/actuator/*` are unaffected; SIP (407 digest) and SMPP (ESME credentials) authenticate at their own protocol layers.
 
 ---
 
@@ -42,24 +42,38 @@ The Telecom Gateway (`telecom-api`) acts as the intermediary between raw telecom
 
 ## 2. API Contract & Payload Schema (`POST /api/v1/classify`)
 
-### Request Payload (Sent by `telecom-api` to `ai-filter:8000`)
+### Request Payloads (Sent by `telecom-api` to `ai-filter:8000`)
+
+Payload shape is **event-typed** — SMS and VOICE_CALL carry different fields (verified against `AiFilterService.java`).
+
+**SMS event** (`event_type: "SMS"`):
 ```json
 {
   "event_type": "SMS",
   "sender_msisdn": "15551234567",
   "recipient_msisdn": "15559876543",
   "content_text": "Urgent: Claim your free prize now at http://spam.link",
-  "timestamp_epoch_ms": 1721590000000,
-  "call_id": "sip-call-id-12345@10.0.0.1"
+  "timestamp_epoch_ms": 1721590000000
+}
+```
+
+**Voice Call event** (`event_type: "VOICE_CALL"`):
+```json
+{
+  "event_type": "VOICE_CALL",
+  "caller_msisdn": "15551234567",
+  "callee_msisdn": "15557654321",
+  "call_id": "call-123",
+  "timestamp_epoch_ms": 1721590000000
 }
 ```
 
 * **`event_type`**: `"SMS"` or `"VOICE_CALL"`.
-* **`sender_msisdn`**: Originating E.164 phone number.
-* **`recipient_msisdn`**: Destination E.164 phone number.
-* **`content_text`**: Raw SMS message text OR transcribed voice call text from Vosk STT.
+* **`sender_msisdn`** / **`recipient_msisdn`** (SMS only): Originating / destination E.164 phone number.
+* **`content_text`** (SMS only): Raw SMS message text. Voice transcriptions are NOT included in the classify payload.
+* **`caller_msisdn`** / **`callee_msisdn`** (VOICE_CALL only): Originating / destination E.164 phone number.
+* **`call_id`** (VOICE_CALL only): SIP call ID for correlation; never sent for SMS.
 * **`timestamp_epoch_ms`**: Event timestamp in epoch milliseconds.
-* **`call_id`**: Optional SIP call ID or SMPP sequence ID for correlation.
 
 ---
 

@@ -9,7 +9,7 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
 ```
 ┌─────────────┐    ┌─────────────┐    ┌──────────────────┐    ┌─────────────┐
 │  5G SA Core │───▶│   Osmocom   │───▶│  Interception    │───▶│  AI Spam    │
-│ (Open5GS +  │    │  (HLR/MSC/  │    │  Gateway         │    │  Filter     │
+│  (Open5GS +  │    │  (HLR/      │    │  Gateway         │    │  Filter     │
 │  UERANSIM)  │    │   SMSC)     │    │ (Kamailio +      │    │  (External) │
 │             │    │  SMPP/GSUP) │    │  rtpengine +     │    │             │
 └─────────────┘    └─────────────┘    │  Vosk ASR +      │    └─────────────┘
@@ -22,7 +22,7 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
 
 **Components:**
 - **5G SA Core**: Open5GS 10 NFs (NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + UERANSIM gNB + 3 UEs
-- **Osmocom Stack**: HLR (GSUP) + MSC/SMSC (SMPP 3.4) via `osmo-hlr` / `osmo-msc` / `osmo-smsc`
+- **Osmocom Stack**: HLR (GSUP) + SMSC (SMPP 3.4) via `osmo-hlr` + `osmo-smsc` containers (the `osmo-msc` binary runs in SMSC mode)
 - **Interception Gateway**: Kamailio SIP registrar/proxy → `rtpengine` media fork → Vosk ASR (native JNI) → Spring Boot gateway (Java 21, virtual threads)
 - **AI Spam Filter**: External REST service at `http://ai-filter:8000/api/v1/classify`
 - **Observability**: Vector (stdout log driver) → VictoriaMetrics (metrics TSDB) → Grafana (4 pre-built dashboards)
@@ -245,9 +245,8 @@ Your container model service **MUST** expose an HTTP REST classification endpoin
     "event_type": "VOICE_CALL",
     "caller_msisdn": "15551234567",
     "callee_msisdn": "15557654321",
-    "content_text": "Transcribed voice audio text from Vosk Java 21 JNI",
-    "timestamp_epoch_ms": 1721590000000,
-    "call_id": "call-123"
+    "call_id": "call-123",
+    "timestamp_epoch_ms": 1721590000000
   }
   ```
 * **Required JSON Response (expected by `telecom-api`)**:
@@ -264,10 +263,11 @@ Your container model service **MUST** expose an HTTP REST classification endpoin
   - SMSC System-ID: `MVNO_SMSC`
   - Primary ESME Account: `mvno-api-route` / password `changeme`
   - Secondary Client ESME Account: `smsclient` / password `password`
-  - REST Interception Endpoint: `POST http://telecom-api:8080/api/v1/intercept/sms`
+  - REST Interception Endpoint: `POST http://telecom-api:8080/api/v1/intercept/sms` — **requires header `X-API-Key: mvno-demo-key-2026`** (missing/mismatched key → `401 Unauthorized`; demo key via env `X_API_KEY`)
 * **Voice Client Teammate (A7med3mar4 — `SipClient`)**:
   - SIP Registrar & Proxy Target: `localhost:5066` on host (`5066:5060/udp`)
   - RTP Media Port Range: `30000-30100/udp` (G.711u PCMU)
+  - SIP INVITE Authentication: `INVITE` is challenged with `407 Proxy Authentication Required` (digest, realm `localhost`) — retry with `Authorization: Digest` using your REGISTER credentials
 
 ### Carrier SLA & Resilience Rules
 1. **5.0s Read Timeout**: `telecom-api` enforces a 5-second timeout window. If your model takes $> 5.0\text{s}$, `telecom-api` automatically fails open (`allow: true`). Keep inference latency $\le 500\text{ ms}$.
