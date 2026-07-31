@@ -34,7 +34,7 @@ rebuild: clean init-db
 
 # Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
-	@mkdir -p state/mongodb state/spool state/hlr state/kamailio state/vm-data state/grafana state/logs/kamailio state/logs/osmocom
+	@mkdir -p state/mongodb state/spool/archived state/hlr state/kamailio state/vm-data state/grafana state/logs/kamailio state/logs/osmocom
 	@sqlite3 state/kamailio/kamailio.db \
 		"CREATE TABLE IF NOT EXISTS version (id INTEGER PRIMARY KEY, table_name TEXT UNIQUE, table_version INTEGER);" \
 		"INSERT OR IGNORE INTO version VALUES (1, 'version', 1);" \
@@ -50,20 +50,24 @@ init-db:
 			imei TEXT, imsi TEXT, blocked INTEGER DEFAULT 0 \
 		);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15551234567', 'mvno.local', 'testpass', \
-				'', '', '15551234567', 100);" \
+			VALUES ('15551234567', 'mvno.local', 'testpass', '', '', '15551234567', 100);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15557654321', 'mvno.local', 'testpass', \
-				'', '', '15557654321', 0);" \
+			VALUES ('15557654321', 'mvno.local', 'testpass', '', '', '15557654321', 0);" \
+		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
+			VALUES ('15559998888', 'mvno.local', 'testpass', '', '', '15559998888', 100);" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
-	@cp -f state/kamailio/kamailio.db state/kamailio.db
-	@if [ -f state/hlr/hlr.db ]; then \
-		sqlite3 state/hlr/hlr.db "INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (1, '001010000000001', '15551234567');" 2>/dev/null || true; \
-	fi
 	@sqlite3 state/hlr/hlr.db \
+		"CREATE TABLE IF NOT EXISTS subscriber (id INTEGER PRIMARY KEY AUTOINCREMENT, imsi VARCHAR(15) UNIQUE, msisdn VARCHAR(15));" \
+		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (1, '001010000000001', '15551234567');" \
+		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (2, '001010000000002', '15557654321');" \
+		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (3, '001010000000003', '15559998888');" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
+
+# Upserts 5G SA subscribers into Open5GS MongoDB
+seed-mongo:
+	@./scripts/seed-mongo.sh
 
 # Alias for native systemd database initialization
 init-native-db: init-db
@@ -93,8 +97,9 @@ test-sms:
 test-vty:
 	@echo "=== Verifying OsmoHLR subscriber ==="
 	@./scripts/vty.sh mvno-osmo-hlr 4258 "show subscribers all" | grep -q "001010000000001" && echo "  ✓ HLR subscriber found" || echo "  ✗ HLR subscriber not found"
-	@echo "=== Verifying OsmoMSC SMPP listener ==="
-	@./scripts/vty.sh mvno-osmosmsc 4254 "write terminal" | grep -q "esme mvno-api-route" && echo "  ✓ SMPP ESME configured" || echo "  ✗ SMPP ESME not found"
+	@echo "=== Verifying OsmoMSC SMPP listeners ==="
+	@./scripts/vty.sh mvno-osmosmsc 4254 "write terminal" | grep -q "esme mvno-api-route" && echo "  ✓ Primary SMPP ESME configured" || echo "  ✗ Primary SMPP ESME not found"
+	@./scripts/vty.sh mvno-osmosmsc 4254 "write terminal" | grep -q "esme smsclient" && echo "  ✓ Secondary client SMPP ESME configured" || echo "  ✗ Secondary client SMPP ESME not found"
 
 test: test-vty test-api test-sms test-call
 

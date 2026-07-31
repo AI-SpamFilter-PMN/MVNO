@@ -149,7 +149,7 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | 7 | **SLA Fallback** | Spring Boot gateway fallback (`allow: true`) when AI filter is unreachable/times out. |
 | 8 | **5G SA Core** | Open5GS 10-NF 5GC + UERANSIM gNB + 3 UE simulation. |
 | 9 | **SMS-over-NAS** | 5G NAS SMS routing architecture contract (Mock / Roadmap item). |
-| 10 | **MongoDB Seed** | Atomic init script (`scripts/seed-mongo.sh` landing in Phase 3) provisions 3 UEs into `open5gs.subscribers`. |
+| 10 | **MongoDB Seed** | Atomic init script (`scripts/seed-mongo.sh`) provisions 3 UEs into `open5gs.subscribers` avoiding WebUI admin hash bug. |
 
 ---
 

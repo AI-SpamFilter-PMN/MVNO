@@ -28,9 +28,10 @@ echo -e "${GREEN}✓ Gateway Health: UP${NC}\n"
 
 # Item 2: 5G SA UE Registration Status
 echo -e "${YELLOW}[2/11] 📱 Auditing 5G SA Core UE Registration (UERANSIM ↔ AMF)...${NC}"
-podman logs mvno-ueransim-ue-1 2>&1 | grep "Initial Registration is successful" | tail -1 || true
-podman logs mvno-ueransim-ue-2 2>&1 | grep "Initial Registration is successful" | tail -1 || true
-echo -e "${GREEN}✓ 5G SA Subscribers registered on PLMN 001/01${NC}\n"
+podman logs mvno-ueransim-ue-1 2>&1 | grep -q "Initial Registration is successful" && echo -e "${GREEN}  ✓ UE-1 (001010000000001) registered${NC}" || echo -e "${YELLOW}  ⚠ UE-1 registration pending/idle${NC}"
+podman logs mvno-ueransim-ue-2 2>&1 | grep -q "Initial Registration is successful" && echo -e "${GREEN}  ✓ UE-2 (001010000000002) registered${NC}" || echo -e "${YELLOW}  ⚠ UE-2 registration pending/idle${NC}"
+podman logs mvno-ueransim-ue-3 2>&1 | grep -q "Initial Registration is successful" && echo -e "${GREEN}  ✓ UE-3 (001010000000003) registered${NC}" || echo -e "${YELLOW}  ⚠ UE-3 registration pending/idle${NC}"
+echo -e "${GREEN}✓ 5G SA Subscriber audit complete${NC}\n"
 
 # Item 3: Vector Live Log Shipper Stream
 echo -e "${YELLOW}[3/11] ⚡ Auditing Vector Real-Time Log Pipeline (docker_logs)...${NC}"
