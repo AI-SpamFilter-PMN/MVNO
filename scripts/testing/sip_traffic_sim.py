@@ -85,7 +85,7 @@ def register_subscriber(username, password, port=5066):
         print(f"[-] SIP REGISTER rejected for {username}:\n{resp2_str}")
         return False
 
-def send_sip_invite(caller, callee, port=5066):
+def send_sip_invite(caller, callee, password, port=5066):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(10)
     call_id = f"call-{int(time.time())}@127.0.0.1"
@@ -100,28 +100,58 @@ def send_sip_invite(caller, callee, port=5066):
         "a=rtpmap:0 PCMU/8000\r\n"
     )
     
-    invite = (
-        f"INVITE sip:{callee}@localhost:{port} SIP/2.0\r\n"
-        f"Via: SIP/2.0/UDP 127.0.0.1:5070;branch=z9hG4bK-inv-{caller}\r\n"
-        f"From: <sip:{caller}@localhost>;tag=tag-inv-{caller}\r\n"
-        f"To: <sip:{callee}@localhost>\r\n"
-        f"Call-ID: {call_id}\r\n"
-        f"CSeq: 1 INVITE\r\n"
-        f"Contact: <sip:{caller}@127.0.0.1:5070>\r\n"
-        f"Content-Type: application/sdp\r\n"
-        f"Content-Length: {len(sdp)}\r\n\r\n"
-        f"{sdp}"
-    )
+    def build_invite(auth_header=""):
+        auth = f"Authorization: {auth_header}\r\n" if auth_header else ""
+        return (
+            f"INVITE sip:{callee}@localhost:{port} SIP/2.0\r\n"
+            f"Via: SIP/2.0/UDP 127.0.0.1:5070;branch=z9hG4bK-inv-{caller}\r\n"
+            f"From: <sip:{caller}@localhost>;tag=tag-inv-{caller}\r\n"
+            f"To: <sip:{callee}@localhost>\r\n"
+            f"Call-ID: {call_id}\r\n"
+            f"CSeq: 1 INVITE\r\n"
+            f"Contact: <sip:{caller}@127.0.0.1:5070>\r\n"
+            f"{auth}"
+            f"Content-Type: application/sdp\r\n"
+            f"Content-Length: {len(sdp)}\r\n\r\n"
+            f"{sdp}"
+        )
     
-    s.sendto(invite.encode(), ('127.0.0.1', port))
+    # 1. Unauthenticated INVITE → expect 407 challenge
+    s.sendto(build_invite().encode(), ('127.0.0.1', port))
     try:
-        resp, _ = s.recvfrom(2048)
-        resp_str = resp.decode('utf-8', errors='ignore')
-        first_line = resp_str.split('\r\n')[0] if resp_str else "No Response"
+        resp1, _ = s.recvfrom(2048)
+        resp1_str = resp1.decode('utf-8', errors='ignore')
+    except Exception as e:
+        print(f"[-] SIP INVITE 407 challenge error: {e}")
+        s.close()
+        return False
+    
+    nonce = ""
+    for line in resp1_str.split('\r\n'):
+        if line.lower().startswith('proxy-authenticate:'):
+            parts = line.split('nonce="')
+            if len(parts) > 1:
+                nonce = parts[1].split('"')[0]
+    
+    if not nonce:
+        print(f"[-] SIP INVITE challenge failed: no nonce received:\n{resp1_str}")
+        s.close()
+        return False
+    
+    # 2. Authenticated INVITE with digest credentials
+    uri = f"sip:{callee}@localhost:{port}"
+    digest = calculate_digest_response(caller, "localhost", password, "INVITE", uri, nonce)
+    auth_header = (f'Digest username="{caller}", realm="localhost", nonce="{nonce}", '
+                   f'uri="{uri}", response="{digest}"')
+    s.sendto(build_invite(auth_header).encode(), ('127.0.0.1', port))
+    try:
+        resp2, _ = s.recvfrom(2048)
+        resp2_str = resp2.decode('utf-8', errors='ignore')
+        first_line = resp2_str.split('\r\n')[0] if resp2_str else "No Response"
         print(f"[+] SIP INVITE Response for {caller}->{callee}: {first_line}")
         s.close()
-        resp_str_lower = resp_str.lower()
-        if any(status in resp_str_lower for status in ["100 trying", "180 ringing", "200 ok", "403 forbidden"]):
+        resp2_str_lower = resp2_str.lower()
+        if any(status in resp2_str_lower for status in ["100 trying", "180 ringing", "200 ok", "403 forbidden"]):
             return True
         return False
     except Exception as e:
@@ -133,7 +163,7 @@ if __name__ == "__main__":
     print("=== Registering Callee 15557654321 ===")
     reg_ok = register_subscriber("15557654321", "testpass")
     time.sleep(1)
-    print("=== Sending Real SIP INVITE Call ===")
-    inv_ok = send_sip_invite("15551234567", "15557654321")
+    print("=== Sending Real SIP INVITE Call (digest-authenticated) ===")
+    inv_ok = send_sip_invite("15551234567", "15557654321", "testpass")
     if not (reg_ok and inv_ok):
         sys.exit(1)

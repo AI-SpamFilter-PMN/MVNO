@@ -59,17 +59,67 @@ echo -e "${YELLOW}[5/13] 📞 Simulating Authorized IMS VoIP Call Interception F
 python3 scripts/testing/sip_traffic_sim.py
 echo -e "${GREEN}✓ Real SIP INVITE processed by Kamailio (REST Intercept & RTPEngine Anchored)${NC}\n"
 
-# Item 6: Zero-Balance Call Block & SIP 403 Assertion
-echo -e "${YELLOW}[6/13] 🚫 Testing Zero-Balance Call Block (SIP 403 Forbidden Response)...${NC}"
+# Item 6: Zero-Balance Call Block & SIP 403 Assertion (digest-authenticated)
+echo -e "${YELLOW}[6/13] 🚫 Testing Zero-Balance Call Block (SIP 407 Challenge → Digest → 403 Forbidden)...${NC}"
 python3 -c "
-import socket, time, sys
+import socket, time, sys, hashlib
+
+def digest_response(username, realm, password, method, uri, nonce):
+    ha1 = hashlib.md5(f'{username}:{realm}:{password}'.encode()).hexdigest()
+    ha2 = hashlib.md5(f'{method}:{uri}'.encode()).hexdigest()
+    return hashlib.md5(f'{ha1}:{nonce}:{ha2}'.encode()).hexdigest()
+
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.settimeout(5)
 caller = '15557654321' # Zero-balance subscriber
 callee = '15557654321'
+port = 5066
 sdp = 'v=0\r\no=user2 1 1 IN IP4 127.0.0.1\r\ns=-\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 30004 RTP/AVP 0\r\na=rtpmap:0 PCMU/8000\r\n'
-invite = f'INVITE sip:{callee}@localhost:5066 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:5072;branch=z9hG4bK-{time.time()}\r\nFrom: <sip:{caller}@localhost>;tag=tag1\r\nTo: <sip:{callee}@localhost>\r\nCall-ID: call-403-{time.time()}@127.0.0.1\r\nCSeq: 1 INVITE\r\nContact: <sip:{caller}@127.0.0.1:5072>\r\nContent-Type: application/sdp\r\nContent-Length: {len(sdp)}\r\n\r\n{sdp}'
-s.sendto(invite.encode(), ('127.0.0.1', 5066))
+
+def build_invite(auth=''):
+    auth_hdr = f'Authorization: {auth}\r\n' if auth else ''
+    return (f'INVITE sip:{callee}@localhost:{port} SIP/2.0\r\n'
+            f'Via: SIP/2.0/UDP 127.0.0.1:5072;branch=z9hG4bK-{time.time()}\r\n'
+            f'From: <sip:{caller}@localhost>;tag=tag1\r\n'
+            f'To: <sip:{callee}@localhost>\r\n'
+            f'Call-ID: call-403-{time.time()}@127.0.0.1\r\n'
+            f'CSeq: 1 INVITE\r\n'
+            f'Contact: <sip:{caller}@127.0.0.1:5072>\r\n'
+            f'{auth_hdr}'
+            f'Content-Type: application/sdp\r\n'
+            f'Content-Length: {len(sdp)}\r\n\r\n'
+            f'{sdp}')
+
+# 1. Unauthenticated INVITE -> expect 407 challenge
+s.sendto(build_invite().encode(), ('127.0.0.1', port))
+resp1 = ''
+try:
+    resp1, _ = s.recvfrom(2048)
+    resp1 = resp1.decode('utf-8', errors='ignore')
+    first = resp1.split('\r\n')[0]
+    if '407' not in first:
+        print(f'[-] Expected 407 challenge, got: {first}', file=sys.stderr)
+        sys.exit(1)
+    print(f'  ✓ SIP 407 Challenge Received: {first}')
+except Exception:
+    print('[-] Error: No SIP 407 challenge for unauthenticated INVITE', file=sys.stderr)
+    sys.exit(1)
+
+nonce = ''
+for line in resp1.split('\r\n'):
+    if line.lower().startswith('proxy-authenticate:'):
+        parts = line.split('nonce=\"')
+        if len(parts) > 1:
+            nonce = parts[1].split('\"')[0]
+if not nonce:
+    print('[-] Error: No nonce in 407 challenge', file=sys.stderr)
+    sys.exit(1)
+
+# 2. Authenticated INVITE (zero-balance caller) -> expect 403 from INTERCEPT
+uri = f'sip:{callee}@localhost:{port}'
+digest = digest_response(caller, 'localhost', 'testpass', 'INVITE', uri, nonce)
+auth = f'Digest username=\"{caller}\", realm=\"localhost\", nonce=\"{nonce}\", uri=\"{uri}\", response=\"{digest}\"'
+s.sendto(build_invite(auth).encode(), ('127.0.0.1', port))
 
 got_403 = False
 for _ in range(5):
