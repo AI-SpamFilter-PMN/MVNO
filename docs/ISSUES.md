@@ -169,15 +169,18 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Symptom**: `telecom-api` REST queries returned `balance: 0` for all subscribers, and container logs showed `[SQLITE_READONLY_DIRECTORY] Process does not have permission to create a journal file in the same directory as the database`.
 * **Root Cause**: Single-file bind mount (`- ./state/kamailio.db:/etc/kamailio/kamailio.db:z`) prevented the non-root container process from creating temporary `.db-wal` and `.db-shm` lock/journal files in `/etc/kamailio/`.
 * **Fix**: Updated `docker-compose.yml` to mount the parent directory (`- ./state:/etc/kamailio:z`), allowing SQLite WAL mode to create journal/shm files seamlessly.
+* **Status**: > [!NOTE] Superseded by Issue 8.12 (unified mount `./state/kamailio/kamailio.db`).
 
 ### Issue 6.2: `vmagent` Promscrape Configuration Flag Omission
 * **Symptom**: VictoriaMetrics (`:8428`) and Grafana NOC Dashboards (`:3000`) rendered empty metric panels with zero active targets.
 * **Root Cause**: `vmagent` container command stanza was missing `-promscrape.config=/etc/prometheus/prometheus.yml`, causing `vmagent` to run in silent mode without loading target scrape configurations. Additionally, the target hostname in `scrape.yml` was listed as `telecom-api` instead of `mvno-api`.
-* **Fix**: Added `-promscrape.config=/etc/prometheus/prometheus.yml` and exposed port `8429:8429` in `docker-compose.yml`, and updated `scrape.yml` target address to `mvno-api:8080`. Verified `3/3` active targets scraped (`lastSamplesScraped: 136`).
+* **Fix**: Added `-promscrape.config=/etc/prometheus/prometheus.yml` and exposed port `8429:8429` in `docker-compose.yml`, and updated `scrape.yml` target address to `mvno-api:8080`. Verified `5` active targets scraped (`mvno-api`, `rtpengine`, `vmagent`, `open5gs`, `mongodb`).
 
 ### Issue 6.3: Grafana SQLite WAL Corruption
 * **Symptom**: Grafana crashes after host reboot with `database is locked` or `disk I/O error`.
-* **Fix**: Pinned image to `grafana/grafana-oss:11.6.0` and set `GF_DATABASE_WAL=true` in `docker-compose.yml`.
+* **Root Cause**: Missing `GF_DATABASE_WAL=true` in `docker-compose.yml` environment variables.
+* **Fix**: Pinned image to `grafana/grafana-oss:11.6.0` and added `GF_DATABASE_WAL=true` in `docker-compose.yml`.
+* **Status**: Unapplied in initial stack compose configuration; applied in 2026-08-01 telemetry alignment.
 
 ### Issue 6.4: PromQL Syntax Error in Grafana Stat Cards (`|| vector(0)`)
 * **Symptom**: Grafana Stat Panels displayed "No data" and red parsing error icons, while time-series line graphs below rendered live values.
@@ -237,6 +240,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Symptom**: System journal reported `[pfcp] WARNING: No Heartbeat from SMF` and `[smf] ERROR: Cannot find PFCP-Node: type [1] node_id NULL from [127.0.0.1]:8805`.
 * **Root Cause**: `configs/open5gs/upf.yaml` lacked `pfcp.client.smf` section, defaulting PFCP client heartbeat target to loopback `127.0.0.1:8805` instead of container network hostname `smf`.
 * **Fix**: Added `pfcp.client.smf: - address: smf` to [configs/open5gs/upf.yaml](file:///home/zkhattab/MVNO/configs/open5gs/upf.yaml). PFCP heartbeats between SMF and UPF are now associated and healthy across `mvno-net`.
+* **Status**: > [!NOTE] Superseded by Issue 8.10 (SMF acts as sole PFCP client initiator per 3GPP TS 29.244).
 
 ### Issue 8.9: Open5GS SBI Cleartext HTTP/2 (`no_tls: true`) Configuration Across All NFs
 * **Symptom**: Open5GS NRF, AMF, SMF, and AUSF logged `nghttp2_session_mem_recv() failed (-903: Received bad client magic byte string)` and `Error in the HTTP2 framing layer (16)`.
@@ -250,8 +254,8 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 
 ### Issue 8.11: EIR SIM-Swap Fraud State Erasure Across Cache Purges
 * **Symptom**: Active SIM-swap blocks were bypassed after scheduled 10-minute cache purges or capacity eviction.
-* **Root Cause**: `EirTracker.java` called `imeiSwapCounter.clear()`, wiping active fraud states (`swaps > 3`) along with idle IMEIs.
-* **Fix**: Refactored [EirTracker.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/subscriber/EirTracker.java) to selectively prune low-activity entries (`removeIf(entry -> entry.getValue().get() <= 1)`) and instrumented Micrometer Prometheus metrics.
+* **Root Cause**: `EirTracker.java` evaluated raw call count instead of distinct SIM insertions per IMEI, and called `imeiSwapCounter.clear()`, wiping active fraud states (`swaps > 3`).
+* **Fix**: Refactored [EirTracker.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/subscriber/EirTracker.java) to track distinct MSISDN bindings (`ConcurrentHashMap<String, Set<String>>`) per IMEI, selectively prune low-activity entries (`removeIf(entry -> entry.getValue().size() <= 1)`), and restrict `reset()` method to test scope.
 
 ### Issue 8.12: Split-Brain SQLite Database File Mount (`kamailio` vs `telecom-api`)
 * **Symptom**: Kamailio registered subscribers to `./state/kamailio.db` while `telecom-api` read from `./state/kamailio/kamailio.db`, causing subscriber data divergence.
@@ -260,8 +264,8 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 
 ### Issue 8.13: RTPEngine PCAP vs Fork Audio Recording Method Mismatch with Vosk ASR
 * **Symptom**: Native Vosk ASR service polled for `*.wav` files in `/var/spool/rtpengine`, while RTPEngine recorded in binary PCAP format (`recording-method=pcap`).
-* **Root Cause**: PCAP streams were encapsulated in ethernet/IP frame headers rather than raw audio streams.
-* **Fix**: Updated [rtpengine.conf](file:///home/zkhattab/MVNO/configs/rtpengine/rtpengine.conf) to `recording-method=fork` and expanded [NativeVoskService.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/transcription/NativeVoskService.java) `DirectoryStream` filter to match `*.wav`, `*.pcap`, and `*.raw` streams.
+* **Root Cause**: PCAP streams were encapsulated in ethernet/IP frame headers rather than raw audio streams, and unconditional `Files.deleteIfExists()` deleted audio evidence regardless of transcription status.
+* **Fix**: Updated [rtpengine.conf](file:///home/zkhattab/MVNO/configs/rtpengine/rtpengine.conf) to `recording-method=fork`, restricted [NativeVoskService.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/transcription/NativeVoskService.java) `DirectoryStream` filter to `*.wav` streams only, and implemented evidence archiving to `state/spool/archived/`.
 
 ### Issue 8.14: Rootless Podman Docker Socket Path Permission for Vector
 * **Symptom**: Vector container failed to collect docker logs with `No such file or directory: /var/run/docker.sock`.
@@ -284,14 +288,42 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 
 | Target / Subsystem | Command / Probe | Expected Result | Verification Status |
 |---|---|---|---|
-| **Spring Boot Unit Tests** | `./mvnw test` | `Tests run: 11, Failures: 0` | ✅ **PASS** |
+| **Spring Boot Unit Tests** | `./mvnw test` | `Tests run: 17, Failures: 0` | ✅ **PASS** |
 | **Gateway Liveness** | `GET :8080/actuator/health/liveness` | `{"status":"UP"}` | ✅ **PASS** |
 | **Subscriber Balance API** | `GET :8080/api/v1/intercept/subscriber/15551234567` | `{"msisdn":"15551234567","balance":100}` | ✅ **PASS** |
 | **Normal VoIP Call** | `POST /api/v1/intercept/call` (`caller: 15551234567`) | `{"allow":true,"reason":"AI filter unreachable — SLA allow"}` | ✅ **PASS** |
 | **Zero-Balance Call Block** | `POST /api/v1/intercept/call` (`caller: 15557654321`) | `{"allow":false,"reason":"Prepaid balance exhausted"}` | ✅ **PASS** |
 | **Normal 5G SMS** | `POST /api/v1/intercept/sms` (`sender: 15551234567`) | `{"allow":true,"reason":"AI filter unreachable — SLA allow"}` | ✅ **PASS** |
 | **Zero-Balance SMS Block** | `POST /api/v1/intercept/sms` (`sender: 15557654321`) | `{"allow":false,"reason":"Prepaid balance exhausted"}` | ✅ **PASS** |
-| **EIR SIM-Swap Block** | 4 rapid calls on single IMEI | `{"allow":false,"reason":"EIR: SIM swap detected"}` | ✅ **PASS** |
-| **vmagent Scraper Targets** | `GET :8429/api/v1/targets` | `3/3 targets health: UP` | ✅ **PASS** |
+| **EIR SIM-Swap Block** | >3 distinct MSISDNs on single IMEI | `{"allow":false,"reason":"EIR: SIM swap detected"}` | ✅ **PASS** |
+| **vmagent Scraper Targets** | `GET :8429/api/v1/targets` | `5/5 targets health: UP` | ✅ **PASS** |
 | **VictoriaMetrics TSDB** | `GET :8428/api/v1/query?query=mvno_sms_requests_total` | `seriesFetched: 1`, `value: [ts, "2"]` | ✅ **PASS** |
 | **Open5GS WebUI Login UI** | `GET :9999/` | `HTTP 200 OK` (`<title>Open5gs - Login</title>`) | ✅ **PASS** |
+
+---
+
+## 10. Cross-Repo Integration Contract Specifications
+
+This section defines the multi-agent integration boundaries across team repositories within the `AI-SpamFilter-PMN` organization.
+
+### 1. `ai-filter` Model Container Interface (`AI-Filteration-System` Repo)
+- **Container Service Name**: `ai-filter` (attached to `mvno_net` bridge network).
+- **Listening Socket**: `0.0.0.0:8000` inside container.
+- **REST Contract**: `POST /api/v1/classify`
+- **Request Payload**: `{ "event_type": "SMS" | "VOICE_CALL", "sender_msisdn": string, "recipient_msisdn": string, "content_text": string, "timestamp_epoch_ms": long, "call_id": string }`
+- **Response Payload**: `{ "allow": boolean, "reason": string }`
+- **SLA Bound**: Response time $\le 5.0\text{s}$ (Fail-open SLA fallback on timeout).
+
+### 2. `sms-client` SMPP Client Interface (Ali — `sms-client` Repo)
+- **Protocol**: SMPP v3.4 BIND_TRANSCEIVER over TCP.
+- **Target Host & Port**: `osmo-smsc:2775` (inside container network `mvno_net`).
+- **SMSC System-ID**: `MVNO_SMSC`
+- **Primary ESME Credentials**: `mvno-api-route` / `changeme`
+- **Secondary Client ESME Credentials**: `smsclient` / `password`
+- **REST Interception Gateway**: Calls `POST /api/v1/intercept/sms` on `telecom-api:8080`.
+
+### 3. `SipClient` User Agent Interface (A7med3mar4 — `SipClient` Repo)
+- **Protocol**: SIP RFC 3261 over UDP.
+- **Target Host & Port**: `localhost:5066` on host (maps to `kamailio:5060/udp`).
+- **SIP REGISTER Authentication**: Digest authentication (`auth_check()`) using credentials seeded in `kamailio.db`.
+- **RTP Media Streams**: RTPEngine UDP port range `30000-30100/udp` (G.711u PCMU codec).

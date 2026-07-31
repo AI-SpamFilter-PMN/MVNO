@@ -526,7 +526,7 @@ services:
     container_name: mvno-vector
     volumes:
       - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
-      - /run/user/1000/podman/podman.sock:/var/run/docker.sock:ro,z
+      - /run/user/${UID:-1000}/podman/podman.sock:/var/run/docker.sock:ro,z
     networks:
       - mvno_net
     restart: unless-stopped
@@ -636,7 +636,7 @@ services:
 
 ---
 
-## 5. MVNO Core Integration Flow & Steps
+## 6. MVNO Core Integration Flow & Steps
 
 This section details the step-by-step runbook to integrate your MVNO core components with each other and connect them to the AI Filtration REST APIs.
 
@@ -646,11 +646,11 @@ Initialize the database files and configure them for high concurrency (WAL Mode)
    ```bash
    make init-db
    ```
-   This creates `state/kamailio.db` (subscriber registry) and `state/hlr/hlr.db` (OsmoHLR subscriber data) with WAL PRAGMAs applied and test subscribers inserted.
+   This creates `state/kamailio/kamailio.db` (subscriber registry) and `state/hlr/hlr.db` (OsmoHLR subscriber data) with WAL PRAGMAs applied and test subscribers inserted.
 
 2. **Verify**:
    ```bash
-   sqlite3 state/kamailio.db "SELECT username, msisdn, balance FROM subscriber;"
+   sqlite3 state/kamailio/kamailio.db "SELECT username, msisdn, balance FROM subscriber;"
    # Expected: 15551234567 | 15551234567 | 100
    #           15557654321 | 15557654321 | 0
    ```
@@ -684,10 +684,9 @@ Configure the signaling systems to call the API Gateway for approval before rout
 
 2. **Call Interception**: In `kamailio.cfg`, the gateway is queried via HTTP POST during the INVITE handling:
    ```kamailio
-   # http_client.so is NOT available in the Alpine image.
-   # Instead, use exec + curl (or build mvno-kamailio:latest with kamailio-utils).
+   # http_client.so is loaded and used in kamailio.cfg for HTTP REST callouts.
    # The gateway URL uses the container hostname:
-   #   http://telecom-api:8080/api/v1/intercept/call
+   #   http://mvno-api:8080/api/v1/intercept/call
    ```
    See `configs/kamailio/kamailio.cfg` `route[INTERCEPT]` for the full implementation.
 
@@ -697,10 +696,10 @@ The ASR pipeline runs **entirely inside the Spring Boot JVM** via `NativeVoskSer
 1. **Set shared spool**: Point rtpengine's recording path to the shared volume mount in `rtpengine.conf`:
    ```ini
    recording-dir = /var/spool/rtpengine
-   recording-method = pcap
+   recording-method = fork
    recording-format = eth
    ```
-   > **Note:** rtpengine supports only PCAP formats (`eth`, `raw`). WAV is not a valid option.
+   > **Note:** rtpengine streams audio captures via fork recording mode to `/var/spool/rtpengine`.
 
 2. **Native Java 21 Vosk ASR** (`NativeVoskService.java` inside `mvno-api`):
    - Uses a `@Scheduled(fixedDelay = 3000)` virtual-thread task that polls `/var/spool/rtpengine` every 3 seconds.
@@ -728,13 +727,13 @@ Connect the lightweight time-series stack to scrape metrics:
 
 ---
 
-## 6. Makefile Targets
+## 7. Makefile Targets
 
 All developer lifecycle operations are in the `Makefile`:
 
 | Target | Command | Purpose |
 |---|---|---|
-| `make init-db` | `sqlite3 state/kamailio.db ...` | Initialize SQLite WAL databases + seed test subscribers |
+| `make init-db` | `sqlite3 state/kamailio/kamailio.db ...` | Initialize SQLite WAL databases + seed test subscribers |
 | `make up` | `podman compose up -d --build` | Start the full stack |
 | `make down` | `podman compose down` | Stop all containers |
 | `make ps` | `podman ps` | List running containers |

@@ -10,14 +10,14 @@ This document defines the interface contracts, SLA constraints, networking param
 ┌─────────────────────────────────────────────────────────┐
 │              MVNO Telecom Infrastructure                │
 │                                                         │
-│  [Kamailio / OsmoMSC] ──▶ [telecom-api Gateway]         │
+│  [Kamailio / OsmoSMSC] ──▶ [telecom-api Gateway]        │
 │                                │ (HTTP REST / Sub-5s)   │
 └────────────────────────────────┼────────────────────────┘
                                  ▼
 ┌─────────────────────────────────────────────────────────┐
 │            AI Spam Filter Team (AI-SpamFilter-PMN)      │
 │                                                         │
-│  [ai-filter:8000] ──▶ [AI Model REST Service (Java 21)] │
+│  [ai-filter:8000] ──▶ [AI Model REST Service]           │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -39,7 +39,7 @@ The Telecom Gateway (`telecom-api`) acts as the intermediary between raw telecom
 }
 ```
 
-* **`event_type`**: `"SMS"` or `"VOICE_TRANSCRIPT"`.
+* **`event_type`**: `"SMS"` or `"VOICE_CALL"`.
 * **`sender_msisdn`**: Originating E.164 phone number.
 * **`recipient_msisdn`**: Destination E.164 phone number.
 * **`content_text`**: Raw SMS message text OR transcribed voice call text from Vosk STT.
@@ -51,28 +51,40 @@ The Telecom Gateway (`telecom-api`) acts as the intermediary between raw telecom
 ### Response Payload (Expected by `telecom-api` from `ai-filter:8000`)
 ```json
 {
-  "is_spam": true,
-  "confidence_score": 0.98,
-  "risk_category": "PHISHING",
-  "action": "BLOCK",
+  "allow": false,
   "reason": "High-probability phishing link detected"
 }
 ```
 
-* **`is_spam`**: `true` if identified as spam/fraud, `false` otherwise.
-* **`confidence_score`**: Float between `0.0` and `1.0`.
-* **`risk_category`**: `"PHISHING"`, `"SPAM"`, `"SMISHING"`, `"VOIP_FRAUD"`, or `"HAM"`.
-* **`action`**: `"BLOCK"`, `"ALLOW"`, or `"FLAG"`.
-* **`reason`**: Human-readable explanation for NOC audit logging.
+* **`allow`**: `true` if call/SMS setup is allowed; `false` to block message/call delivery.
+* **`reason`**: Human-readable classification explanation for NOC audit logging.
 
 ---
 
-## 3. SLA Constraints & Fail-Open Behavior
+## 3. Teammate Cross-Repo Integration Specifications
 
-### 1. 5.0-Second Timeout Window
-Telecom signaling timers require call/SMS routing decisions within controlled bounds.
-- **`telecom-api` enforces a 5.0-second HTTP client timeout** (`ai-filter.timeout-seconds: 5`) to accommodate CPU model inference latency.
-- **Teammates should optimize model inference latency $\le 500\text{ ms}$** per classification.
+### 1. AI Team (`ai-filter` drop-in criteria)
+- Must replace mock `ai-filter` container in `docker-compose.yml` with classification engine listening on port `8000`.
+- Endpoint: `POST /api/v1/classify` taking request schema above and returning `{ "allow": boolean, "reason": "string" }`.
+
+### 2. SMS Client Teammate (Ali — `sms-client`)
+- **SMPP Listener**: Connects to `OsmoSMSC` on TCP port `2775`.
+- **SMSC System-ID**: `MVNO_SMSC`
+- **Primary ESME Account**: `mvno-api-route` / password `changeme`
+- **Secondary Client ESME Account**: `smsclient` / password `password`
+- **REST Interception**: Calls `POST /api/v1/intercept/sms` on `telecom-api:8080`. Expects response `{ "allow": boolean, "reason": "string" }`.
+
+### 3. Voice Client Teammate (A7med3mar4 — `SipClient`)
+- **SIP Registrar & Proxy**: Target host port `5066/udp` (`localhost:5066` on host, maps to `kamailio:5060` inside container network).
+- **RTP Media Relay**: RTPEngine ports `30000-30100/udp` (G.711u PCMU codec supported).
+
+---
+
+## 4. SLA Constraints & Fail-Open Behavior
+
+### 1. Split-Timeout Windows
+- **`AI_FILTER_CONNECT_TIMEOUT_SECONDS`**: 1s connect timeout.
+- **`AI_FILTER_READ_TIMEOUT_SECONDS`**: 5s read timeout to accommodate CPU model inference latency.
 
 ### 2. Carrier SLA Fallback (Fail-Open)
 If `ai-filter:8000` is offline, times out ($> 5.0\text{s}$), or returns an HTTP 5xx error, `telecom-api` automatically executes **Carrier SLA Fallback**:
@@ -86,34 +98,11 @@ If `ai-filter:8000` is offline, times out ($> 5.0\text{s}$), or returns an HTTP 
 
 ---
 
-## 4. Teammate Communication & Integration Checklist
-
-Share the following checklist with your teammates on the `AI-SpamFilter-PMN` project:
-
-### Network & Container Setup
-- [ ] **Container Service Name**: Name container/service `ai-filter` in Docker/Podman compose.
-- [ ] **Bridge Network**: Attach `ai-filter` container to `mvno_net` bridge network.
-- [ ] **IP Binding**: Bind REST server to `0.0.0.0:8000` inside container (NOT `127.0.0.1`).
-- [ ] **Docker Network**: Attach container to `mvno_net` network with service name `ai-filter`.
-- [ ] **Response SLA**: Ensure classification completes within 5 seconds to prevent Carrier SLA Fail-Open fallback.
-- [ ] **Concurrency**: Handle concurrent HTTP requests without thread blocking.
-- [ ] **Batching**: Enable dynamic batching if processing bulk SMS streams.
-
-### Text & Noise Handling
-- [ ] **Speech-to-Text Noise**: Model must handle raw ASR transcriptions (which may lack punctuation or contain minor phonetic misspellings).
-- [ ] **Special Characters**: Model must handle URL links, emojis, and non-ASCII character sets.
-
-### Health Check Endpoint
-- [ ] Implement `GET /health` or `GET /api/v1/health` returning `{"status": "UP"}` for container health monitoring.
-
----
-
 ## 5. Environment Variables Summary
 
-In `docker-compose.yml`:
+In `docker-compose.yml` / `application.yml`:
 ```yaml
-  telecom-api:
-    environment:
-      AI_FILTER_URL: http://ai-filter:8000/api/v1/classify
-      AI_FILTER_TIMEOUT_SECONDS: 5
+AI_FILTER_URL: http://ai-filter:8000/api/v1/classify
+AI_FILTER_CONNECT_TIMEOUT_SECONDS: 1
+AI_FILTER_READ_TIMEOUT_SECONDS: 5
 ```

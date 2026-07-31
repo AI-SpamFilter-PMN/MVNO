@@ -141,15 +141,15 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | # | Feature | How |
 |---|---------|-----|
 | 1 | **Prepaid OCS** | SQLite balance check before every call/SMS. Zero-balance → blocked. |
-| 2 | **STIR/SHAKEN** | Kamailio compares SIP `From` header to authenticated username. Mismatch → 407. |
-| 3 | **LAC/CellID Geofencing** | Vector parses cell ID from OsmoSMSC logs → Spring Boot → AI filter zone policy. |
-| 4 | **EIR SIM-Swap Detection** | In-memory IMEI→MSISDN tracker. >3 swaps in 10 min → blocked. |
-| 5 | **DTMF Logging** | rtpengine captures DTMF tones to companion JSON metadata. |
-| 6 | **Voice Biometrics** | Silence ratio + spectral flatness via Vosk numpy FFT. Flags robocall/TTS. |
-| 7 | **SLA Fallback** | Kamailio HTable whitelist/blacklist used when AI filter is unreachable. |
+| 2 | **Caller-ID Auth** | Kamailio digest authentication for REGISTER requests (SIP INVITE 407 challenge on Roadmap). |
+| 3 | **LAC/CellID Geofencing** | Cell ID parsing and zone-based geofencing policy (Mock / Roadmap item). |
+| 4 | **EIR SIM-Swap Detection** | In-memory IMEI→MSISDN tracker. >3 distinct SIMs per IMEI → blocked. |
+| 5 | **DTMF Telemetry** | rtpengine captures DTMF events (`dtmf-log=yes`); REST biometrics payload accepted by gateway. |
+| 6 | **Voice Biometrics** | Silence ratio and spectral flatness biometrics payload schema (Mock / Roadmap item). |
+| 7 | **SLA Fallback** | Spring Boot gateway fallback (`allow: true`) when AI filter is unreachable/times out. |
 | 8 | **5G SA Core** | Open5GS 10-NF 5GC + UERANSIM gNB + 3 UE simulation. |
-| 9 | **SMS-over-NAS** | 5G UE → AMF → OsmoSMSC → Spring Boot gateway (same pipeline as SMPP). |
-| 10 | **MongoDB Seed** | Atomic init script avoids Open5GS WebUI admin hash bug on first boot. |
+| 9 | **SMS-over-NAS** | 5G NAS SMS routing architecture contract (Mock / Roadmap item). |
+| 10 | **MongoDB Seed** | Atomic init script (`scripts/seed-mongo.sh` landing in Phase 3) provisions 3 UEs into `open5gs.subscribers`. |
 
 ---
 

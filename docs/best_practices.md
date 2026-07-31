@@ -7,11 +7,11 @@ _Augmenting the 5 existing practices without exceeding lightweight/optimized con
 
 | # | Practice | Status |
 |---|----------|--------|
-| 1 | On-Demand Activation (`restart: "no"` + `systemctl disable`) | Adopted |
-| 2 | Tiny Python log exporter (no Filebeat/Logstash) | Adopted |
+| 1 | Containerized Orchestration (`docker-compose.yml`) | Adopted |
+| 2 | Vector JSON telemetry pipeline (stdout log driver) | Adopted |
 | 3 | Plaintext IMSI exposure detection via regex | Adopted |
 | 4 | Sovereign Makefile orchestration | Adopted |
-| 5 | Static config validation script (`validate_configs.py`) | Adopted |
+| 5 | Static config validation via `podman compose config` | Adopted |
 
 ---
 
@@ -205,11 +205,11 @@ Normal SMS → OsmoSMSC → [Filtration REST API]
 **Category:** REST API / Integration Layer
 **Footprint impact:** ~120-180MB RAM — slightly heavier than Python ASGI but production-grade JVM
 
-The REST API layer bridges the MVNO core and the AI Filtration System. **Spring Boot 4.1 on JDK 25 LTS** with **Virtual Threads** (JEP 444, 491) delivers thread-per-request scalability without the complexity of reactive frameworks:
+The REST API layer bridges the MVNO core and the AI Filtration System. **Spring Boot 3.4.3 on JDK 21 LTS** with **Virtual Threads** (JEP 444) delivers thread-per-request scalability without the complexity of reactive frameworks:
 
-- **Virtual Threads (JEP 444/491):** Spring Boot MVC runs on JDK virtual threads, scaling to thousands of concurrent requests from Kamailio and OsmoSMSC without thread pool tuning — no need for WebFlux
+- **Virtual Threads (JEP 444):** Spring Boot MVC runs on JDK virtual threads, scaling to thousands of concurrent requests from Kamailio and OsmoSMSC without thread pool tuning — no need for WebFlux
 - **SQLite + JDBC eliminates WebFlux:** No R2DBC driver exists for SQLite, so blocking JDBC is the only option. Virtual threads make JDBC (blocking IO) scale like reactive IO — best of both worlds
-- **Jackson 3** for JSON serialization (faster than Jackson 2, fully compatible with Spring Boot 4.x)
+- **Jackson 2.x** for JSON serialization (standard Spring Boot 3.4.x binder)
 - **RestClient + JDK HttpClient** for outbound HTTP calls to the AI Filtration System (replaces WebClient / RestTemplate)
 - **Spring Boot Actuator** for health checks (industry gold standard):
   - `/actuator/health/liveness` — lightweight process-alive check
@@ -314,7 +314,7 @@ This eliminates entire categories of startup race condition bugs with zero runti
 | vmagent | ~8MB | ~12MB | Scrape agent |
 | Grafana | ~80MB | ~100MB | Dashboard only |
 | MongoDB (Open5GS) | ~350MB | ~500MB | WiredTiger capped at 0.25GB |
-| Spring Boot REST | ~120MB | ~180MB | JDK 25 + Virtual Threads |
+| Spring Boot REST | ~120MB | ~180MB | JDK 21 + Virtual Threads |
 | **Total (idle)** | **~526MB** | | |
 | **Total (1 active call)** | **~726-876MB** | | Vosk active |
 

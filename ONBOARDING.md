@@ -235,8 +235,7 @@ Your container model service **MUST** expose an HTTP REST classification endpoin
     "sender_msisdn": "15551234567",
     "recipient_msisdn": "15557654321",
     "content_text": "Urgent: Claim your free prize now at http://spam.link",
-    "timestamp_epoch_ms": 1721590000000,
-    "call_id": "smpp-seq-12345"
+    "timestamp_epoch_ms": 1721590000000
   }
   ```
 * **Voice Call Classification Request (sent by `telecom-api`)**:
@@ -253,13 +252,21 @@ Your container model service **MUST** expose an HTTP REST classification endpoin
 * **Required JSON Response (expected by `telecom-api`)**:
   ```json
   {
-    "is_spam": true,
-    "confidence_score": 0.98,
-    "risk_category": "PHISHING",
-    "action": "BLOCK",
+    "allow": false,
     "reason": "Phishing URL detected"
   }
   ```
+
+### Teammate Integration Parameters
+* **SMS Client Teammate (Ali — `sms-client`)**:
+  - SMPP 3.4 Host & Port: `osmo-smsc:2775` (inside `mvno_net`)
+  - SMSC System-ID: `MVNO_SMSC`
+  - Primary ESME Account: `mvno-api-route` / password `changeme`
+  - Secondary Client ESME Account: `smsclient` / password `password`
+  - REST Interception Endpoint: `POST http://telecom-api:8080/api/v1/intercept/sms`
+* **Voice Client Teammate (A7med3mar4 — `SipClient`)**:
+  - SIP Registrar & Proxy Target: `localhost:5066` on host (`5066:5060/udp`)
+  - RTP Media Port Range: `30000-30100/udp` (G.711u PCMU)
 
 ### Carrier SLA & Resilience Rules
 1. **5.0s Read Timeout**: `telecom-api` enforces a 5-second timeout window. If your model takes $> 5.0\text{s}$, `telecom-api` automatically fails open (`allow: true`). Keep inference latency $\le 500\text{ ms}$.
