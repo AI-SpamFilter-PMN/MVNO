@@ -2,7 +2,7 @@
 # ==============================================================================
 # MVNO Telecom Core — Graduation Project Live Demo & Presentation Runbook
 # ==============================================================================
-# Executable 11-step demonstration script verifying end-to-end 5G SA Core,
+# Executable 13-step demonstration script verifying end-to-end 5G SA Core,
 # IMS SIP Interception, SMPP SMSC, Gateway REST APIs, and SOTA Grafana NOC.
 # ==============================================================================
 
@@ -22,12 +22,12 @@ echo -e "${CYAN}${BOLD}=========================================================
 echo ""
 
 # Item 1: Actuator Health & Probes
-echo -e "${YELLOW}[1/11] 🏥 Checking Gateway Actuator Health & Liveness Probes...${NC}"
+echo -e "${YELLOW}[1/13] 🏥 Checking Gateway Actuator Health & Liveness Probes...${NC}"
 curl -s http://localhost:8080/actuator/health | python3 -m json.tool
 echo -e "${GREEN}✓ Gateway Health: UP${NC}\n"
 
 # Item 2: 5G SA UE Registration Status Audit
-echo -e "${YELLOW}[2/11] 📱 Auditing 5G SA Core UE Registration (UERANSIM ↔ AMF)...${NC}"
+echo -e "${YELLOW}[2/13] 📱 Auditing 5G SA Core UE Registration (UERANSIM ↔ AMF)...${NC}"
 failed=0
 for i in 1 2 3; do
   if podman logs --tail 100 "mvno-ueransim-ue-$i" 2>&1 | grep -E -q "Initial Registration is successful|MM-REGISTERED"; then
@@ -44,7 +44,7 @@ fi
 echo -e "${GREEN}✓ 5G SA Subscriber audit complete — 3/3 UEs Registered${NC}\n"
 
 # Item 3: Vector Live Log Shipper Stream
-echo -e "${YELLOW}[3/11] ⚡ Auditing Vector Container Log Aggregation (stdout sink)...${NC}"
+echo -e "${YELLOW}[3/13] ⚡ Auditing Vector Container Log Aggregation (stdout sink)...${NC}"
 echo -e "${YELLOW}[3/13] ⚡ Auditing Vector Container Log Aggregation (stdout sink)...${NC}"
 podman logs mvno-vector --tail 5 || true
 echo -e "${GREEN}✓ Vector VRL parsing active${NC}\n"
@@ -141,12 +141,16 @@ with wave.open(wav_path, 'wb') as wav_file:
 os.chmod(wav_path, 0o777)
 print(f'  ✓ Simulated Call Audio Stream Generated: {wav_filename}')
 
-time.sleep(5)
+time.sleep(0.5)
+deadline = time.time() + 15
 archived_path = os.path.join('state/spool/archived', wav_filename)
+while time.time() < deadline and not os.path.exists(archived_path):
+    time.sleep(1)
 if os.path.exists(archived_path):
     print(f'  ✓ Native Vosk ASR Engine processed audio and moved file to: {archived_path}')
 else:
-    print(f'[-] Warning: File not yet moved to archived path, but created in spool.', file=sys.stderr)
+    print('[-] Error: WAV file was not archived by Vosk ASR engine within 15s', file=sys.stderr)
+    sys.exit(1)
 "
 echo -e "${GREEN}✓ Native Vosk Java 21 ASR Speech-to-Text Pipeline Proven${NC}\n"
 
@@ -191,8 +195,18 @@ echo -e "  Grafana Dashboard URL: http://localhost:3000 (admin/admin)"
 echo -e "  HTTP Status Code: ${code} OK"
 echo -e "${GREEN}✓ Master NOC Command Center Operational${NC}\n"
 
-# Item 13: Summary Assertion
+# Item 13: Summary Assertion (hard gate — banner only prints on live telemetry)
 echo -e "${YELLOW}[13/13] 🎓 Overall Stack Graduation Readiness Verification...${NC}"
+python3 -c "
+import urllib.request, json, sys
+url = 'http://localhost:8428/api/v1/query?query=mvno_call_requests_total'
+data = json.loads(urllib.request.urlopen(url).read().decode('utf-8'))
+results = data.get('data', {}).get('result', [])
+if not results:
+    print('[-] Error: VictoriaMetrics returned 0 series for mvno_call_requests_total', file=sys.stderr)
+    sys.exit(1)
+print(f\"  ✓ Telemetry re-asserted live: {results[0]['metric']['__name__']} = {results[0]['value'][1]}\")
+"
 echo -e "${GREEN}✓ All core telecom, signaling, interception, ASR, and observability flows verified live${NC}\n"
 
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
