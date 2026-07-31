@@ -288,7 +288,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 
 | Target / Subsystem | Command / Probe | Expected Result | Verification Status |
 |---|---|---|---|
-| **Spring Boot Unit Tests** | `./mvnw test` | `Tests run: 17, Failures: 0` | ✅ **PASS** |
+| **Spring Boot Unit Tests** | `./mvnw test` | `Tests run: 19, Failures: 0` | ✅ **PASS** |
 | **Gateway Liveness** | `GET :8080/actuator/health/liveness` | `{"status":"UP"}` | ✅ **PASS** |
 | **Subscriber Balance API** | `GET :8080/api/v1/intercept/subscriber/15551234567` | `{"msisdn":"15551234567","balance":100}` | ✅ **PASS** |
 | **Normal VoIP Call** | `POST /api/v1/intercept/call` (`caller: 15551234567`) | `{"allow":true,"reason":"AI filter unreachable — SLA allow"}` | ✅ **PASS** |

@@ -148,7 +148,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 | `make test-sms` | `allow: true, "Clean content"` |
 | `make test-call` | `allow: false, "EIR: SIM swap detected"` (test IMEI) |
 | `make test` | All 4 pass |
-| `cd telecom-api && ./mvnw test` | 17/17 pass (includes SLA + circuit breaker + distinct EIR tests) |
+| `cd telecom-api && ./mvnw test` | 19/19 pass (includes SLA + circuit breaker + distinct EIR + GET intercept tests) |
 
 ---
 
