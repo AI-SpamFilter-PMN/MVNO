@@ -55,6 +55,10 @@ init-db:
 			VALUES ('15557654321', 'mvno.local', 'testpass', '', '', '15557654321', 0);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
 			VALUES ('15559998888', 'mvno.local', 'testpass', '', '', '15559998888', 100);" \
+		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
+			VALUES ('15554443322', 'mvno.local', 'testpass', '', '', '15554443322', 100);" \
+		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
+			VALUES ('15553332211', 'mvno.local', 'testpass', '', '', '15553332211', 100);" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
 	@sqlite3 state/hlr/hlr.db \

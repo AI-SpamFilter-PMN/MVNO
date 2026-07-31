@@ -7,6 +7,8 @@ import hashlib
 import socket
 import time
 
+import sys
+
 def calculate_digest_response(username, realm, password, method, uri, nonce):
     ha1 = hashlib.md5(f"{username}:{realm}:{password}".encode()).hexdigest()
     ha2 = hashlib.md5(f"{method}:{uri}".encode()).hexdigest()
@@ -30,8 +32,13 @@ def register_subscriber(username, password, port=5066):
         f"Content-Length: 0\r\n\r\n"
     )
     s.sendto(req1.encode(), ('127.0.0.1', port))
-    resp1, _ = s.recvfrom(2048)
-    resp1_str = resp1.decode('utf-8', errors='ignore')
+    try:
+        resp1, _ = s.recvfrom(2048)
+        resp1_str = resp1.decode('utf-8', errors='ignore')
+    except Exception as e:
+        print(f"[-] Registration failed for {username}: {e}")
+        s.close()
+        return False
     
     # Extract nonce
     nonce = ""
@@ -62,8 +69,13 @@ def register_subscriber(username, password, port=5066):
         f"Content-Length: 0\r\n\r\n"
     )
     s.sendto(req2.encode(), ('127.0.0.1', port))
-    resp2, _ = s.recvfrom(2048)
-    resp2_str = resp2.decode('utf-8', errors='ignore')
+    try:
+        resp2, _ = s.recvfrom(2048)
+        resp2_str = resp2.decode('utf-8', errors='ignore')
+    except Exception as e:
+        print(f"[-] SIP REGISTER response error: {e}")
+        s.close()
+        return False
     s.close()
     
     if "200 OK" in resp2_str:
@@ -105,14 +117,23 @@ def send_sip_invite(caller, callee, port=5066):
     try:
         resp, _ = s.recvfrom(2048)
         resp_str = resp.decode('utf-8', errors='ignore')
-        print(f"[+] SIP INVITE Response for {caller}->{callee}:\n{resp_str}")
+        first_line = resp_str.split('\r\n')[0] if resp_str else "No Response"
+        print(f"[+] SIP INVITE Response for {caller}->{callee}: {first_line}")
+        s.close()
+        resp_str_lower = resp_str.lower()
+        if any(status in resp_str_lower for status in ["100 trying", "180 ringing", "200 ok", "403 forbidden"]):
+            return True
+        return False
     except Exception as e:
         print(f"[-] SIP INVITE recv error: {e}")
-    s.close()
+        s.close()
+        return False
 
 if __name__ == "__main__":
     print("=== Registering Callee 15557654321 ===")
-    register_subscriber("15557654321", "testpass")
+    reg_ok = register_subscriber("15557654321", "testpass")
     time.sleep(1)
     print("=== Sending Real SIP INVITE Call ===")
-    send_sip_invite("15551234567", "15557654321")
+    inv_ok = send_sip_invite("15551234567", "15557654321")
+    if not (reg_ok and inv_ok):
+        sys.exit(1)

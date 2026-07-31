@@ -34,7 +34,7 @@ podman logs mvno-ueransim-ue-3 2>&1 | grep -q "Initial Registration is successfu
 echo -e "${GREEN}✓ 5G SA Subscriber audit complete${NC}\n"
 
 # Item 3: Vector Live Log Shipper Stream
-echo -e "${YELLOW}[3/11] ⚡ Auditing Vector Real-Time Log Pipeline (docker_logs)...${NC}"
+echo -e "${YELLOW}[3/11] ⚡ Auditing Vector Container Log Aggregation (stdout sink)...${NC}"
 podman logs mvno-vector --tail 5 || true
 echo -e "${GREEN}✓ Vector VRL parsing active${NC}\n"
 
@@ -52,18 +52,21 @@ echo -e "${GREEN}✓ Real SIP INVITE processed by Kamailio (REST Intercept & RTP
 echo -e "${YELLOW}[6/11] 🚫 Testing Zero-Balance Call Block (Caller: 15557654321)...${NC}"
 curl -s -X POST http://localhost:8080/api/v1/intercept/call \
   -H "Content-Type: application/json" \
-  -d '{"caller":"15557654321","callee":"15551234567","call_id":"demo-call-002"}' | python3 -m json.tool
+  -d '{"caller":"15557654321","callee":"15551234567","call_id":"demo-call-002","imei":"356938035643809"}' | python3 -m json.tool
 echo -e "${RED}✓ Call Blocked (Prepaid Balance Exhausted)${NC}\n"
 
 # Item 7: EIR SIM-Swap Fraud Anomaly Block (Negative Test 2)
-echo -e "${YELLOW}[7/11] 🛡️ Triggering EIR SIM-Swap Anomaly (>3 rapid calls on IMEI: 356938035643809)...${NC}"
-for i in {1..4}; do
+echo -e "${YELLOW}[7/11] 🛡️ Triggering EIR SIM-Swap Anomaly (>3 distinct SIMs on IMEI: 356938035643809)...${NC}"
+callers=("15551234567" "15559998888" "15554443322" "15553332211")
+for i in "${!callers[@]}"; do
+  caller="${callers[$i]}"
+  attempt=$((i+1))
   res=$(curl -s -X POST http://localhost:8080/api/v1/intercept/call \
     -H "Content-Type: application/json" \
-    -d "{\"caller\":\"15551234567\",\"callee\":\"15557654321\",\"call_id\":\"eir-test-$i\",\"imei\":\"356938035643809\"}")
-  echo -e "  Attempt $i: $res"
+    -d "{\"caller\":\"$caller\",\"callee\":\"15557654321\",\"call_id\":\"eir-test-$attempt\",\"imei\":\"356938035643809\"}")
+  echo -e "  Attempt $attempt (Caller: $caller): $res"
 done
-echo -e "${MAGENTA}✓ EIR Fraud Detection Blocked 4th Swap Attempt${NC}\n"
+echo -e "${MAGENTA}✓ EIR Fraud Detection Blocked 4th Distinct SIM Swap Attempt${NC}\n"
 
 # Item 8: Successful 5G SMS Interception Flow
 echo -e "${YELLOW}[8/11] 💬 Simulating Authorized 5G SMS Interception Flow...${NC}"
