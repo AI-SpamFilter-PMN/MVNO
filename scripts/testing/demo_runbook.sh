@@ -26,21 +26,22 @@ echo -e "${YELLOW}[1/13] 🏥 Checking Gateway Actuator Health & Liveness Probes
 curl -s http://localhost:8080/actuator/health | python3 -m json.tool
 echo -e "${GREEN}✓ Gateway Health: UP${NC}\n"
 
-# Item 2: 5G SA UE Registration Status Audit
-echo -e "${YELLOW}[2/13] 📱 Auditing 5G SA Core UE Registration (UERANSIM ↔ AMF)...${NC}"
-failed=0
-for i in 1 2 3; do
-  if podman logs --tail 100 "mvno-ueransim-ue-$i" 2>&1 | grep -E -q "Initial Registration is successful|MM-REGISTERED"; then
-    echo -e "${GREEN}  ✓ UE-$i registered successfully (MM-REGISTERED)${NC}"
-  else
-    echo -e "${RED}  ❌ Error: UE-$i registration failed or incomplete${NC}"
-    failed=1
-  fi
-done
-if [ $failed -ne 0 ]; then
-  echo -e "${RED}[-] 5G SA Subscriber audit failed: Not all UEs registered${NC}"
-  exit 1
-fi
+# Item 2: 5G SA UE Registration Status Audit (live AMF gauge via PromQL)
+echo -e "${YELLOW}[2/13] 📱 Auditing 5G SA Core UE Registration (UERANSIM ↔ AMF, live ran_ue gauge)...${NC}"
+python3 -c "
+import urllib.request, json, sys
+url = 'http://localhost:8428/api/v1/query?query=ran_ue'
+data = json.loads(urllib.request.urlopen(url).read().decode('utf-8'))
+results = data.get('data', {}).get('result', [])
+if not results:
+    print('[-] Error: ran_ue series not found in VictoriaMetrics', file=sys.stderr)
+    sys.exit(1)
+count = int(results[0]['value'][1])
+if count < 3:
+    print(f'[-] Error: only {count}/3 UEs registered (ran_ue gauge)', file=sys.stderr)
+    sys.exit(1)
+print(f'  ✓ Live AMF gauge ran_ue = {count} (3/3 UEs registered)')
+"
 echo -e "${GREEN}✓ 5G SA Subscriber audit complete — 3/3 UEs Registered${NC}\n"
 
 # Item 3: Vector Live Log Shipper Stream
@@ -51,7 +52,7 @@ echo -e "${GREEN}✓ Vector VRL parsing active${NC}\n"
 
 # Item 4: Active Subscriber Balance Lookup
 echo -e "${YELLOW}[4/13] 💳 Querying Subscriber Balance (E.164 MSISDN: 15551234567)...${NC}"
-curl -s http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -m json.tool
+curl -s -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -m json.tool
 echo -e "${GREEN}✓ Subscriber Balance retrieved: 100 credits${NC}\n"
 
 # Item 5: Voice Call Interception Simulation

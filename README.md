@@ -88,10 +88,10 @@ make up
 curl http://localhost:8080/actuator/health/liveness
 # Expected: {"status":"UP"}
 
-curl http://localhost:8080/api/v1/intercept/subscriber/15551234567
+curl -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15551234567
 # Expected: {"msisdn":"15551234567","balance":100}  ← allowed
 
-curl http://localhost:8080/api/v1/intercept/subscriber/15557654321
+curl -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15557654321
 # Expected: {"msisdn":"15557654321","balance":0}    ← zero-balance blocked
 
 # 6. Test interception & execute automated presentation runbook
