@@ -79,7 +79,7 @@ up-native: init-db
 
 test-api:
 	@echo "Testing API health..."
-	@curl -s http://localhost:8080/actuator/health/ | python3 -m json.tool
+	@curl -s http://localhost:8080/actuator/health | python3 -m json.tool
 	@echo ""
 	@echo "Testing subscriber endpoint..."
 	@curl -s http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -m json.tool

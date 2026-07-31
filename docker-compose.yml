@@ -55,13 +55,28 @@ services:
     volumes:
       - ./state/mongodb:/data/db:z
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.4
+        aliases:
+          - mongodb
     restart: unless-stopped
     healthcheck:
       test: mongosh --eval 'db.runCommand({ping:1})' --quiet
       interval: 10s
       timeout: 5s
       retries: 3
+
+  # ─── MongoDB Exporter (Prometheus metrics for vmagent scraping) ───
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.41
+    container_name: mvno-mongodb-exporter
+    extra_hosts:
+      - "mongodb:10.89.0.4"
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017
+    networks:
+      - mvno_net
+    restart: unless-stopped
 
   # ─── Open5GS Subscriber WebUI Management ───
   open5gs-webui:
@@ -472,6 +487,8 @@ services:
     container_name: mvno-vmagent
     ports:
       - "8429:8429"
+    extra_hosts:
+      - "victoria-metrics:10.89.0.2"
     command:
       - "-remoteWrite.url=http://victoria-metrics:8428/api/v1/write"
       - "-promscrape.config=/etc/prometheus/prometheus.yml"

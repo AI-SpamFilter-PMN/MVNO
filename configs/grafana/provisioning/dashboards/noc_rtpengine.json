@@ -1,9 +1,9 @@
 {
   "__inputs": [],
   "__requires": [],
-  "title": "NOC RTPEngine",
+  "title": "MVNO NOC — RTPEngine",
   "uid": "noc-rtpengine",
-  "tags": ["mvno", "rtpengine", "media-plane", "noc", "sota"],
+  "tags": ["mvno", "plane:media-plane", "component:rtpengine", "noc", "sota"],
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
@@ -123,8 +123,8 @@
       "id": 4,
       "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total", "legendFormat": "Media Bytes Total", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packets_total", "legendFormat": "Packets Total", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total default 0", "legendFormat": "Media Bytes Total", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packets_total default 0", "legendFormat": "Packets Total", "refId": "B" }
       ],
       "title": "RTP Media Throughput & Packets",
       "type": "timeseries"
@@ -151,8 +151,8 @@
       "id": 5,
       "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packet_errors_total", "legendFormat": "Packet Errors", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_closed_sessions_total", "legendFormat": "Closed Sessions", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packet_errors_total default 0", "legendFormat": "Packet Errors", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_closed_sessions_total default 0", "legendFormat": "Closed Sessions", "refId": "B" }
       ],
       "title": "RTP Packet Errors & Closed Sessions",
       "type": "timeseries"

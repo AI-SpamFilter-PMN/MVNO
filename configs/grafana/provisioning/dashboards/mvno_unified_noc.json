@@ -1,7 +1,7 @@
 {
   "__inputs": [],
   "__requires": [],
-  "title": "MVNO Interception Core — Unified Master NOC Command Center",
+  "title": "MVNO NOC — Unified",
   "uid": "mvno-unified-noc",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -9,7 +9,7 @@
   "liveNow": true,
   "refresh": "5s",
   "schemaVersion": 39,
-  "tags": ["mvno", "telecom", "noc", "interception", "security", "sota"],
+  "tags": ["mvno", "plane:core", "component:unified", "noc", "sota"],
   "time": {
     "from": "now-15m",
     "to": "now"
@@ -166,7 +166,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(up)", "refId": "A" }],
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(up) default 0", "refId": "A" }],
       "title": "Active Scrape Targets",
       "type": "stat"
     },
@@ -220,8 +220,8 @@
       "id": 7,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_requests_total", "legendFormat": "SMS Requests Total", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_blocked_total", "legendFormat": "SMS Blocked Total", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_requests_total default 0", "legendFormat": "SMS Requests Total", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_blocked_total default 0", "legendFormat": "SMS Blocked Total", "refId": "B" }
       ],
       "title": "SMS Interception Traffic Volume",
       "type": "timeseries"
@@ -256,9 +256,9 @@
       "id": 8,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_requests_total", "legendFormat": "Call Requests Total", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_blocked_total", "legendFormat": "Call Blocked Total", "refId": "B" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_blocked_eir_total", "legendFormat": "Call Blocked (EIR Fraud)", "refId": "C" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_requests_total default 0", "legendFormat": "Call Requests Total", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_blocked_total default 0", "legendFormat": "Call Blocked Total", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_blocked_eir_total default 0", "legendFormat": "Call Blocked (EIR Fraud)", "refId": "C" }
       ],
       "title": "Voice Call Interception Traffic Volume",
       "type": "timeseries"
@@ -296,8 +296,8 @@
       "id": 9,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_sim_swap_detected_total", "legendFormat": "SIM Swap Anomalies", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size", "legendFormat": "Tracked IMEIs", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_sim_swap_detected_total default 0", "legendFormat": "SIM Swap Anomalies", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size default 0", "legendFormat": "Tracked IMEIs", "refId": "B" }
       ],
       "title": "Equipment Identity Register (EIR) SIM-Swap Tracker",
       "type": "timeseries"
@@ -324,7 +324,7 @@
       "id": 10,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_subscriber_lookups_total", "legendFormat": "OCS Subscriber Queries", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_subscriber_lookups_total default 0", "legendFormat": "OCS Subscriber Queries", "refId": "A" }
       ],
       "title": "Prepaid Online Charging System (OCS) Queries",
       "type": "timeseries"
@@ -353,9 +353,9 @@
       "id": 11,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=\"telecom-api\"}", "legendFormat": "Spring Gateway (mvno-api)", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=\"rtpengine\"}", "legendFormat": "Media Relay (rtpengine)", "refId": "B" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=\"vmagent\"}", "legendFormat": "Telemetry Scraper (vmagent)", "refId": "C" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=\"telecom-api\"} default 0", "legendFormat": "Spring Gateway (mvno-api)", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=\"rtpengine\"} default 0", "legendFormat": "Media Relay (rtpengine)", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=\"vmagent\"} default 0", "legendFormat": "Telemetry Scraper (vmagent)", "refId": "C" }
       ],
       "title": "Service Target Liveness (up)",
       "type": "timeseries"
@@ -377,10 +377,191 @@
       "id": 12,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions", "legendFormat": "RTPEngine Active Sessions", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_uptime_seconds", "legendFormat": "RTPEngine Uptime (s)", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions default 0", "legendFormat": "RTPEngine Active Sessions", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_uptime_seconds default 0", "legendFormat": "RTPEngine Uptime (s)", "refId": "B" }
       ],
       "title": "RTPEngine Media Relay Performance",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "id": 101,
+      "title": "RTP ENGINE DEEP DIVE",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#00F2FE", "value": null }, { "color": "#FF9100", "value": 500 }, { "color": "#FF0844", "value": 1000 }]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 39 },
+      "id": 13,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions default 0", "refId": "A" }
+      ],
+      "title": "Active RTP Sessions",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#00F2FE", "value": null }]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 5, "x": 4, "y": 39 },
+      "id": 14,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total default 0", "refId": "A" }
+      ],
+      "title": "Media Bytes Total",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#00F2FE", "value": null }, { "color": "#FF9100", "value": 100 }, { "color": "#FF0844", "value": 500 }]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 9, "y": 39 },
+      "id": 15,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packet_errors_total default 0", "refId": "A" }
+      ],
+      "title": "Packet Errors",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [{ "color": "#00F2FE", "value": null }, { "color": "#FF9100", "value": 80 }, { "color": "#FF0844", "value": 95 }]
+          },
+          "unit": "short",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 13, "y": 39 },
+      "id": 16,
+      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_ports_free default 0", "refId": "A" }
+      ],
+      "title": "Media Ports Free",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawPoints": "off",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 10, "x": 17, "y": 39 },
+      "id": 17,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions_total default 0", "legendFormat": "Total Sessions", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_closed_sessions_total default 0", "legendFormat": "Closed Sessions", "refId": "B" }
+      ],
+      "title": "Session Lifecycle",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawPoints": "off",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "unit": "pps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 43 },
+      "id": 18,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packets_total default 0", "legendFormat": "Packets Total", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packet_errors_total default 0", "legendFormat": "Packet Errors", "refId": "B" }
+      ],
+      "title": "Packet Rate & Errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawPoints": "off",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "unit": "decBps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 43 },
+      "id": 19,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total default 0", "legendFormat": "Media Bytes Total", "refId": "A" }
+      ],
+      "title": "Media Throughput",
       "type": "timeseries"
     }
   ]

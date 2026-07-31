@@ -1,9 +1,9 @@
 {
   "__inputs": [],
   "__requires": [],
-  "title": "NOC Overview Command Center",
+  "title": "MVNO NOC — Overview",
   "uid": "noc-overview",
-  "tags": ["mvno", "telecom", "noc", "overview", "sota"],
+  "tags": ["mvno", "plane:overview", "component:overview", "noc", "sota"],
   "panels": [
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
@@ -123,10 +123,10 @@
       "id": 5,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "none" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_requests_total", "legendFormat": "SMS", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_requests_total", "legendFormat": "Call", "refId": "B" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_blocked_total", "legendFormat": "SMS Blocked", "refId": "C" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_blocked_total", "legendFormat": "Call Blocked", "refId": "D" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_requests_total default 0", "legendFormat": "SMS", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_requests_total default 0", "legendFormat": "Call", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_blocked_total default 0", "legendFormat": "SMS Blocked", "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_blocked_total default 0", "legendFormat": "Call Blocked", "refId": "D" }
       ],
       "title": "Requests per Minute",
       "type": "timeseries"
@@ -158,8 +158,8 @@
       "id": 6,
       "options": { "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size", "legendFormat": "EIR Tracked IMEIs", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_sim_swap_detected_total", "legendFormat": "SIM Swaps", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size default 0", "legendFormat": "EIR Tracked IMEIs", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_sim_swap_detected_total default 0", "legendFormat": "SIM Swaps", "refId": "B" }
       ],
       "title": "EIR SIM Swap & Cache Size",
       "type": "timeseries"

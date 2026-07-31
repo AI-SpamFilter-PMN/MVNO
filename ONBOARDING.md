@@ -73,7 +73,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 | `make test-sms` | SMS simulation (SMPP → gateway → AI filter) |
 | `make test-call` | Voice call simulation (SIP → gateway → AI filter) |
 | `make test` | Runs all 4 test suites sequentially |
-| `make up-native` | Starts native systemd services (`kamailio`, `ngcp-rtpengine`, `osmo-msc`, `osmo-hlr`) |
+| `make up-native` | Starts native systemd services (`kamailio`, `ngcp-rtpengine`, `osmo-msc`, `osmo-hlr`) — requires `sudo`, systemd, and OS packages |
 | `make init-native-db` | Alias for `init-db` for native systemd deployments |
 
 ---
@@ -221,7 +221,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 
 ## 14. Integration Guide: External Team (AI-SpamFilter-PMN ↔ MVNO Core)
 
-If you are on the **AI Model Team** developing in the [AI-SpamFilter-PMN](https://github.com/AI-SpamFilter-PMN/AI-SpamFilter-PMN) repository:
+If you are on the **AI Model Team** developing in the [AI-Filteration-System](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) repository:
 
 ### Interface Contract
 Your container model service **MUST** expose an HTTP REST classification endpoint at:

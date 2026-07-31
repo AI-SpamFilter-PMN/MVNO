@@ -107,11 +107,11 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
    ```bash
    sudo apt install kamailio kamailio-sqlite-modules ngcp-rtpengine osmo-msc osmo-hlr
    ```
-2. **Initialize SQLite databases**:
+2. **Initialize SQLite databases** (experimental):
    ```bash
    make init-native-db
    ```
-3. **Start the systemd services**:
+3. **Start the systemd services** (experimental):
    ```bash
    make up-native
    ```
