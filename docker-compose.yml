@@ -74,6 +74,9 @@ services:
       - "mongodb:10.89.0.4"
     environment:
       MONGODB_URI: mongodb://mongodb:27017
+    command:
+      - "--mongodb.uri=mongodb://mongodb:27017"
+      - "--collect-all"
     networks:
       - mvno_net
     restart: unless-stopped

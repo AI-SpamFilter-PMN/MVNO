@@ -26,12 +26,22 @@ echo -e "${YELLOW}[1/11] 🏥 Checking Gateway Actuator Health & Liveness Probes
 curl -s http://localhost:8080/actuator/health | python3 -m json.tool
 echo -e "${GREEN}✓ Gateway Health: UP${NC}\n"
 
-# Item 2: 5G SA UE Registration Status
+# Item 2: 5G SA UE Registration Status Audit
 echo -e "${YELLOW}[2/11] 📱 Auditing 5G SA Core UE Registration (UERANSIM ↔ AMF)...${NC}"
-podman logs mvno-ueransim-ue-1 2>&1 | grep -q "Initial Registration is successful" && echo -e "${GREEN}  ✓ UE-1 (001010000000001) registered${NC}" || echo -e "${YELLOW}  ⚠ UE-1 registration pending/idle${NC}"
-podman logs mvno-ueransim-ue-2 2>&1 | grep -q "Initial Registration is successful" && echo -e "${GREEN}  ✓ UE-2 (001010000000002) registered${NC}" || echo -e "${YELLOW}  ⚠ UE-2 registration pending/idle${NC}"
-podman logs mvno-ueransim-ue-3 2>&1 | grep -q "Initial Registration is successful" && echo -e "${GREEN}  ✓ UE-3 (001010000000003) registered${NC}" || echo -e "${YELLOW}  ⚠ UE-3 registration pending/idle${NC}"
-echo -e "${GREEN}✓ 5G SA Subscriber audit complete${NC}\n"
+failed=0
+for i in 1 2 3; do
+  if podman logs --tail 100 "mvno-ueransim-ue-$i" 2>&1 | grep -E -q "Initial Registration is successful|MM-REGISTERED"; then
+    echo -e "${GREEN}  ✓ UE-$i registered successfully (MM-REGISTERED)${NC}"
+  else
+    echo -e "${RED}  ❌ Error: UE-$i registration failed or incomplete${NC}"
+    failed=1
+  fi
+done
+if [ $failed -ne 0 ]; then
+  echo -e "${RED}[-] 5G SA Subscriber audit failed: Not all UEs registered${NC}"
+  exit 1
+fi
+echo -e "${GREEN}✓ 5G SA Subscriber audit complete — 3/3 UEs Registered${NC}\n"
 
 # Item 3: Vector Live Log Shipper Stream
 echo -e "${YELLOW}[3/11] ⚡ Auditing Vector Container Log Aggregation (stdout sink)...${NC}"

@@ -2,6 +2,9 @@ logger:
   file:
     path: /var/log/open5gs/udm.log
 
+default:
+  no_tls: true
+
 global:
   max:
     ue: 1024
@@ -19,3 +22,4 @@ udm:
           no_tls: true
       udr:
         - uri: http://udr:7777
+          no_tls: true
