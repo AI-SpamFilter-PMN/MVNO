@@ -6,14 +6,14 @@ This document outlines upcoming architectural enhancements, operational backlog 
 
 ## 1. Architectural Enhancements
 
-### 1. SIP INVITE Digest Authentication (407 Challenge)
-- **Current State**: Kamailio challenges `REGISTER` requests via `auth_check()`. `INVITE` requests currently pass directly to `route(INTERCEPT)` without authentication challenge (`$au` is `""`).
-- **Roadmap Item**: Implement `407 Proxy Authentication Required` challenge flow for SIP `INVITE` requests using `auth_check()`.
-- **Interop Client**: Compatible with `SipClient`'s `InviteAuthenticator` module.
+### 1. SIP INVITE Digest Authentication (407 Challenge) — ✅ IMPLEMENTED
+- **Current State**: Kamailio challenges both `REGISTER` and `INVITE` via `auth_check()` (commit `7829d5a`). Unauthenticated `INVITE` → `407 Proxy Authentication Required`; authenticated zero-balance callers still receive `403 Call Intercepted / Blocked` from `route(INTERCEPT)`. Digest realm `localhost`, credentials from the SQLite `subscriber` table.
+- **Verification**: `scripts/testing/sip_traffic_sim.py` (REGISTER + digest-authenticated INVITE) and runbook step 6 (407 → digest → 403 handshake) both green.
+- **Interop Client**: Compatible with `SipClient`'s `InviteAuthenticator` module (see `docs/API_CONTRACT.md` §3.3).
 
-### 2. Gateway API Key Authentication
-- **Current State**: `telecom-api` REST endpoints (`/api/v1/intercept/*`) process requests without API key headers.
-- **Roadmap Item**: Implement `X-API-Key` HTTP header authentication and rate-limiting middleware for carrier API gateways.
+### 2. Gateway API Key Authentication — ✅ IMPLEMENTED
+- **Current State**: `telecom-api` enforces `X-API-Key` on all `/api/v1/intercept/**` endpoints via `ApiKeyInterceptor` (commit `fc1c006`). Missing/mismatched key → `401 Unauthorized`. Key from `intercept.api-key` property (`X_API_KEY` env override, demo default `mvno-demo-key-2026`); Kamailio INTERCEPT queries carry the header via 4-arg `http_client_query`.
+- **Verification**: unit tests (3 interceptor cases, 22/22 total), Makefile + runbook curls all carry the header; no-header → 401 confirmed live.
 
 ### 3. VictoriaLogs Log Ingestion Sink
 - **Current State**: Vector outputs JSON logs to `[sinks.stdout]`.
@@ -31,7 +31,7 @@ This document outlines upcoming architectural enhancements, operational backlog 
 
 ## 2. Operational Backlog & Housekeeping
 
-- [ ] **Remote Branch Cleanup**: Delete 8 merged feature branches on `origin` (`feature/5g-core-open5gs`, `feature/telecom-gateway-api`, etc.).
+- [ ] **Remote Branch Cleanup**: Delete 8 merged feature branches on `origin` (`feature/5g-core-open5gs`, `feature/telecom-gateway-api`, etc.). — **INTENTIONALLY KEPT** (user decision, Aug 1 2026): all 9 local + 8 remote branches are fully merged into `main` and retained as frozen domain evidence for the graduation portfolio. No deletions, no prunes.
 - [ ] **Orphaned State File Cleanup**: Create automated cleanup utility for orphaned temporary database lock files (`*.db-shm`, `*.db-wal`) in `./state/`.
 - [x] **VictoriaMetrics Self-Scrape Job**: Add `victoria-metrics` (`victoria-metrics:8428/metrics`) scrape job to `configs/victoria-metrics/scrape.yml` to collect `vm_*` internal TSDB metrics and `vmagent_remotewrite_*` pipeline stats.
 - [ ] **VictoriaMetrics System NOC Dashboard**: Create `noc_victoriametrics.json` Grafana dashboard (cache entries, ingestion rate `vm_rows_added_total`, disk usage `vm_fsdata_bytes`, `vmagent` remoteWrite stats).

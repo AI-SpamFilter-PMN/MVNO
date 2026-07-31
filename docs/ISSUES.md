@@ -320,10 +320,11 @@ This section defines the multi-agent integration boundaries across team reposito
 - **SMSC System-ID**: `MVNO_SMSC`
 - **Primary ESME Credentials**: `mvno-api-route` / `changeme`
 - **Secondary Client ESME Credentials**: `smsclient` / `password`
-- **REST Interception Gateway**: Calls `POST /api/v1/intercept/sms` on `telecom-api:8080`.
+- **REST Interception Gateway**: Calls `POST /api/v1/intercept/sms` on `telecom-api:8080` with header `X-API-Key: mvno-demo-key-2026` (zero-trust §1.2; missing/mismatched key → `401`).
 
 ### 3. `SipClient` User Agent Interface (A7med3mar4 — `SipClient` Repo)
 - **Protocol**: SIP RFC 3261 over UDP.
 - **Target Host & Port**: `localhost:5066` on host (maps to `kamailio:5060/udp`).
 - **SIP REGISTER Authentication**: Digest authentication (`auth_check()`) using credentials seeded in `kamailio.db`.
+- **SIP INVITE Authentication**: `INVITE` is also challenged (`407 Proxy Authentication Required`, zero-trust §1.1) — retry with `Authorization: Digest` (realm `localhost`).
 - **RTP Media Streams**: RTPEngine UDP port range `30000-30100/udp` (G.711u PCMU codec).
