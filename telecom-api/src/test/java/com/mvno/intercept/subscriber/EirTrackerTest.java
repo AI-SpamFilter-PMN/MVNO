@@ -31,7 +31,7 @@ class EirTrackerTest {
         assertTrue(eirTracker.checkEirBinding(imei, "15552222222"));
         assertTrue(eirTracker.checkEirBinding(imei, "15553333333"));
 
-        // 4th evaluation exceeds threshold >3
+        // 4th distinct MSISDN evaluation exceeds threshold >3
         assertFalse(eirTracker.checkEirBinding(imei, "15554444444"));
     }
 
@@ -39,5 +39,16 @@ class EirTrackerTest {
     void testCheckEirBinding_NullOrBlankImeiAllowed() {
         assertTrue(eirTracker.checkEirBinding(null, "15551111111"));
         assertTrue(eirTracker.checkEirBinding("", "15551111111"));
+    }
+
+    @Test
+    void testEirTracker_SameMsisdnRepeatedBinding() {
+        String imei = "356923090000003";
+        // Multiple calls from the SAME MSISDN should count as 1 distinct binding
+        assertTrue(eirTracker.checkEirBinding(imei, "15551111111"));
+        assertTrue(eirTracker.checkEirBinding(imei, "15551111111"));
+        assertTrue(eirTracker.checkEirBinding(imei, "15551111111"));
+        assertTrue(eirTracker.checkEirBinding(imei, "15551111111"));
+        assertTrue(eirTracker.checkEirBinding(imei, "15551111111"));
     }
 }

@@ -1,5 +1,7 @@
 package com.mvno.intercept.transcription;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +26,8 @@ import java.util.Map;
 @RequestMapping("/api/v1/transcriptions")
 public class TranscriptionController {
 
+    private static final Logger logger = LoggerFactory.getLogger(TranscriptionController.class);
+
     /**
      * Receives and processes post-call speech transcription and acoustic biometrics payloads.
      * 
@@ -32,6 +36,12 @@ public class TranscriptionController {
      */
     @PostMapping
     public ResponseEntity<Map<String, String>> receiveTranscription(@RequestBody final TranscriptionRequest req) {
+        if (req == null || req.transcript() == null || req.transcript().isBlank()) {
+            logger.warn("Received empty or missing speech transcript payload for callId: {}", req != null ? req.callId() : "null");
+        } else {
+            final String snippet = req.transcript().length() > 50 ? req.transcript().substring(0, 50) + "..." : req.transcript();
+            logger.info("Received transcription payload for callId [{}]: snippet='{}', biometrics={}", req.callId(), snippet, req.biometrics());
+        }
         return ResponseEntity.ok(Map.of("status", "received"));
     }
 

@@ -78,12 +78,40 @@ class SubscriberControllerTest {
         Mockito.when(subscriberService.getBalance("15551234567")).thenReturn(20);
         Mockito.when(subscriberService.checkEirBinding("867530900000001", "15551234567")).thenReturn(false);
 
-        CallInterceptRequest req = new CallInterceptRequest("15551234567", "15558888888", "867530900000001", "call-id-123");
+        CallInterceptRequest req = new CallInterceptRequest("15551234567", "15558888888", "call-id-123", "867530900000001");
         ResponseEntity<InterceptResponse> response = controller.interceptCall(req);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertFalse(response.getBody().allow());
         assertEquals("EIR: SIM swap detected", response.getBody().reason());
+    }
+
+    @Test
+    void testInterceptCall_ZeroBalance() {
+        Mockito.when(subscriberService.getBalance("15550000000")).thenReturn(0);
+
+        CallInterceptRequest req = new CallInterceptRequest("15550000000", "15558888888", "call-id-zero", "356938035643809");
+        ResponseEntity<InterceptResponse> response = controller.interceptCall(req);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse(response.getBody().allow());
+        assertEquals("Prepaid balance exhausted", response.getBody().reason());
+    }
+
+    @Test
+    void testInterceptCall_AllowedCall() {
+        Mockito.when(subscriberService.getBalance("15551234567")).thenReturn(100);
+        Mockito.when(subscriberService.checkEirBinding("356938035643809", "15551234567")).thenReturn(true);
+        Mockito.when(aiFilterService.classifyCall(any())).thenReturn(new InterceptResponse(true, "Clean call"));
+
+        CallInterceptRequest req = new CallInterceptRequest("15551234567", "15558888888", "call-id-clean", "356938035643809");
+        ResponseEntity<InterceptResponse> response = controller.interceptCall(req);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().allow());
+        assertEquals("Clean call", response.getBody().reason());
     }
 }

@@ -8,8 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Equipment Identity Register (EIR) Device Binding & SIM-Swap Tracker
@@ -21,12 +21,12 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - Black List: Stolen/fraudulent devices blocked from call setup.
  * 
  * Concurrency & Eviction Strategy:
- * Uses ConcurrentHashMap + AtomicInteger for lock-free thread safety across Virtual Threads.
+ * Uses ConcurrentHashMap + ConcurrentHashMap.newKeySet() for lock-free thread safety across Virtual Threads.
  * Enforces MAX_CAPACITY (10,000 IMEIs) size bounding + @Scheduled time-based TTL cleanup (every 10 min)
  * to automatically purge stale IMEI fraud tracking data and prevent memory leaks.
  * 
  * Fraud Rule:
- * >3 distinct SIM insertions on a single IMEI hardware unit triggers SIM-swap / robocall farm detection.
+ * >3 distinct SIM insertions (MSISDNs) on a single IMEI hardware unit triggers SIM-swap / robocall farm detection.
  * 
  * @author MVNO Core Engineering Team
  * @version 1.0.0
@@ -36,23 +36,24 @@ public class EirTracker {
 
     private static final Logger logger = LoggerFactory.getLogger(EirTracker.class);
 
+    private static final int MAX_CAPACITY = 10000;
+    private final ConcurrentHashMap<String, Set<String>> imeiBindings = new ConcurrentHashMap<>();
+    private final Counter simSwapDetections;
+    private final Object evictionLock = new Object();
+
     public EirTracker(final MeterRegistry meterRegistry) {
         this.simSwapDetections = meterRegistry.counter("mvno.eir.sim_swap_detected");
-        Gauge.builder("mvno.eir.cache_size", imeiSwapCounter, ConcurrentHashMap::size)
+        Gauge.builder("mvno.eir.cache_size", imeiBindings, ConcurrentHashMap::size)
                 .description("Number of IMEIs tracked in EIR cache")
                 .register(meterRegistry);
     }
-    private static final int MAX_CAPACITY = 10000;
-    private final ConcurrentHashMap<String, AtomicInteger> imeiSwapCounter = new ConcurrentHashMap<>();
-    private final Counter simSwapDetections;
-    private final Object evictionLock = new Object();
 
     /**
      * Evaluates device binding and verifies hardware IMEI rapidly against SIM swap anomaly rules.
      * 
      * @param imei 15-digit International Mobile Equipment Identity string.
      * @param msisdn Calling party E.164 phone number string.
-     * @return true if allowed; false if SIM-swap threshold (>3) is exceeded.
+     * @return true if allowed; false if distinct SIM-swap threshold (>3) is exceeded.
      */
     public boolean checkEirBinding(final String imei, final String msisdn) {
         if (imei == null || imei.isBlank()) {
@@ -60,22 +61,24 @@ public class EirTracker {
         }
 
         // Thread-safe Bounded capacity eviction: prune low-activity IMEIs rather than wiping active fraud state
-        if (imeiSwapCounter.size() >= MAX_CAPACITY) {
+        if (imeiBindings.size() >= MAX_CAPACITY) {
             synchronized (evictionLock) {
-                if (imeiSwapCounter.size() >= MAX_CAPACITY) {
+                if (imeiBindings.size() >= MAX_CAPACITY) {
                     logger.warn("EIR Tracker memory limit reached ({} IMEIs). Pruning low-activity entries.", MAX_CAPACITY);
-                    imeiSwapCounter.entrySet().removeIf(entry -> entry.getValue().get() <= 1);
-                    if (imeiSwapCounter.size() >= MAX_CAPACITY) {
-                        imeiSwapCounter.keySet().stream().limit(MAX_CAPACITY / 2).forEach(imeiSwapCounter::remove);
+                    imeiBindings.entrySet().removeIf(entry -> entry.getValue().size() <= 1);
+                    if (imeiBindings.size() >= MAX_CAPACITY) {
+                        imeiBindings.keySet().stream().limit(MAX_CAPACITY / 2).forEach(imeiBindings::remove);
                     }
                 }
             }
         }
 
-        final AtomicInteger counter = imeiSwapCounter.computeIfAbsent(imei, k -> new AtomicInteger(0));
-        final int swaps = counter.incrementAndGet();
+        final Set<String> msisdns = imeiBindings.computeIfAbsent(imei, k -> ConcurrentHashMap.newKeySet());
+        if (msisdn != null && !msisdn.isBlank()) {
+            msisdns.add(msisdn);
+        }
 
-        if (swaps > 3) {
+        if (msisdns.size() > 3) {
             simSwapDetections.increment();
             return false;
         }
@@ -89,17 +92,17 @@ public class EirTracker {
      */
     @Scheduled(fixedRate = 600000)
     public void cleanupStaleImeiCache() {
-        if (!imeiSwapCounter.isEmpty()) {
-            final int preSize = imeiSwapCounter.size();
-            imeiSwapCounter.entrySet().removeIf(entry -> entry.getValue().get() <= 1);
-            logger.info("Executing scheduled EIR tracking cache TTL purge (reduced from {} to {} entries).", preSize, imeiSwapCounter.size());
+        if (!imeiBindings.isEmpty()) {
+            final int preSize = imeiBindings.size();
+            imeiBindings.entrySet().removeIf(entry -> entry.getValue().size() <= 1);
+            logger.info("Executing scheduled EIR tracking cache TTL purge (reduced from {} to {} entries).", preSize, imeiBindings.size());
         }
     }
 
     /**
-     * Helper method to reset tracking cache (for testing and administrative reset).
+     * Helper method to reset tracking cache (package-private for testing).
      */
-    public void reset() {
-        imeiSwapCounter.clear();
+    void reset() {
+        imeiBindings.clear();
     }
 }
