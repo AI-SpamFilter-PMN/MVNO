@@ -23,7 +23,7 @@ SMPP Client ──▶ OsmoSMSC ───────────────▶ 
 5G UE ──▶ Open5GS (AMF) ─────────────────┘
 ```
 
-Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP). The 5G SA core adds UERANSIM gNB+UE simulation with SMS-over-NAS architecture contract (planned mock/roadmap). All decisions go through the Spring Boot policy gateway.
+Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP). The 5G SA core adds UERANSIM gNB+UE simulation with live PDU Session establishment (`S-NSSAI {sst: 1, sd: 0x000001}`) and IPv4 data-plane allocation (`10.45.0.0/16`). All decisions go through the Spring Boot policy gateway.
 
 3 test UEs: **UE-1** (15551234567, balance=100), **UE-2** (15557654321, balance=0), **UE-3** (15559998888, balance=100). EIR SIM-swap fraud detection triggers dynamically on multi-SIM IMEI bindings.
 
@@ -147,7 +147,7 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | 5 | **DTMF Telemetry** | rtpengine captures DTMF events (`dtmf-log=yes`); REST biometrics payload accepted by gateway. |
 | 6 | **Voice Biometrics** | Silence ratio and spectral flatness biometrics payload schema (Mock / Roadmap item). |
 | 7 | **SLA Fallback** | Spring Boot gateway fallback (`allow: true`) when AI filter is unreachable/times out. |
-| 8 | **5G SA Core** | Open5GS 10-NF 5GC + UERANSIM gNB + 3 UE simulation. |
+| 8 | **5G SA Core** | Open5GS 10-NF 5GC + UERANSIM gNB + 3 UE simulation with live PDU Session establishment (`10.45.0.0/16`). |
 | 9 | **SMS-over-NAS** | 5G NAS SMS routing architecture contract (Mock / Roadmap item). |
 | 10 | **MongoDB Seed** | Atomic init script (`scripts/seed-mongo.sh`) provisions 3 UEs into `open5gs.subscribers` avoiding WebUI admin hash bug. |
 

@@ -580,11 +580,10 @@ services:
 ```
 
 
-**Phase 3+ additions** (when adding 5G core):
-- Add `mongodb` service before Open5GS NFs
-- Add 10 Open5GS NFs (nrf, amf, smf, upf, udm, ausf, udr, pcf, nssf, bsf)
-- Add `webui` service for subscriber management
-- Add `ueransim` for gNB and UE simulation (run natively, not in containers)
+**Integrated 5G SA Core & RAN Simulation Services**:
+- Includes `mongodb` service (`mongo:7.0`) and 10 Open5GS NFs (`nrf`, `amf`, `smf`, `upf`, `udm`, `ausf`, `udr`, `pcf`, `nssf`, `bsf`)
+- Includes `mvno-open5gs-webui` service for web subscriber management
+- Includes containerized `ueransim` base image (`mvno-ueransim:3.2.6`) running `mvno-ueransim-gnb` and 3 simulated UEs (`mvno-ueransim-ue-1..3`)
 
 ---
 
@@ -697,7 +696,7 @@ The ASR pipeline runs **entirely inside the Spring Boot JVM** via `NativeVoskSer
    ```ini
    recording-dir = /var/spool/rtpengine
    recording-method = fork
-   recording-format = eth
+   recording-format = wav
    ```
    > **Note:** rtpengine streams audio captures via fork recording mode to `/var/spool/rtpengine`.
 

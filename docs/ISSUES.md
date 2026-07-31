@@ -174,7 +174,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 6.2: `vmagent` Promscrape Configuration Flag Omission
 * **Symptom**: VictoriaMetrics (`:8428`) and Grafana NOC Dashboards (`:3000`) rendered empty metric panels with zero active targets.
 * **Root Cause**: `vmagent` container command stanza was missing `-promscrape.config=/etc/prometheus/prometheus.yml`, causing `vmagent` to run in silent mode without loading target scrape configurations. Additionally, the target hostname in `scrape.yml` was listed as `telecom-api` instead of `mvno-api`.
-* **Fix**: Added `-promscrape.config=/etc/prometheus/prometheus.yml` and exposed port `8429:8429` in `docker-compose.yml`, and updated `scrape.yml` target address to `mvno-api:8080`. Verified `5` active targets scraped (`mvno-api`, `rtpengine`, `vmagent`, `open5gs`, `mongodb`).
+* **Fix**: Added `-promscrape.config=/etc/prometheus/prometheus.yml` and exposed port `8429:8429` in `docker-compose.yml`, and updated `scrape.yml` target address to `mvno-api:8080`. Verified 5 scrape jobs resolving to **7 active scrape target instances (7/7 health: UP)** (`amf`, `smf`, `upf`, `mvno-api`, `rtpengine`, `mongodb-exporter`, `vmagent`). Ingested MongoDB metrics grew from 1 to **2,372 metrics** after adding `--collect-all`.
 
 ### Issue 6.3: Grafana SQLite WAL Corruption
 * **Symptom**: Grafana crashes after host reboot with `database is locked` or `disk I/O error`.
@@ -296,7 +296,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 | **Normal 5G SMS** | `POST /api/v1/intercept/sms` (`sender: 15551234567`) | `{"allow":true,"reason":"AI filter unreachable — SLA allow"}` | ✅ **PASS** |
 | **Zero-Balance SMS Block** | `POST /api/v1/intercept/sms` (`sender: 15557654321`) | `{"allow":false,"reason":"Prepaid balance exhausted"}` | ✅ **PASS** |
 | **EIR SIM-Swap Block** | >3 distinct MSISDNs on single IMEI | `{"allow":false,"reason":"EIR: SIM swap detected"}` | ✅ **PASS** |
-| **vmagent Scraper Targets** | `GET :8429/api/v1/targets` | `5/5 targets health: UP` | ✅ **PASS** |
+| **vmagent Scraper Targets** | `GET :8429/api/v1/targets` | `7/7 targets health: UP` (5 scrape jobs) | ✅ **PASS** |
 | **VictoriaMetrics TSDB** | `GET :8428/api/v1/query?query=mvno_sms_requests_total` | `seriesFetched: 1`, `value: [ts, "2"]` | ✅ **PASS** |
 | **Open5GS WebUI Login UI** | `GET :9999/` | `HTTP 200 OK` (`<title>Open5gs - Login</title>`) | ✅ **PASS** |
 
