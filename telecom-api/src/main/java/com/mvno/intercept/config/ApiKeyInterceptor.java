@@ -5,7 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
- * Gateway API-Key Authentication Interceptor (Zero-Trust §1.2)
+ * Gateway API-Key Authentication Interceptor (Zero-Trust Section 1.2)
  *
  * Rejects HTTP requests to interception endpoints that do not present a valid
  * {@code X-API-Key} header matching the configured {@code intercept.api-key}

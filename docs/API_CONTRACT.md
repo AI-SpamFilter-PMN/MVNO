@@ -4,7 +4,7 @@ This document defines the interface contracts, SLA constraints, networking param
 
 ---
 
-## 0. Gateway Authentication (X-API-Key — Zero-Trust §1.2)
+## 0. Gateway Authentication (X-API-Key — Zero-Trust Section 1.2)
 
 All `telecom-api` interception endpoints (`POST /api/v1/intercept/sms`, `GET /api/v1/intercept/call` — Kamailio callout, `POST /api/v1/intercept/call`, `GET /api/v1/intercept/subscriber/{msisdn}`) require the header:
 
@@ -105,7 +105,7 @@ Payload shape is **event-typed** — SMS and VOICE_CALL carry different fields (
 
 ### 3. Voice Client Teammate (A7med3mar4 — `SipClient`)
 - **SIP Registrar & Proxy**: Target host port `5066/udp` (`localhost:5066` on host, maps to `kamailio:5060` inside container network).
-- **SIP INVITE Authentication (407 Digest)**: Kamailio challenges unauthenticated `INVITE` with `407 Proxy Authentication Required` (zero-trust §1.1). Clients MUST handle the `Proxy-Authenticate: Digest` challenge and retry with an `Authorization: Digest` header using their subscriber-table credentials (`username: MSISDN`, realm `localhost`). Applies to REGISTER and INVITE alike.
+- **SIP INVITE Authentication (407 Digest)**: Kamailio challenges unauthenticated `INVITE` with `407 Proxy Authentication Required` (zero-trust Section 1.1). Clients MUST handle the `Proxy-Authenticate: Digest` challenge and retry with an `Authorization: Digest` header using their subscriber-table credentials (`username: MSISDN`, realm `localhost`). Applies to REGISTER and INVITE alike.
 - **RTP Media Relay**: RTPEngine ports `30000-30100/udp` (G.711u PCMU codec supported).
 
 ---

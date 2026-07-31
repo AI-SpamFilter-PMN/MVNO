@@ -6,7 +6,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Web MVC Configuration — Gateway API-Key Authentication (Zero-Trust §1.2)
+ * Web MVC Configuration — Gateway API-Key Authentication (Zero-Trust Section 1.2)
  *
  * Registers the {@link ApiKeyInterceptor} on all {@code /api/v1/intercept/**}
  * endpoints. The key is read from the {@code intercept.api-key} property
