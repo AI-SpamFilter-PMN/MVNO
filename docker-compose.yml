@@ -487,8 +487,6 @@ services:
     container_name: mvno-vmagent
     ports:
       - "8429:8429"
-    extra_hosts:
-      - "victoria-metrics:10.89.0.2"
     command:
       - "-remoteWrite.url=http://victoria-metrics:8428/api/v1/write"
       - "-promscrape.config=/etc/prometheus/prometheus.yml"

@@ -94,8 +94,20 @@ echo -e "${GREEN}✓ SMPP 3.4 ESME Transceiver Bound Successfully${NC}\n"
 
 # Item 10: VictoriaMetrics Telemetry Query
 echo -e "${YELLOW}[10/11] 📈 Querying VictoriaMetrics TSDB PromQL Telemetry...${NC}"
-curl -s "http://localhost:8428/api/v1/query?query=mvno_sms_requests_total" | python3 -m json.tool
-echo -e "${GREEN}✓ Time-series metric data returned${NC}\n"
+python3 -c "
+import urllib.request, json, sys
+url = 'http://localhost:8428/api/v1/query?query=mvno_call_requests_total'
+req = urllib.request.urlopen(url)
+data = json.loads(req.read().decode('utf-8'))
+results = data.get('data', {}).get('result', [])
+if not results:
+    print('[-] Error: VictoriaMetrics returned 0 active series for mvno_call_requests_total', file=sys.stderr)
+    sys.exit(1)
+val = results[0]['value'][1]
+metric = results[0]['metric']['__name__']
+print(f'  ✓ PromQL Series Found: {metric} = {val} (Total Series: {len(results)})')
+"
+echo -e "${GREEN}✓ Time-series metric data verified & non-empty${NC}\n"
 
 # Item 11: SOTA Grafana NOC Command Center Status
 echo -e "${YELLOW}[11/11] 📊 Verifying SOTA Grafana NOC Command Center Dashboard...${NC}"

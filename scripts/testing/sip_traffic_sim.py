@@ -87,7 +87,7 @@ def register_subscriber(username, password, port=5066):
 
 def send_sip_invite(caller, callee, port=5066):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(3)
+    s.settimeout(10)
     call_id = f"call-{int(time.time())}@127.0.0.1"
     
     sdp = (
