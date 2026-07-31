@@ -115,6 +115,11 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: Host port `5060/udp` was held by host system SIP daemons or socket proxies, causing socket bind failure (`EADDRINUSE`).
 * **Fix**: Updated `docker-compose.yml` port mapping for Kamailio to `5066:5060/udp`.
 
+### Issue 3.6: Unauthenticated SIP INVITE Proxying (Zero-Trust §1.1)
+* **Symptom**: Any unauthenticated SIP client could trigger policy interception calls and reach RTPEngine — no credential check on inbound `INVITE` dialogs.
+* **Root Cause**: `configs/kamailio/kamailio.cfg` only enforced digest auth on `REGISTER`; the `INVITE` branch proxied straight into `route[INTERCEPT]` with no `auth_db` challenge.
+* **Fix**: Added a 407 digest challenge on the `INVITE` branch in [kamailio.cfg](file:///home/zkhattab/MVNO/configs/kamailio/kamailio.cfg): `if ($au == "" && !auth_check("$fd","subscriber","1")) { auth_challenge("$fd","0"); exit; }` before `route(INTERCEPT)`. Updated [sip_traffic_sim.py](file:///home/zkhattab/MVNO/scripts/testing/sip_traffic_sim.py) with a full 407→digest→INVITE handshake (`send_sip_invite(caller, callee, password)`), and rewrote runbook step 6 to assert the handshake still yields `403 Forbidden` for zero-balance callers. Verified live: unauth INVITE → `407 Proxy Authentication Required`; valid digest + zero balance → `403`; `REGISTER` flow unaffected.
+
 ---
 
 ## 4. RTPEngine Media Relay Issues
@@ -267,6 +272,11 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: PCAP streams were encapsulated in ethernet/IP frame headers rather than raw audio streams, and unconditional `Files.deleteIfExists()` deleted audio evidence regardless of transcription status.
 * **Fix**: Updated [rtpengine.conf](file:///home/zkhattab/MVNO/configs/rtpengine/rtpengine.conf) to `recording-method=fork`, restricted [NativeVoskService.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/transcription/NativeVoskService.java) `DirectoryStream` filter to `*.wav` streams only, and implemented evidence archiving to `state/spool/archived/`.
 
+### Issue 8.17: Unauthenticated Intercept REST Endpoints (Zero-Trust §1.2)
+* **Symptom**: `POST /api/v1/intercept/sms`, `GET /api/v1/intercept/call`, and `POST /api/v1/intercept/call` accepted requests with no credential of any kind, so any reachable client could trigger interception or read subscriber state.
+* **Root Cause**: `SubscriberController` and the Kamailio `http_client_query` callout relied on network position (bridge-internal) rather than an application-layer credential.
+* **Fix**: Added [ApiKeyInterceptor.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/config/ApiKeyInterceptor.java) + [WebConfig.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/config/WebConfig.java) (registered on `/api/v1/intercept/**`) with `intercept.api-key: ${X_API_KEY:mvno-demo-key-2026}` in `application.yml`; Kamailio callout switched to 4-arg `http_client_query(url, "", "X-API-Key: ...\r\n", res)` (empty post-data → GET with headers). All consumers keyed: Makefile `make test-api/test-sms/test-call` and runbook steps 4/7/8. `/actuator/*` intentionally left open for vmagent scraping. Verified live: missing/wrong key → `401`; valid key → normal flow; 3 new tests (`ApiKeyInterceptorTest`) → suite now 22/22.
+
 ### Issue 8.14: Rootless Podman Docker Socket Path Permission for Vector
 * **Symptom**: Vector container failed to collect docker logs with `No such file or directory: /var/run/docker.sock`.
 * **Root Cause**: Rootless Podman exposes user-level socket at `/run/user/1000/podman/podman.sock` instead of root system path `/var/run/docker.sock`.
@@ -288,7 +298,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 
 | Target / Subsystem | Command / Probe | Expected Result | Verification Status |
 |---|---|---|---|
-| **Spring Boot Unit Tests** | `./mvnw test` | `Tests run: 19, Failures: 0` | ✅ **PASS** |
+| **Spring Boot Unit Tests** | `./mvnw test` | `Tests run: 22, Failures: 0` | ✅ **PASS** |
 | **Gateway Liveness** | `GET :8080/actuator/health/liveness` | `{"status":"UP"}` | ✅ **PASS** |
 | **Subscriber Balance API** | `GET :8080/api/v1/intercept/subscriber/15551234567` | `{"msisdn":"15551234567","balance":100}` | ✅ **PASS** |
 | **Normal VoIP Call** | `POST /api/v1/intercept/call` (`caller: 15551234567`) | `{"allow":true,"reason":"AI filter unreachable — SLA allow"}` | ✅ **PASS** |
@@ -296,6 +306,8 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 | **Normal 5G SMS** | `POST /api/v1/intercept/sms` (`sender: 15551234567`) | `{"allow":true,"reason":"AI filter unreachable — SLA allow"}` | ✅ **PASS** |
 | **Zero-Balance SMS Block** | `POST /api/v1/intercept/sms` (`sender: 15557654321`) | `{"allow":false,"reason":"Prepaid balance exhausted"}` | ✅ **PASS** |
 | **EIR SIM-Swap Block** | >3 distinct MSISDNs on single IMEI | `{"allow":false,"reason":"EIR: SIM swap detected"}` | ✅ **PASS** |
+| **SIP INVITE 407 (zero-trust §1.1)** | Unauthenticated `INVITE` via `sip_traffic_sim.py` | `407 Proxy Authentication Required`; digest + zero-balance → `403` | ✅ **PASS** |
+| **X-API-Key 401 (zero-trust §1.2)** | `GET /api/v1/intercept/call` without `X-API-Key` header | `HTTP 401 Unauthorized`; valid key → normal response | ✅ **PASS** |
 | **vmagent Scraper Targets** | `GET :8429/api/v1/targets` | `8/8 targets health: UP` (6 scrape jobs) | ✅ **PASS** |
 | **VictoriaMetrics TSDB** | `GET :8428/api/v1/query?query=mvno_sms_requests_total` | `seriesFetched: 1`, `value: [ts, "2"]` | ✅ **PASS** |
 | **Open5GS WebUI Login UI** | `GET :9999/` | `HTTP 200 OK` (`<title>Open5gs - Login</title>`) | ✅ **PASS** |

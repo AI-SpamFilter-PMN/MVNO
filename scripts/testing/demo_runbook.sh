@@ -46,7 +46,6 @@ echo -e "${GREEN}✓ 5G SA Subscriber audit complete — 3/3 UEs Registered${NC}
 
 # Item 3: Vector Live Log Shipper Stream
 echo -e "${YELLOW}[3/13] ⚡ Auditing Vector Container Log Aggregation (stdout sink)...${NC}"
-echo -e "${YELLOW}[3/13] ⚡ Auditing Vector Container Log Aggregation (stdout sink)...${NC}"
 podman logs mvno-vector --tail 5 || true
 echo -e "${GREEN}✓ Vector VRL parsing active${NC}\n"
 

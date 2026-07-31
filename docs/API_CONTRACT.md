@@ -4,6 +4,21 @@ This document defines the interface contracts, SLA constraints, networking param
 
 ---
 
+## 0. Gateway Authentication (X-API-Key — Zero-Trust §1.2)
+
+All `telecom-api` interception endpoints (`POST /api/v1/intercept/sms`, `GET /api/v1/intercept/call` — Kamailio callout, `POST /api/v1/intercept/call`, `GET /api/v1/intercept/subscriber/{msisdn}`) require the header:
+
+```
+X-API-Key: mvno-demo-key-2026
+```
+
+- Missing or mismatched key → `HTTP 401 Unauthorized`.
+- Demo key default from `intercept.api-key` property (env override: `X_API_KEY`).
+- Not required for `/actuator/*` health/metrics endpoints (scrape-safe).
+- **Exempt endpoints**: `GET /api/v1/classify` (outbound to `ai-filter`), SMPP/SIP protocols are authenticated at their own layers.
+
+---
+
 ## 1. Overview & Architecture Boundary
 
 ```

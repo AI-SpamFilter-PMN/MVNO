@@ -156,7 +156,7 @@ services:
     container_name: mvno-mongodb
     command: mongod --wiredTigerCacheSizeGB 0.25
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - ./state/mongodb:/data/db:z
     networks:
@@ -598,7 +598,7 @@ services:
 | **VictoriaMetrics** | `8428` | TCP | Metrics ingestion | Native bind (no changes) |
 | **vmagent** | `8429` | TCP | Metrics scraping agent target API | Mapped to host port `8429` for target inspection |
 | **Grafana** | `3000` | TCP | NOC dashboard | Native bind (no changes) |
-| **MongoDB** (Phase 3+) | `27017` | TCP | Open5GS subscriber metadata | Native bind (no changes) |
+| **MongoDB** (Phase 3+) | `27017` | TCP | Open5GS subscriber metadata | Loopback-only publish (`127.0.0.1:27017`), container-internal auth-off |
 | **Open5GS NRF** (Phase 3+) | `7777` | TCP | 5GC service registry | Native bind (no changes) |
 | **Vector** | — | — | Log shipper (no exposed ports) | Internal only |
 | **Open5GS WebUI** | `9999` | TCP | Subscriber & SIM Management WebUI | Native bind (`9999:3000`) |

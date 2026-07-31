@@ -51,7 +51,7 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 ## 3. Technology Stack
 
 - **Signaling & Proxy**: Kamailio (SIP Registrar/Proxy) + `rtpengine` (Userspace media proxy/forker).
-- **SMS Control Plane**: Osmocom (`OsmoSMSC` / `OsmoMSC` / `OsmoHLR`).
+- **SMS Control Plane**: Osmocom (`OsmoSMSC` + `OsmoHLR`).
 - **Speech Processing**: Native Vosk Speech-to-Text (In-JVM JNI Java 21 runtime, zero cloud latency).
 - **Interception Gateway**: Spring Boot 3.4.3 + Java 21 LTS + Virtual Threads (Tomcat, JdbcTemplate, RestClient).
 - **Observability**: VictoriaMetrics (Single-binary TSDB) + `vmagent` (Telemetry scraper) + Grafana (Dashboard).
@@ -126,13 +126,13 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | **Kamailio CSCF** | `mvno-kamailio` | `5066 (host) → 5060` | UDP / TCP | SIP signaling & registrar proxy |
 | **rtpengine NG** | `mvno-rtpengine` | `22222 (internal)` | UDP | Userspace media proxy control port |
 | **rtpengine Media** | `mvno-rtpengine` | `30000-30100`| UDP | RTP media audio stream relay range |
-| **OsmoSMSC / MSC** | `mvno-osmosmsc` | `2775` | TCP / SMPP | Short Message Peer-to-Peer (SMPP 3.4) |
+| **OsmoSMSC + OsmoHLR** | `mvno-osmosmsc` | `2775` | TCP / SMPP | Short Message Peer-to-Peer (SMPP 3.4) |
 | **OsmoHLR** | `mvno-osmo-hlr` | `4222 (internal)` | TCP / GSUP | Standalone subscriber location database |
 | **VictoriaMetrics** | `mvno-victoriametrics`| `8428` | HTTP | Telemetry TSDB & PromQL query API |
 | **vmagent Scraper** | `mvno-vmagent` | `8429` | HTTP | Telemetry scraper target health API |
 | **Grafana NOC** | `mvno-grafana` | `3000` | HTTP | Real-time telecom NOC dashboard UI |
 | **Open5GS WebUI** | `mvno-open5gs-webui`| `9999` | HTTP | Subscriber SIM & Profile Management UI |
-| **AI Spam Model** | `ai-filter` | `8008 (host) → 8000` | HTTP / REST | External AI Spam Model Server |
+| **AI Spam Model** | `ai-filter` | `8008 (host) → 8000` | HTTP / REST | External AI Spam Model Server (mock) |
 
 ---
 
@@ -141,7 +141,7 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | # | Feature | How |
 |---|---------|-----|
 | 1 | **Prepaid OCS** | SQLite balance check before every call/SMS. Zero-balance → blocked. |
-| 2 | **Caller-ID Auth** | Kamailio digest authentication for REGISTER requests (SIP INVITE 407 challenge on Roadmap). |
+| 2 | **Caller-ID Auth** | Kamailio digest authentication for REGISTER + INVITE (407 challenge live). |
 | 3 | **LAC/CellID Geofencing** | Cell ID parsing and zone-based geofencing policy (Mock / Roadmap item). |
 | 4 | **EIR SIM-Swap Detection** | In-memory IMEI→MSISDN tracker. >3 distinct SIMs per IMEI → blocked. |
 | 5 | **DTMF Telemetry** | rtpengine captures DTMF events (`dtmf-log=yes`); REST biometrics payload accepted by gateway. |
@@ -158,7 +158,7 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 * [ONBOARDING.md](ONBOARDING.md): Team onboarding guide, setup instructions, make targets, and Section 14 integration specs.
 * [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Public AI Spam Filter REST API contract & JSON schemas for teammates.
 * [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
-* [docs/ROADMAP.md](docs/ROADMAP.md): Architectural roadmap and operational backlog (SIP 407 challenge, API keys, VictoriaLogs).
+* [docs/ROADMAP.md](docs/ROADMAP.md): Architectural roadmap and operational backlog (SIP 407 + API keys implemented; VictoriaLogs, healthchecks, SBI eval open).
 * [docs/ISSUES.md](docs/ISSUES.md): Root cause analysis log and Section 10 Cross-Repo Contract Specifications.
 * [docs/architecture_flow.svg](docs/architecture_flow.svg): System architecture overview diagram.
 * [docs/ims_voice_call_flow.svg](docs/ims_voice_call_flow.svg): IMS VoLTE/VoNR Voice Call Interception sequence diagram.
