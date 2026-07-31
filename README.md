@@ -97,7 +97,7 @@ curl http://localhost:8080/api/v1/intercept/subscriber/15557654321
 # 6. Test interception & execute automated presentation runbook
 make test-sms    # HTTP SMS policy intercept endpoint verification
 make test-call   # HTTP voice call policy intercept endpoint verification (EIR & balance)
-./scripts/testing/demo_runbook.sh  # Complete 11-step graduation project live presentation
+./scripts/testing/demo_runbook.sh  # Complete 13-step graduation project live presentation
 ```
 
 ### Method B: Native (systemd)

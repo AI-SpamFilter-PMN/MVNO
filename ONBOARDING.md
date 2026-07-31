@@ -210,7 +210,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 |-----------|---------------|
 | 5G Core | `open5gs/open5gs` (v2.8.0) |
 | RAN Simulator | `aligungr/UERANSIM` (v3.2.6) |
-| SIP Proxy | `kamailio/kamailio` (5.7.4) |
+| SIP Proxy | `mvno-kamailio` (5.7.2, Alpine 3.19 build) |
 | Media Proxy | `drachtio/rtpengine` (mr9.4.0.0) |
 | HLR/MSC/SMSC | `osmocom/osmocom` (osmo-msc, osmo-hlr, osmo-smsc) |
 | ASR | `alphacep/vosk-api` (v0.3.45) + `vosk-model-small-en-us-0.15` |

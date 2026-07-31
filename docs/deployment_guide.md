@@ -71,7 +71,7 @@ sudo dnf install -y lksctp-tools      # Fedora/RHEL
 sudo pacman -S --needed lksctp-tools  # Arch/CachyOS
 ```
 | **Podman API Socket**| `systemctl --user enable --now podman.socket` | Required by Docker Compose Plugin to talk to Podman |
-| **Kamailio Image** | `mvno-kamailio:5.7.4` | Custom Alpine build (adds kamailio-utils) from `configs/kamailio/Dockerfile` |
+| **Kamailio Image** | `mvno-kamailio:5.7.2` | Custom Alpine build (adds kamailio-utils) from `configs/kamailio/Dockerfile` |
 | **rtpengine Image**| `drachtio/rtpengine:mr9.4.0.0` | Media engine container |
 | **Osmocom Image** | `mvno-osmo-smsc:1.0.0` | Custom Debian build from `configs/osmocom/Dockerfile` |
 | **Spring Boot Image** | `mvno-telecom-api:1.0.0` | Custom multi-stage Maven/Temurin build from `telecom-api/Dockerfile` (Java 21 LTS + Native Vosk) |
@@ -424,7 +424,7 @@ services:
     restart: unless-stopped
 
   kamailio:
-    image: mvno-kamailio:5.7.4
+    image: mvno-kamailio:5.7.2
     container_name: mvno-kamailio
     ports:
       - "5066:5060/udp"
