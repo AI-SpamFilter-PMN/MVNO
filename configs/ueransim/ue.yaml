@@ -22,8 +22,8 @@ sessions:
   - type: 'IPv4'
     apn: 'internet'
     slice:
-      sst: 1
-      sd: 0x000001
+      sst: 1 # SST: 1 (eMBB)
+      sd: 0x000001 # SD: 0x000001 — MUST match 3-layer S-NSSAI slice in Subscriber MongoDB & 5G Core AMF/SMF for PDU session establishment
 configured-nssai:
   - sst: 1
     sd: 0x000001
