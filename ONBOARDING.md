@@ -51,7 +51,7 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
 git clone https://github.com/AI-SpamFilter-PMN/MVNO.git
 cd MVNO
 make init-db   # creates SQLite WAL DBs + seeds test subscribers
-make up        # offline-first launch (26 containers)
+make up        # offline-first launch (27 containers)
 make test      # runs test-vty + test-api + test-sms + test-call
 ```
 
@@ -182,9 +182,9 @@ make test      # runs test-vty + test-api + test-sms + test-call
 
 | Symptom | Likely Cause | Fix |
 |---------|--------------|-----|
-| gNB never connects to AMF | SCTP module not loaded | `sudo modprobe sctp` |
+| gNB never connects to AMF | SCTP module not loaded | `sudo modprobe sctp` (verify: `lsmod \| grep sctp`) |
 | `make up` hangs on gNB | Image not built / missing | `make rebuild` or `./scripts/bootstrap.sh` |
-| `test-vty` fails | Containers not ready | Wait 60s after `make up`; check `make ps` |
+| `test-vty` fails | Containers not ready | Wait 60s after `make up`; check `make ps` / `podman compose ps` |
 | `mvno-vector` crashes | Podman socket path wrong | `export PODMAN_USER_UID=$(id -u)` before `make up` |
 | No transcription in logs | Model not mounted | Run `./scripts/bootstrap.sh` to vendor model |
 | `make init-db` fails | `sqlite3` not installed | Install `sqlite3` package |
