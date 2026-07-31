@@ -17,15 +17,15 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
        ▼                ▼             └────────┬─────────┘           ▼
 ┌─────────────┐    ┌─────────────┐             │             ┌─────────────┐
 │  Observability      │◀───────────────────┘    AI Spam Filter
-│ (Vector → VM → Grafana)                        (External Repo)
+│ (Vector → stdout / VM → Grafana)               (External Repo)
 ```
 
 **Components:**
 - **5G SA Core**: Open5GS 10 NFs (NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + UERANSIM gNB + 3 UEs
-- **Osmocom Stack**: HLR (GSUP) + MSC/SMSC (SMPP 3.4) via `osmo-hlr` / `osmo-msc`
+- **Osmocom Stack**: HLR (GSUP) + MSC/SMSC (SMPP 3.4) via `osmo-hlr` / `osmo-msc` / `osmo-smsc`
 - **Interception Gateway**: Kamailio SIP registrar/proxy → `rtpengine` media fork → Vosk ASR (native JNI) → Spring Boot gateway (Java 21, virtual threads)
 - **AI Spam Filter**: External REST service at `http://ai-filter:8000/api/v1/classify`
-- **Observability**: Vector → VictoriaMetrics → Grafana (4 pre-built dashboards)
+- **Observability**: Vector (stdout log driver) → VictoriaMetrics (metrics TSDB) → Grafana (4 pre-built dashboards)
 
 **Diagrams:** `docs/architecture_flow.svg`, `docs/ims_voice_call_flow.svg`, `docs/sms_interception_flow.svg`
 
@@ -36,7 +36,7 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
 | Distro | Command |
 |--------|---------|
 | Ubuntu/Debian | `apt install podman docker-compose-v2 sqlite3 lksctp-tools` |
-| Fedora/RHEL | `dnf install podman docker-compose sqlite3 lksctp-tools` |
+| Fedora/RHEL | `dnf install podman podman-compose sqlite3 lksctp-tools` |
 | Arch/CachyOS | `pacman -S podman docker-compose sqlite3 lksctp-tools` |
 | **All** | `sudo modprobe sctp` (verify: `lsmod \| grep sctp`) |
 
@@ -143,11 +143,11 @@ make test      # runs test-vty + test-api + test-sms + test-call
 | Command | Expected |
 |---------|----------|
 | `make test-api` | `{"status":"UP"}` + subscriber JSON |
-| `make test-vty` | `✓ HLR subscriber found` + `✓ SMPP ESME configured` |
+| `make test-vty` | `✓ HLR subscriber found` + `✓ Primary SMPP ESME configured` + `✓ Secondary client SMPP ESME configured` |
 | `make test-sms` | `allow: true, "Clean content"` |
 | `make test-call` | `allow: false, "EIR: SIM swap detected"` (test IMEI) |
 | `make test` | All 4 pass |
-| `cd telecom-api && ./mvnw test` | 14/14 pass (includes SLA + circuit breaker tests) |
+| `cd telecom-api && ./mvnw test` | 17/17 pass (includes SLA + circuit breaker + distinct EIR tests) |
 
 ---
 
@@ -158,7 +158,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 | Grafana | `http://localhost:3000` (admin/admin) | Dashboards: NOC, Telecom-API, Rtpengine, Overview |
 | VictoriaMetrics | `http://localhost:8428` | Raw PromQL queries |
 | vmagent | `http://localhost:8429` | Scrape config |
-| Vector | Internal | Log pipeline (no UI) |
+| Vector | Internal | Log pipeline (console stdout driver; VictoriaLogs on Roadmap) |
 
 **Key metrics:** `mvno_sms_requests_total`, `mvno_sms_blocked_total`, `mvno_call_requests_total`, `mvno_call_blocked_total`, `mvno_call_blocked_eir_total`.
 
@@ -172,7 +172,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 | **AI Filter Mock** | Returns `allow: true` always. Replace `ai-filter` container with your model. |
 | **SIP Testing** | `make test-call` uses HTTP POST, not real SIP INVITE. No SIPp scenario included. |
 | **SCTP Kernel** | `modprobe sctp` required on host. Fails silently if missing (gNB↔AMF never connects). |
-| **RTPEngine Kernel** | Needs `xt_rtpengine` kernel module or userspace fallback (`--kernel` flag). |
+| **RTPEngine Kernel** | Runs in userspace mode (kernel module not required). |
 | **First-call ASR Cold Start** | Vosk model loads lazily on first transcription (~2-5s delay). |
 
 ---
@@ -211,7 +211,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 | RAN Simulator | `aligungr/UERANSIM` (v3.2.6) |
 | SIP Proxy | `kamailio/kamailio` (5.7.4) |
 | Media Proxy | `drachtio/rtpengine` (mr9.4.0.0) |
-| HLR/MSC/SMSC | `osmocom/osmocom` (osmo-msc, osmo-hlr) |
+| HLR/MSC/SMSC | `osmocom/osmocom` (osmo-msc, osmo-hlr, osmo-smsc) |
 | ASR | `alphacep/vosk-api` (v0.3.45) + `vosk-model-small-en-us-0.15` |
 | Metrics TSDB | `victoriametrics/victoria-metrics` (v1.101.0) |
 | Log Pipeline | `timberio/vector` (0.44.0) |
