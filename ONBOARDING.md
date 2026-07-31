@@ -66,6 +66,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 | `make ps` | List active container services |
 | `make logs` | Stream live container logs across microservices |
 | `make init-db` | Recreate SQLite WAL DBs + seed subscriber test records |
+| `make seed-mongo` | Upsert 3 5G SA UERANSIM subscriber records into Open5GS MongoDB |
 | `make clean` | `down -v` + wipe runtime state directories |
 | `make rebuild` | `clean` → `init-db` → `up --build` |
 | `make test-api` | Health check + subscriber endpoint verification |
