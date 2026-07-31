@@ -5,7 +5,7 @@
 [![Database](https://img.shields.io/badge/Database-SQLite_WAL_%7C_MongoDB-green?style=for-the-badge&logo=sqlite)](docs/deployment_guide.md)
 [![Observability](https://img.shields.io/badge/Observability-VictoriaMetrics_%7C_Grafana-purple?style=for-the-badge&logo=grafana)](docs/deployment_guide.md)
 
-Simulates an MVNO / Private Mobile Network core for the companion [AI Spam Filter](https://github.com/AI-SpamFilter-PMN/MVNO) platform. Handles SMS routing and SIP/VoIP calling, intercepts payloads in real-time, and enforces allow/block decisions from the AI filter REST API.
+Simulates an MVNO / Private Mobile Network core for the companion [AI Spam Filter](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) platform. Handles SMS routing and SIP/VoIP calling, intercepts payloads in real-time, and enforces allow/block decisions from the AI filter REST API.
 
 ---
 
@@ -23,9 +23,9 @@ SMPP Client ──▶ OsmoSMSC ───────────────▶ 
 5G UE ──▶ Open5GS (AMF) ─────────────────┘
 ```
 
-Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP). The 5G SA core adds UERANSIM gNB+UE simulation with SMS-over-NAS routed through the same pipeline. All decisions go through the Spring Boot policy gateway.
+Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP). The 5G SA core adds UERANSIM gNB+UE simulation with SMS-over-NAS architecture contract (planned mock/roadmap). All decisions go through the Spring Boot policy gateway.
 
-3 test UEs: **normal** (balance=100), **spam** (EIR trigger), **zero-balance** (OCS block).
+3 test UEs: **UE-1** (15551234567, balance=100), **UE-2** (15557654321, balance=0), **UE-3** (15559998888, balance=100). EIR SIM-swap fraud detection triggers dynamically on multi-SIM IMEI bindings.
 
 ---
 
@@ -35,9 +35,9 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 [![IMS Voice Call Interception Flow](docs/ims_voice_call_flow.png)](docs/ims_voice_call_flow.svg)
 
 1. UE_1 sends a `SIP INVITE`. Kamailio checks prepaid balance and EIR via the Spring Boot gateway.
-2. If allowed, Kamailio anchors media through `rtpengine` (in-kernel) and forks a PCAP copy to `/var/spool/rtpengine`.
+2. If allowed, Kamailio anchors media through `rtpengine` (userspace mode) and forks a WAV copy to `/var/spool/rtpengine`.
 3. After the call, `NativeVoskService.java` transcribes the audio offline via Vosk Java 21 JNI and sends the result to the AI filter.
-4. If flagged, the caller's MSISDN is blacklisted for future calls.
+4. If flagged by policy checks, the gateway returns `allow: false` with an explicit rejection reason.
 
 ### B. SMS Interception
 [![SMS Interception Flow](docs/sms_interception_flow.png)](docs/sms_interception_flow.svg)
@@ -50,7 +50,7 @@ Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP).
 
 ## 3. Technology Stack
 
-- **Signaling & Proxy**: Kamailio (SIP Registrar/Proxy) + `rtpengine` (In-kernel media proxy/forker).
+- **Signaling & Proxy**: Kamailio (SIP Registrar/Proxy) + `rtpengine` (Userspace media proxy/forker).
 - **SMS Control Plane**: Osmocom (`OsmoSMSC` / `OsmoMSC` / `OsmoHLR`).
 - **Speech Processing**: Native Vosk Speech-to-Text (In-JVM JNI Java 21 runtime, zero cloud latency).
 - **Interception Gateway**: Spring Boot 3.4.3 + Java 21 LTS + Virtual Threads (Tomcat, JdbcTemplate, RestClient).
@@ -68,7 +68,7 @@ Recommended for sandbox development. Rootless-compliant out-of-the-box.
 ```bash
 # 1. Prerequisites (pick your distro — SCTP kernel module required for 5G NGAP)
 sudo apt install -y podman docker-compose-v2 sqlite3 lksctp-tools  # Debian/Ubuntu
-sudo dnf install -y podman docker-compose sqlite3 lksctp-tools        # Fedora/RHEL
+sudo dnf install -y podman podman-compose sqlite3 lksctp-tools        # Fedora/RHEL
 sudo pacman -S --needed podman docker-compose sqlite3                # Arch/CachyOS
 sudo modprobe sctp                                                    # Load SCTP kernel module
 
@@ -95,8 +95,8 @@ curl http://localhost:8080/api/v1/intercept/subscriber/15557654321
 # Expected: {"msisdn":"15557654321","balance":0}    ← zero-balance blocked
 
 # 6. Test interception & execute automated presentation runbook
-make test-sms    # SMS via SMPP → Spring Boot → AI Filter
-make test-call   # SIP call → rtpengine → Vosk STT → Spring Boot
+make test-sms    # HTTP SMS policy intercept endpoint verification
+make test-call   # HTTP voice call policy intercept endpoint verification (EIR & balance)
 ./scripts/testing/demo_runbook.sh  # Complete 11-step graduation project live presentation
 ```
 
@@ -124,10 +124,10 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | :--- | :--- | :--- | :--- | :--- |
 | **Spring Boot Gateway** | `mvno-api` | `8080` | HTTP / REST | Interception policy control & subscriber API |
 | **Kamailio CSCF** | `mvno-kamailio` | `5066 (host) → 5060` | UDP / TCP | SIP signaling & registrar proxy |
-| **rtpengine NG** | `mvno-rtpengine` | `22222` | UDP | In-kernel media proxy control port |
+| **rtpengine NG** | `mvno-rtpengine` | `22222 (internal)` | UDP | Userspace media proxy control port |
 | **rtpengine Media** | `mvno-rtpengine` | `30000-30100`| UDP | RTP media audio stream relay range |
 | **OsmoSMSC / MSC** | `mvno-osmosmsc` | `2775` | TCP / SMPP | Short Message Peer-to-Peer (SMPP 3.4) |
-| **OsmoHLR** | `mvno-osmo-hlr` | `4222` | TCP / GSUP | Standalone subscriber location database |
+| **OsmoHLR** | `mvno-osmo-hlr` | `4222 (internal)` | TCP / GSUP | Standalone subscriber location database |
 | **VictoriaMetrics** | `mvno-victoriametrics`| `8428` | HTTP | Telemetry TSDB & PromQL query API |
 | **vmagent Scraper** | `mvno-vmagent` | `8429` | HTTP | Telemetry scraper target health API |
 | **Grafana NOC** | `mvno-grafana` | `3000` | HTTP | Real-time telecom NOC dashboard UI |
@@ -155,8 +155,11 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ## 7. Documentation
 
+* [ONBOARDING.md](ONBOARDING.md): Team onboarding guide, setup instructions, make targets, and Section 14 integration specs.
 * [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Public AI Spam Filter REST API contract & JSON schemas for teammates.
 * [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
+* [docs/ROADMAP.md](docs/ROADMAP.md): Architectural roadmap and operational backlog (SIP 407 challenge, API keys, VictoriaLogs).
+* [docs/ISSUES.md](docs/ISSUES.md): Root cause analysis log and Section 10 Cross-Repo Contract Specifications.
 * [docs/architecture_flow.svg](docs/architecture_flow.svg): System architecture overview diagram.
 * [docs/ims_voice_call_flow.svg](docs/ims_voice_call_flow.svg): IMS VoLTE/VoNR Voice Call Interception sequence diagram.
 * [docs/sms_interception_flow.svg](docs/sms_interception_flow.svg): SMS Store-and-Forward Interception sequence diagram.
