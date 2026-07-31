@@ -151,7 +151,7 @@
             "mode": "absolute",
             "steps": [
               { "color": "#FF0844", "value": null },
-              { "color": "#00E676", "value": 3 }
+              { "color": "#00E676", "value": 7 }
             ]
           }
         },
@@ -216,7 +216,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 14 },
       "id": 7,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
@@ -252,7 +252,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 14 },
       "id": 8,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
@@ -353,9 +353,7 @@
       "id": 11,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=\"telecom-api\"} default 0", "legendFormat": "Spring Gateway (mvno-api)", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=\"rtpengine\"} default 0", "legendFormat": "Media Relay (rtpengine)", "refId": "B" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=\"vmagent\"} default 0", "legendFormat": "Telemetry Scraper (vmagent)", "refId": "C" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=~\"telecom-api|rtpengine|vmagent|open5gs|mongodb\"} default 0", "legendFormat": "{{job}} ({{instance}})", "refId": "A" }
       ],
       "title": "Service Target Liveness (up)",
       "type": "timeseries"
@@ -377,8 +375,7 @@
       "id": 12,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions default 0", "legendFormat": "RTPEngine Active Sessions", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_uptime_seconds default 0", "legendFormat": "RTPEngine Uptime (s)", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions default 0", "legendFormat": "Active Sessions ({{type}})", "refId": "A" }
       ],
       "title": "RTPEngine Media Relay Performance",
       "type": "timeseries"
@@ -386,9 +383,29 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
-      "id": 101,
+      "id": 104,
       "title": "RTP ENGINE DEEP DIVE",
       "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#00F2FE", "value": null }]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 39 },
+      "id": 20,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_uptime_seconds default 0", "refId": "A" }],
+      "title": "RTPEngine Uptime",
+      "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
@@ -403,9 +420,9 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 39 },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 39 },
       "id": 13,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions default 0", "refId": "A" }
@@ -426,9 +443,9 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 5, "x": 4, "y": 39 },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 39 },
       "id": 14,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total default 0", "refId": "A" }
@@ -449,9 +466,9 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 9, "y": 39 },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 39 },
       "id": 15,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packet_errors_total default 0", "refId": "A" }
@@ -465,24 +482,22 @@
         "defaults": {
           "color": { "mode": "thresholds" },
           "thresholds": {
-            "mode": "percentage",
-            "steps": [{ "color": "#00F2FE", "value": null }, { "color": "#FF9100", "value": 80 }, { "color": "#FF0844", "value": 95 }]
+            "mode": "absolute",
+            "steps": [{ "color": "#00E676", "value": null }, { "color": "#FF9100", "value": 50 }, { "color": "#FF0844", "value": 10 }]
           },
-          "unit": "short",
-          "min": 0,
-          "max": 100
+          "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 13, "y": 39 },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 39 },
       "id": 16,
-      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true },
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.6.0",
       "targets": [
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_ports_free default 0", "refId": "A" }
       ],
       "title": "Media Ports Free",
-      "type": "gauge"
+      "type": "stat"
     },
     {
       "datasource": { "type": "prometheus", "uid": "victoriametrics" },
@@ -501,12 +516,12 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 10, "x": 17, "y": 39 },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 39 },
       "id": 17,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions_total default 0", "legendFormat": "Total Sessions", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_closed_sessions_total default 0", "legendFormat": "Closed Sessions", "refId": "B" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_closed_sessions_total default 0", "legendFormat": "Closed ({{reason}})", "refId": "B" }
       ],
       "title": "Session Lifecycle",
       "type": "timeseries"
