@@ -359,7 +359,7 @@ services:
 
   # ─── Kamailio SIP Registrar & Interception Proxy ───
   kamailio:
-    image: mvno-kamailio:5.7.4
+    image: mvno-kamailio:5.7.2
     container_name: mvno-kamailio
     ports:
       - "5066:5060/udp"

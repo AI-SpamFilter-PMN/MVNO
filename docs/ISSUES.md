@@ -92,8 +92,8 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: `kamailio-http` package does NOT exist in Alpine 3.19. The correct package is `kamailio-utils`.
 * **Fix**: `configs/kamailio/Dockerfile`:
   ```dockerfile
-  FROM kamailio/kamailio:5.7-alpine
-  RUN apk add --no-cache kamailio-utils
+  FROM alpine:3.19
+  RUN apk add --no-cache kamailio kamailio-utils kamailio-sqlite
   ```
 
 ### Issue 3.3: Worker Process Proliferation (`children=4`)
