@@ -32,7 +32,7 @@ This document outlines upcoming architectural enhancements, operational backlog 
 ## 2. Operational Backlog & Housekeeping
 
 - [ ] **Remote Branch Cleanup**: Delete 8 merged feature branches on `origin` (`feature/5g-core-open5gs`, `feature/telecom-gateway-api`, etc.). — **INTENTIONALLY KEPT** (user decision, Aug 1 2026): all 9 local + 8 remote branches are fully merged into `main` and retained as frozen domain evidence for the graduation portfolio. No deletions, no prunes.
-- [ ] **Orphaned State File Cleanup**: Create automated cleanup utility for orphaned temporary database lock files (`*.db-shm`, `*.db-wal`) in `./state/`.
+- [x] **Orphaned State File Cleanup**: Added `scripts/cleanup-state.sh` — removes stale `*.db-shm` / `*.db-wal` lock files in `./state/` only when the owning container (hlr/kamailio/grafana) is not running; `-n` dry-run flag; live files always skipped.
 - [x] **VictoriaMetrics Self-Scrape Job**: Add `victoria-metrics` (`victoria-metrics:8428/metrics`) scrape job to `configs/victoria-metrics/scrape.yml` to collect `vm_*` internal TSDB metrics and `vmagent_remotewrite_*` pipeline stats.
 - [x] **VictoriaMetrics System NOC Dashboard**: Created `noc_victoriametrics.json` Grafana dashboard (cache entries, ingestion rate `rate(vm_rows_added_to_storage_total[5m])`, disk usage `vm_data_size_bytes` / `vm_free_disk_space_bytes`, `vmagent` remoteWrite stats).
 - [x] **vmagent RemoteWrite Alert Panels**: Added `vmagent_remotewrite_blocks_sent_total` / `vmagent_remotewrite_errors_total` / `vmagent_remotewrite_push_failures_total` panels to `noc_victoriametrics.json` to make telemetry write failures immediately visible at a glance.
