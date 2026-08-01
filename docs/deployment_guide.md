@@ -537,7 +537,7 @@ services:
     restart: unless-stopped
 
   victoria-metrics:
-    image: victoriametrics/victoria-metrics:v1.101.0
+    image: victoriametrics/victoria-metrics:v1.147.0
     container_name: mvno-victoriametrics
     ports:
       - "8428:8428"
@@ -548,7 +548,7 @@ services:
     restart: unless-stopped
 
   vmagent:
-    image: victoriametrics/vmagent:v1.101.0
+    image: victoriametrics/vmagent:v1.147.0
     container_name: mvno-vmagent
     ports:
       - "8429:8429"

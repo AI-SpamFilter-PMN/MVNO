@@ -222,7 +222,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 | Media Proxy | `drachtio/rtpengine` (mr9.4.0.0) |
 | HLR/MSC/SMSC | `osmocom/osmocom` (osmo-msc, osmo-hlr, osmo-smsc) |
 | ASR | `alphacep/vosk-api` (v0.3.45) + `vosk-model-small-en-us-0.15` |
-| Metrics TSDB | `victoriametrics/victoria-metrics` (v1.101.0) |
+| Metrics TSDB | `victoriametrics/victoria-metrics` (v1.147.0) |
 | Log Pipeline | `timberio/vector` (0.44.0) |
 | Visualization | `grafana/grafana-oss` (11.6.0) |
 
