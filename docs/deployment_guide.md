@@ -616,11 +616,10 @@ services:
 - **Web UI URL:** `http://localhost:3000`
 - **Username:** `admin`
 - **Password:** `admin`
-- **Provisioned NOC Dashboards:**
-  1. `MVNO Interception Core — Unified Master NOC Dashboard` (`uid: mvno-unified-noc`)
-  2. `NOC Overview` (`uid: noc-overview`)
-  3. `NOC Telecom API` (`uid: noc-telecom-api`)
-  4. `NOC RTPEngine` (`uid: noc-rtpengine`)
+- **Provisioned NOC Dashboards** (auto-provisioned from `configs/grafana/provisioning/dashboards/`, hot-reload ~10s):
+  1. `MVNO NOC — Unified` (`uid: mvno-unified-noc`) — KPIs, interception traffic, EIR, rtpengine, topology
+  2. `MVNO VictoriaMetrics System NOC` (`uid: mvno-victoriametrics-noc`) — observability-of-observability: ingestion rate, disk, remoteWrite pipeline
+- **Provisioned Alert Rules** (folder `MVNO NOC`, 4 rules): Scrape Targets Down (critical), Media Ports Free Low, EIR SIM-Swap Blocks, AI Fail-Open SLA Rate
 - **Verification Status:** Validated via HTTP `POST /login` (`HTTP 200 OK`, `grafana_session` cookie issued).
 
 ### 📱 Open5GS 5G SA Subscriber Management WebUI
@@ -744,8 +743,13 @@ All developer lifecycle operations are in the `Makefile`:
 | `make ps` | `podman ps` | List running containers |
 | `make logs` | `podman compose logs -f` | Stream all container logs |
 | `make test-api` | `curl /actuator/health/liveness` | Verify gateway health |
+| `make test-vty` | VTY socket assertions (`scripts/vty.sh`) | Verify OsmoHLR/SMSC VTY control sockets + subscriber + ESMEs |
 | `make test-sms` | `curl -X POST /api/v1/intercept/sms` (JSON body + `X-API-Key` header) | End-to-end SMS intercept test |
 | `make test-call` | `curl -X POST /api/v1/intercept/call` (JSON body + `X-API-Key` header) | Call intercept test |
+| `make test` | `test-vty` + `test-api` + `test-sms` + `test-call` | Runs all 4 test suites sequentially |
+| `make seed-mongo` | `scripts/seed-mongo.sh` | Upsert 3 5G SA subscriber records into Open5GS MongoDB |
+| `make init-native-db` | Alias for `init-db` | SQLite init for native systemd deployments |
+| `make up-native` | `init-db` + systemd services | Native (non-containerized) deployment |
 | `make clean` | `rm -rf state/*` | Wipe all state data |
-| `make rebuild` | `clean + init-db + up` | Full teardown and rebuild |
+| `make rebuild` | `clean + init-db + up --build` | Full teardown and rebuild |
 

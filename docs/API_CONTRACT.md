@@ -16,6 +16,7 @@ X-API-Key: mvno-demo-key-2026
 - Demo key default from `intercept.api-key` property (env override: `X_API_KEY`).
 - Not required for `/actuator/*` health/metrics endpoints (scrape-safe).
 - **Scope**: only `/api/v1/intercept/**` is key-protected. `POST /api/v1/classify` (outbound to `ai-filter`) and `/actuator/*` are unaffected; SIP (407 digest) and SMPP (ESME credentials) authenticate at their own protocol layers.
+- **Kamailio callout** (voice path): `GET /api/v1/intercept/call?caller=<$fU>&callee=<$rU>` with the `X-API-Key` header (see `kamailio.cfg` `route[INTERCEPT]`, `http_client_query`). Caller/callee are E.164 MSISDNs; the gateway response is `{ "allow": boolean, "reason": "string" }` — `allow:false` → Kamailio rejects the call with `403 Call Intercepted / Blocked`.
 
 ---
 
@@ -125,6 +126,8 @@ If `ai-filter:8000` is offline, times out ($> 5.0\text{s}$), or returns an HTTP 
 }
 ```
 *SMS/Calls will be allowed through to prevent carrier service outages.*
+
+**Observability**: every fail-open increments `mvno_ai_failopen_total{reason}` (Micrometer, exported at `/actuator/prometheus`, scraped into VictoriaMetrics; Grafana alert `MVNO AI Fail-Open SLA Rate`). `reason` ∈ `unreachable` | `empty_response` | `internal` | `circuit_open` — the SLA contract is instrumented end-to-end.
 
 ---
 

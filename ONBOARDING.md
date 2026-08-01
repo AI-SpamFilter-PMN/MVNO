@@ -7,17 +7,24 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
 ## 2. Architecture Overview
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌──────────────────┐    ┌─────────────┐
-│  5G SA Core │───▶│   Osmocom   │───▶│  Interception    │───▶│  AI Spam    │
-│  (Open5GS +  │    │  (HLR/      │    │  Gateway         │    │  Filter     │
-│  UERANSIM)  │    │   SMSC)     │    │ (Kamailio +      │    │  (External) │
-│             │    │  SMPP/GSUP) │    │  rtpengine +     │    │             │
-└─────────────┘    └─────────────┘    │  Vosk ASR +      │    └─────────────┘
-       │                │             │  Spring Boot)    │           │
-       ▼                ▼             └────────┬─────────┘           ▼
-┌─────────────┐    ┌─────────────┐             │             ┌─────────────┐
-│  Observability      │◀───────────────────┘    AI Spam Filter
-│ (Vector → stdout / VM → Grafana)               (External Repo)
+┌───────────────────┐  ┌──────────────────────┐  ┌──────────────────┐  ┌─────────────┐
+│ VOICE PATH        │  │                      │  │                  │  │             │
+│ SipClient UA      │─▶│ Kamailio SIP Proxy   │─▶│ Telecom Gateway  │─▶│ AI Spam     │
+│ (SIP 5066)        │  │ (407 digest + 403)   │  │ (Spring Boot:    │  │ Filter      │
+└───────────────────┘  └──────────────────────┘  │  OCS · EIR · SLA)│  │ (External)  │
+┌───────────────────┐  ┌──────────────────────┐  └────────┬─────────┘  └─────────────┘
+│ SMS PATH          │  │                      │           │
+│ sms-client ESME   │─▶│ OsmoSMSC (SMPP 2775) │─▶  POST /intercept/* (X-API-Key)
+│ (SMPP 3.4)        │  │                      │
+└───────────────────┘  └──────────────────────┘
+┌───────────────────┐  ┌──────────────────────┐
+│ 5G RADIO TRACK    │  │ Open5GS 5GC          │   (registration-only — SMS-over-NAS on roadmap)
+│ UERANSIM gNB+3UEs │─▶│ AMF/SMF/UPF/NRF      │
+└───────────────────┘  └──────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ OBSERVABILITY — Vector → VictoriaMetrics → Grafana NOC          │
+│ (Unified + VictoriaMetrics System dashboards · 4 alert rules)   │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 **Components:**
@@ -25,7 +32,7 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
 - **Osmocom Stack**: HLR (GSUP) + SMSC (SMPP 3.4) via `osmo-hlr` + `osmo-smsc` containers (the `osmo-msc` binary runs in SMSC mode)
 - **Interception Gateway**: Kamailio SIP registrar/proxy → `rtpengine` media fork → Vosk ASR (native JNI) → Spring Boot gateway (Java 21, virtual threads)
 - **AI Spam Filter**: External REST service at `http://ai-filter:8000/api/v1/classify`
-- **Observability**: Vector (stdout log driver) → VictoriaMetrics (metrics TSDB) → Grafana (4 pre-built dashboards)
+- **Observability**: Vector (stdout log driver) → VictoriaMetrics (metrics TSDB) → Grafana (2 dashboards: Unified NOC + VictoriaMetrics System NOC)
 
 **Diagrams:** `docs/architecture_flow.svg`, `docs/ims_voice_call_flow.svg`, `docs/sms_interception_flow.svg`
 
@@ -156,12 +163,12 @@ make test      # runs test-vty + test-api + test-sms + test-call
 
 | Tool | URL | Purpose |
 |------|-----|---------|
-| Grafana | `http://localhost:3000` (admin/admin) | Dashboards: NOC, Telecom-API, Rtpengine, Overview |
+| Grafana | `http://localhost:3000` (admin/admin) | Dashboards: MVNO NOC — Unified, MVNO VictoriaMetrics System NOC (auto-provisioned, hot-reload; 4 alert rules) |
 | VictoriaMetrics | `http://localhost:8428` | Raw PromQL queries |
 | vmagent | `http://localhost:8429` | Scrape config |
 | Vector | Internal | Log pipeline (console stdout driver; VictoriaLogs on Roadmap) |
 
-**Key metrics:** `mvno_sms_requests_total`, `mvno_sms_blocked_total`, `mvno_call_requests_total`, `mvno_call_blocked_total`, `mvno_call_blocked_eir_total`.
+**Key metrics (12 families):** `mvno_sms_requests_total`, `mvno_sms_blocked_total`, `mvno_call_requests_total`, `mvno_call_blocked_total`, `mvno_call_blocked_eir_total`, `mvno_subscriber_lookups_total`, `mvno_eir_sim_swap_detected_total`, `mvno_eir_cache_size` (gauge), `mvno_vosk_transcriptions_total`, `mvno_vosk_decode_errors_total`, `mvno_vosk_model_ready` (gauge 0/1), `mvno_ai_failopen_total{reason}` — lazily registered: 11 families export at idle; `mvno_ai_failopen_total` appears only after the first SLA fail-open.
 
 ---
 
@@ -171,7 +178,8 @@ make test      # runs test-vty + test-api + test-sms + test-call
 |------|------------|
 | **Vosk ASR** | English-only small model (50MB). Post-call only. ~10-15% WER. No Arabic. |
 | **AI Filter Mock** | Returns `allow: true` always. Replace `ai-filter` container with your model. |
-| **SIP Testing** | `make test-call` uses HTTP POST, not real SIP INVITE. No SIPp scenario included. |
+| **SIP Testing** | `make test-call` uses HTTP POST; real SIP covered by `scripts/testing/sip_traffic_sim.py` (REGISTER + 407 digest challenge → INVITE handshake, used by runbook steps 5-6). No SIPp scenario included. |
+| **5G Radio Path** | Registration-only demo (3 UEs on AMF). **No SMS-over-NAS / VoNR over radio** — voice and SMS are external-path demos (SipClient / sms-client); SMS-over-NAS is on the roadmap. |
 | **SCTP Kernel** | `modprobe sctp` required on host. Fails silently if missing (gNB↔AMF never connects). |
 | **RTPEngine Kernel** | Runs in userspace mode (kernel module not required). |
 | **First-call ASR Cold Start** | Vosk model loads lazily on first transcription (~2-5s delay). |
