@@ -171,6 +171,38 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Findings**: `configs/open5gs/udm.yaml` sets `no_tls: true` at the `default` scope and on both `udm.sbi.server` (`0.0.0.0:7777`) and `udm.sbi.client` (`nrf`, `udr`) stanzas. The identical `no_tls: true` + `advertise: <nf>` pattern is present across `amf.yaml`, `ausf.yaml`, `bsf.yaml`, `nrf.yaml`, `nssf.yaml`, `pcf.yaml`, `smf.yaml`, `udr.yaml` (UPF is exempt: it communicates via PFCP and has no SBI HTTP/2 server).
 * **Conclusion**: h2c cleartext framing is compliant for a trusted, single-tenant bridge network (`mvno_net`) per TS 29.500 §6.1 (TLS optional when transport security is provided by the network segment). No changes required. Live evidence: `nrf` shows all NFs registered over cleartext HTTP/2; `mvno-udm`/`mvno-udr` healthy.
 
+### Issue 5.5: `ogs_tun_set_ip()` is a No-Op on Linux — ogstun Gateway Never Configured
+* **Symptom**: UPF's N6 tunnel device `ogstun` existed inside `mvno-upf` but had **no IP address and no route** (`ip addr` empty, `10.45.0.0/16` route absent). All user-plane packets written to the tun by the UPF were silently dropped by the kernel (device RX/TX counters stayed at 0). Symptom seen as "UPF receives GTP-U but no N6 write" (`[RECV] GPU-U` traces present, `ogstun` RX = 0).
+* **Root Cause**: `ogs_tun_set_ip()` in Open5GS `lib/tun/linux-setup.c` is a **deliberate no-op returning `OGS_OK`** on Linux — verified identical in v2.7.7 and v2.8.0. The comment in `src/upf/gtp-path.c` states "Note that Linux will skip this configuration": on Linux the operator must configure the TUN externally (`ip tuntap add` / `ip addr add` + route). The containerized UPF entrypoint never did this, so the UPF opened `ogstun` (device created via `TUNSETIFF`) but the device had no addressing.
+* **Fix**: [configs/open5gs/entrypoint.sh](file:///home/zkhattab/MVNO/configs/open5gs/entrypoint.sh) UPF branch polls for `ogstun` to appear (≤30 s), then applies:
+  ```bash
+  ip addr replace 10.45.0.1/16 dev ogstun
+  ip -6 addr replace 2001:db8:cafe::1/48 dev ogstun
+  ip link set ogstun up
+  ```
+  (`iproute2` added to the runtime stage of [configs/open5gs/Dockerfile](file:///home/zkhattab/MVNO/configs/open5gs/Dockerfile)).
+* **Verification**: `podman exec mvno-upf ip addr show ogstun` → `inet 10.45.0.1/16`, `inet6 2001:db8:cafe::1/48`, `UP,LOWER_UP`; `ip route` → `10.45.0.0/16 dev ogstun proto kernel scope link src 10.45.0.1`. UL probe: 5 UDP packets from a UE tun reach `ogstun` RX (+165 bytes); DL probe: packets from the UPF netns reach the UE tun.
+
+### Issue 5.6: Fresh v2.8.0 Source Rebuild Regresses SBI HTTP/2 Clients (30 s Heartbeat Death)
+* **Symptom**: After rebuilding the Open5GS container from the `v2.8.0` tag source, every NF's SBI connection to the NRF died at the first heartbeat (~30-35 s after registration): `[sbi] WARNING: Error in the HTTP2 framing layer (16)` (lib/sbi/client.c:767, `CURLE_HTTP2`), followed by NRF `[nrf] WARNING: No heartbeat` → de-registration. All NFs de-registered on a fixed cadence regardless of NRF restart order.
+* **Root Cause**: The freshly built daemon binaries (from-source v2.8.0 tag, verified tag peel `157f611a...` 2026-06-20 Release-19) exhibited a regressed HTTP/2 client behavior compared to the known-good 07-26 image (`mvno-open5gs:latest`, image `a2f041bbd267`). A 2×2 matrix (old/new image × NRF/client) proved: any *new-image client* fails; any *known-good client* works against either NRF. Runtime libraries were byte-identical (libcurl3-gnutls 7.88.1-10+deb12u15, libgnutls30 3.7.9-2+deb12u7, libnghttp2-14 1.52.0-1+deb12u3, libssl3 3.0.20-1~deb12u2); only the Open5GS daemon binaries differed (md5).
+* **Fix**: [configs/open5gs/Dockerfile](file:///home/zkhattab/MVNO/configs/open5gs/Dockerfile) is now **layered on the known-good image** (`FROM mvno-open5gs:latest`) adding only `iproute2` + the fixed `entrypoint.sh` — it does **not** rebuild Open5GS from source. The Dockerfile carries an explicit banner: do not switch the base back to a fresh source build until the HTTP/2 client regression is root-caused upstream. Rebuilt image `mvno-open5gs:2.8.0` daemon binaries now md5-match the known-good image.
+* **Verification**: Full stack recreate → NRF shows 8 NF registrations, **0 de-registrations** past the 90 s heartbeat checkpoint; only a few startup-race framings (all before the settle timestamp), none after.
+
+### Issue 5.7: SMF UE Pool Allocates the ogstun Gateway Address (10.45.0.1) to UEs
+* **Symptom**: Intermittently a UE was handed `10.45.0.1/32` — the same address as the `ogstun` gateway (e.g. wave 1: ue-1=.3, ue-2=**10.45.0.1**, ue-3=.4). Traffic to `10.45.0.1:9` from that UE self-routed into its own tun, breaking probes and shadowing the real gateway.
+* **Root Cause**: `configs/open5gs/smf.yaml` session stanza declared only `subnet: 10.45.0.0/16`, so the SMF's allocatable UE pool began at the subnet base — including the gateway address the UPF's ogstun uses.
+* **Fix**: [configs/open5gs/smf.yaml](file:///home/zkhattab/MVNO/configs/open5gs/smf.yaml):
+  ```yaml
+  session:
+    - subnet: 10.45.0.0/16
+      gateway: 10.45.0.1
+      range: # UE address pool: starts at .2 so ogstun gateway .1 is never allocated to a UE
+        - 10.45.0.2-10.45.0.254
+      dnn: internet
+  ```
+* **Verification**: After recreate, UE addresses were 10.45.0.2 / 10.45.0.3 / 10.45.0.4 — `.1` never allocated across subsequent session establishments.
+
 ---
 
 ## 6. Control-Plane & Telemetry Pipeline Operational RCA
@@ -216,6 +248,18 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Fix**:
   - `gnb.yaml`: Added `linkIp: 0.0.0.0`, `ngapIp: 0.0.0.0`, `gtpIp: 0.0.0.0`, `ignoreStreamIds: true`.
   - `ue.yaml`: Added `sessions.type: IPv4`, `gnbSearchList`, `op`, `opType: OP`, `integrity`, `ciphering`, `integrityMaxRate`, `uacAic`, `uacAcc`.
+
+### Issue 7.3: Spurious Second PDU Session Establishment Request → SMF 400 → Session Teardown
+* **Symptom**: ~10 s after a UE's PDU session established (observed on `ue-1`, the first UE after a gNB/UE recreate), the UE's NAS sent a **second PDU Session Establishment Request** (type 193). The AMF forwarded it to the SMF via `sm-contexts/{ref}/modify`; the SMF rejected with `[smf] ERROR: Unknown message [214]` (0xD6 = PDU Session Release Command) + HTTP 400; the AMF then failed the session (`Cannot receive SBI message` → `amf_nnrf_send_session_failure_to_ran` → NGAP Error Indication `protocol/semantic-error` to the gNB). UE log: `SM forwarding failure for message type[193] ... PAYLOAD_NOT_FORWARDED`, `Received PSI value [1] is invalid, expected was [0]`, `Sending SM Cause[INVALID_PTI_VALUE]`. Result: that UE's DL data path stopped working (DL GTP-U dropped at gNB, no DRB delivery) while other UEs stayed healthy.
+* **Root Cause**: UERANSIM v3.2.6 UE NAS state quirk — the UE re-sent a PDU session establishment request (with a stale/invalid PSI transaction) ~10 s after establishment; the Open5GS SMF's GSM state machine does not recognize the forwarded NAS type in that path and 400s it, and the AMF tears the session down. Not caused by deployment configuration (occurred only on the first UE after a full UERANSIM trio recreate, while ue-2/ue-3 with identical config stayed clean).
+* **Fix / Workaround**: Recreate the affected UE (`podman compose up -d --force-recreate ueransim-ue-1`) to obtain a fresh session. No permanent config change required.
+* **Verification**: After ue-1 recreate: UL probes delivered to `ogstun` (RX +165 bytes) and DL probes delivered to ue-1 tun (RX incremented) — full bidirectional gate PASS.
+
+### Issue 7.4: UL Data Plane Dead After Partial gNB Recreate — Stale NGAP Contexts, gNB Silently Swallows PDU Session Resource Setup
+* **Symptom**: After recreating **only** `ueransim-gnb` (single-container recreate; UEs kept running and re-attached to the new gNB), UL data died: UE tun TX counters incremented when probing `10.45.0.1:9`, but **nothing ever reached the UPF** (`[RECV] GPU-U` absent, ogstun RX stuck). The gNB logged neither RRC Reconfiguration nor DRB establishment for the UEs, and never logged `PDU session resource(s) setup`. `smf` and `upf` were silent — no F-TEID modification, no PFCP Session Modification Response.
+* **Root Cause**: The partial gNB recreate left **stale NGAP contexts on the UEs** (the UEs carried UE contexts from the pre-recreate gNB instance). When the UEs sent Service Requests and the new gNB forwarded the PDU session setups, UERANSIM's `gnb/ngap/session.cpp` `handlePDUSessionResourceSetupRequest()` could not match the contexts (`findUeByNgapIdPair` returned null) and **returned silently without sending the setup response** — the exact case a code-path review of v3.2.6 source confirmed. Without the PDU Session Resource Setup Response, no RRC Reconfiguration/DRB is ever issued → no data radio → UL GTP-U never flows. Contamination is persistent: consecutive waves (AMF restart, then another gNB recreate) kept reproducing the dead path because the stale UE contexts were never cleared atomically. Note the log-order gotcha: the gNB's `PDU session resource(s) setup` log line (session.cpp:206) is emitted **after** `sendNgapUeAssociated()` (session.cpp:203), so its absence proves the setup was never answered.
+* **Fix (operational rule)**: **Always recreate the whole UERANSIM trio atomically** — `podman compose up -d --force-recreate ueransim-gnb ueransim-ue-1 ueransim-ue-2 ueransim-ue-3` — never a single UERANSIM container. A full atomic recreate (05:14 wave) cleared all stale contexts: gNB logged `PDU session resource(s) setup` for every UE, SMF processed `/modify` with `IPv4[10.89.0.30]` F-TEID and answered `Session Modification Response [5gc]` (n4-handler.c:268), and the UPF re-ran `gtp_connect() [10.89.0.30]:2152` for N3.
+* **Verification**: 5 UDP probes from ue-1 tun → 10.45.0.1:9: UPF logged `[RECV] GPU-U Type [255] from [10.89.0.30] : TEID[0x9fa2]` (gtp-path.c:345) with rule-match `PROTO:17 SRC:0a2d0006`; ogstun RX incremented (+165 bytes). DL: 4 UDP probes from the UPF netns (10.45.0.1:34569) → ue-1 tun IP:9 delivered (tun RX incremented). Full bidirectional gate PASS on ue-1 and DL PASS on ue-2/ue-3.
 
 ---
 
@@ -297,6 +341,28 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: Non-bash container shells (Alpine/busybox) lack `/dev/tcp` socket redirection syntax, causing execution failure on minimalist images.
 * **Fix**: Refactored [scripts/vty.sh](file:///home/zkhattab/MVNO/scripts/vty.sh) with container runtime auto-detection (`podman`/`docker`) and added `nc -w 3 127.0.0.1 <port>` socket redirection fallback.
 
+### Issue 8.18: `docker build` vs `podman build` Store Divergence
+* **Symptom**: A fresh `docker build` of the Open5GS container produced a different image than the previously built `podman` image — identical `Dockerfile` and context, different daemon binary md5s and different `imageId`, even though layer hashes appeared equal.
+* **Root Cause**: Container engines cache differently (`docker build` separate store; `podman` may reuse a stale local cache) — the "identical layers" hash equality was broken once fresh-archive hashes were compared. This divergence was implicated in the HTTP/2 heartbeat regression hunt (Issue 5.6): the source rebuild experiment was repeated on both engines and only the source-rebuild artifacts (not engine choice) correlated with the framing failures.
+* **Fix / Guidance**: Treat the image cache as non-portable across engines. Reproduce experiments on the same engine; do not validate a rebuilt image with a different engine's cache. For Phase 0 the build is frozen: `mvno-open5gs:2.8.0` is layered on the known-good `mvno-open5gs:latest` (a2f041bbd267) with only `iproute2` + `entrypoint.sh` added (Issue 5.6).
+* **Verification**: `podman images` shows `mvno-open5gs:latest`/`mvno-open5gs:2.8.0`; daemon binaries inside both images md5-match after the layering fix.
+
+### Issue 8.19: docker-compose IPAM Collision — Unpinned Static IP Grabs Another Service's Address
+* **Symptom**: `telecom-api` intermittently came up without its intended static address; a concurrent container (e.g. `mongodb`) had already claimed `10.89.0.4`, and `telecom-api` grabbed a different address (e.g. `10.89.0.46`) — breaking configs that hardcode the gateway's FQDN/address.
+* **Root Cause**: `docker-compose.yml` left `telecom-api` `ipv4_address` unpinned at times (or assigned last), while other services used fixed IPs; the bridge IPAM hands out addresses in order, so two services raced for the same subnet slot.
+* **Fix**: [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml) pins every service's `ipv4_address` explicitly in a conflict-free plan (e.g. `telecom-api: 10.89.0.46`, `mongodb: 10.89.0.4`), with the plan audited via `podman compose config` (no duplicate IP assertions).
+* **Verification**: `podman compose config` exits 0; `podman exec mvno-api ip addr` shows `10.89.0.46/24`; no `Network address already in use` errors across full-stack recreates.
+
+### Issue 8.20: Rootless Podman Has No Host Route to Container IPs — UE↔Bridge Needs UPF-Internal SNAT
+* **Symptom**: `sudo ip route add 10.45.0.0/16 via 10.89.0.14` on the host fails with `Error: Nexthop has invalid gateway`; `curl http://10.89.0.46:8080/...` from the host is unreachable even though the container answers on published ports.
+* **Root Cause**: Rootless Podman (pasta/slirp) keeps the compose bridge subnet `10.89.0.0/24` inside its **user network namespace** — no host interface carries it, so the host cannot route to container IPs at all. The "host route via the UPF" design (valid for rootful/native deployments) is impossible here; return traffic for anything forwarded out of `ogstun` (10.45.0.0/16) to the bridge would be dropped at the host.
+* **Fix**: The UPF entrypoint ([configs/open5gs/entrypoint.sh](file:///home/zkhattab/MVNO/configs/open5gs/entrypoint.sh)) installs an idempotent SNAT rule inside the UPF netns — the whole UE→bridge round-trip stays in-netns:
+  ```bash
+  iptables -t nat -A POSTROUTING -s 10.45.0.0/16 ! -o ogstun -j MASQUERADE
+  ```
+  (`iptables` added to the Open5GS Dockerfile runtime layer; `net.ipv4.ip_forward=1` is already the container default.) Trade-off: bridge services see the UE's traffic with source `10.89.0.14` (the UPF), not the UE's `10.45.0.x`.
+* **Verification**: SIP over 5G end-to-end (Phase 1 gate): sim from inside ue-1 with the kamailio `/32` routed via `uesimtun0` → REGISTER 200 OK, INVITE 407 → digest → 100 trying; Kamailio logs show the dialog from `10.89.0.14`; ogstun counters grow (~10 KB RX / ~15 KB TX per dialog pair).
+
 ---
 
 ## 9. Master Verification & Verification Checklist
@@ -315,6 +381,11 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 | **X-API-Key 401 (zero-trust Section 1.2)** | `GET /api/v1/intercept/call` without `X-API-Key` header | `HTTP 401 Unauthorized`; valid key → normal response | ✅ **PASS** |
 | **vmagent Scraper Targets** | `GET :8429/api/v1/targets` | `8/8 targets health: UP` (6 scrape jobs) | ✅ **PASS** |
 | **VictoriaMetrics TSDB** | `GET :8428/api/v1/query?query=mvno_sms_requests_total` | `seriesFetched: 1`, `value: [ts, "2"]` | ✅ **PASS** |
+| **ogstun N6 Gateway (Issue 5.5)** | `podman exec mvno-upf ip addr show ogstun` | `inet 10.45.0.1/16`, `inet6 2001:db8:cafe::1/48`, `UP` | ✅ **PASS** |
+| **UE Pool vs Gateway (Issue 5.7)** | `podman exec mvno-ue-1 ip addr show uesimtun0` | UE in `10.45.0.2-10.45.0.254` range, **never** `10.45.0.1` | ✅ **PASS** |
+| **UL Data Plane (Phase 0 gate)** | 5 UDP probes from ue-1 tun → `10.45.0.1:9` | UPF `[RECV] GPU-U Type [255] from [10.89.0.30]`; ogstun RX +165 bytes | ✅ **PASS** |
+| **DL Data Plane (Phase 0 gate)** | 4 UDP probes from UPF netns `10.45.0.1:34569` → ue-1 tun IP:9 | ue-1 tun RX incremented (+4); no N3 drops | ✅ **PASS** |
+| **SIP over 5G (Phase 1 gate)** | `sip_traffic_sim.py --host 10.89.0.23 --port 5060` from inside ue-1 (kamailio `/32` via `uesimtun0`) | REGISTER 200 OK + INVITE 407 → digest → 100 trying; ogstun counters grow; `mvno_call_requests_total` increments | ✅ **PASS** |
 | **Open5GS WebUI Login UI** | `GET :9999/` | `HTTP 200 OK` (`<title>Open5gs - Login</title>`) | ✅ **PASS** |
 
 ---

@@ -727,7 +727,78 @@ Connect the lightweight time-series stack to scrape metrics:
        static_configs:
          - targets: ['vmagent:8429']
    ```
-2. **Set ingestion write-path**: Point `vmagent` to push all aggregated telemetry to the VictoriaMetrics TSDB single-binary database at `victoria-metrics:8428`.
+ 2. **Set ingestion write-path**: Point `vmagent` to push all aggregated telemetry to the VictoriaMetrics TSDB single-binary database at `victoria-metrics:8428`.
+
+### Step 6: 5G SA Radio Access & User-Plane Data Path (UERANSIM ↔ Open5GS)
+
+This step brings up the 5G SA access network (UERANSIM gNB + UEs) against the Open5GS core and verifies a **live user-plane data path** end-to-end (UE tun → N3 GTP-U → UPF → N6 ogstun, and the reverse DL direction).
+
+1. **Addressing plan** (fixed static IPs in `docker-compose.yml`):
+
+   | Role | Container | Address / Port |
+   |---|---|---|
+   | N2/NGAP (gNB ↔ AMF) | `mvno-ueransim-gnb` | `10.89.0.30:38412` ↔ `mvno-amf:38412` (SCTP) |
+   | N3 GTP-U (gNB ↔ UPF) | `mvno-ueransim-gnb` | `gtpIp: 10.89.0.30` ↔ `mvno-upf` `gtpu: 10.89.0.14:2152` |
+   | N6 (UPF ↔ UE network) | `mvno-upf` | `ogstun 10.45.0.1/16` (gateway) |
+   | UE address pool | SMF | `10.45.0.0/16` subnet, **pool `10.45.0.2-10.45.0.254`** (`gateway: 10.45.0.1`) — see Issue 5.7 |
+
+2. **ogstun gateway (required)**: Open5GS' `ogs_tun_set_ip()` is a deliberate **no-op on Linux** (Issue 5.5). The UPF entrypoint (`configs/open5gs/entrypoint.sh`) polls for `ogstun` then configures:
+   ```bash
+   ip addr replace 10.45.0.1/16 dev ogstun
+   ip -6 addr replace 2001:db8:cafe::1/48 dev ogstun
+   ip link set ogstun up
+   ```
+   Verify: `podman exec mvno-upf ip addr show ogstun` → `inet 10.45.0.1/16`, `UP`.
+
+3. **UE default route (required after every UE recreate)**: The SMF `gateway` key does **not** install a default route in the UE. After each UERANSIM UE (re)create, add it from inside the UE container:
+   ```bash
+   podman exec mvno-ueransim-ue-1 sh -c 'ip route add 10.45.0.1 dev uesimtun0'
+   # repeat for ue-2 / ue-3 with their tun interfaces
+   ```
+
+4. **UERANSIM recreate rule (critical)**: Always recreate the **whole UERANSIM trio atomically** — never a single container:
+   ```bash
+   podman compose up -d --force-recreate ueransim-gnb ueransim-ue-1 ueransim-ue-2 ueransim-ue-3
+   ```
+   A partial (gNB-only) recreate leaves stale NGAP contexts that make the gNB silently swallow PDU Session Resource Setup requests (no RRC Reconfiguration → no DRB → dead UL path). See Issue 7.4; the one-off "second PDU session request → SMF 400" quirk on the first UE after a recreate is Issue 7.3 (recreate the affected UE).
+
+5. **Image layering constraint**: `configs/open5gs/Dockerfile` is layered on the known-good `mvno-open5gs:latest` (adds only `iproute2` + `iptables` + entrypoint). **Do not rebuild Open5GS from source** — fresh v2.8.0 source builds regress the SBI HTTP/2 client (heartbeat death loop, Issue 5.6).
+
+6. **N6 forwarding & SNAT (automatic)**: the UPF entrypoint also installs an idempotent NAT rule so UE traffic can reach the bridge network (and get replies back):
+   ```bash
+   iptables -t nat -A POSTROUTING -s 10.45.0.0/16 ! -o ogstun -j MASQUERADE
+   ```
+   Rootless Podman keeps `10.89.0.0/24` inside its user netns (the host has no route to it), so a host-side route is **impossible**; the SNAT keeps the whole round-trip inside the UPF netns. Note: with SNAT, services on the bridge see the UE's traffic with source IP `10.89.0.14` (the UPF), not the UE's `10.45.0.x`.
+
+7. **Data-plane gate verification** (production log levels — traces are only visible when the temporary `logger.level: trace` blocks are re-added to `smf.yaml`/`upf.yaml`):
+   - **UL**: 5 UDP probes from ue-1 tun → `10.45.0.1:9`. Expected: ogstun RX counter +165 bytes (`podman exec mvno-upf ip -s link show ogstun`) and UPF trace `[RECV] GPU-U Type [255] from [10.89.0.30] : TEID[0x9fa2]`.
+   - **DL**: UDP probes from the UPF netns (`10.45.0.1`) → the UE's tun IP (`podman exec mvno-ueransim-ue-1 ping -c1 10.45.0.2` after adding the route, or raw UDP via the UPF netns). Expected: ue tun RX counter increments. No reply is expected on a probe port with no responder.
+
+### Step 7: Flexible SIP Transport Paths (2G/IMS Direct vs 5G SA User Plane)
+
+The same SIP simulator drives **both** transport paths — nothing is hardcoded to one path, and both can be used simultaneously by different clients:
+
+| Path | Invocation | SIP source seen by Kamailio | Transport |
+|---|---|---|---|
+| **2G/IMS direct** (default) | `python3 scripts/testing/sip_traffic_sim.py` (host, `127.0.0.1:5066`) | `127.0.0.1` (host) | Loopback → Kamailio host-mapped port |
+| **5G SA user plane** | From inside a UE container: `python3 /sim.py --host 10.89.0.23 --port 5060` | `10.89.0.14` (UPF, SNAT'd) | UE tun → N3 GTP-U → UPF ogstun → bridge → Kamailio |
+
+Simulator options (defaults preserve the 2G/IMS behavior exactly): `--host`, `--port`, `--caller`, `--callee`, `--password`.
+
+To run the 5G SA path:
+1. **Per-UE route** (required after every UE recreate — the SMF `gateway` key does not install UE routes): point the Kamailio IP through the 5G tun so SIP leaves via the user plane instead of the UE's bridge NIC:
+   ```bash
+   podman exec mvno-ueransim-ue-1 sh -c 'ip route add 10.89.0.23/32 dev uesimtun0'
+   ```
+   A `/32` (not `/16`) is deliberate: the UE's `10.89.0.0/24 dev eth0` route must keep serving the gNB/control traffic; only Kamailio SIP is steered onto 5G.
+2. **Copy + run the simulator inside the UE** (`python3` is baked into the UERANSIM image):
+   ```bash
+   podman cp scripts/testing/sip_traffic_sim.py mvno-ueransim-ue-1:/tmp/sip_traffic_sim.py
+   podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py \
+     --host 10.89.0.23 --port 5060 --callee 15559998888 --caller 15551234567
+   ```
+   Expected: `SIP REGISTER 200 OK` (callee registered via 5G) then `SIP INVITE Response ... 100 trying` (407 digest challenge → 200/100 via 5G).
+3. **Warm-up note**: the first packet of a session (after a UPF/bridge restart) may race neighbor resolution and time out — simply re-run the simulator; subsequent exchanges are immediate. Live evidence: `ogstun` counters grow (~10 KB RX / ~15 KB TX per dialog pair), `mvno_call_requests_total` increments (Kamailio's INTERCEPT callout fires for 5G-originated calls), and Kamailio logs `contact for [15559998888] found`.
 
 ---
 
