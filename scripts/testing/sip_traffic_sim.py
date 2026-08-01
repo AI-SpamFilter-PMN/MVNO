@@ -2,7 +2,16 @@
 """
 SIP Traffic Simulator for MVNO Interception Core
 Generates real SIP REGISTER & INVITE dialogs through Kamailio & RTPEngine
+
+Flexible transport paths (same script, different --host/--port):
+  - 2G/IMS path (default):  python3 sip_traffic_sim.py
+    -> host loopback 127.0.0.1:5066 -> Kamailio (host-mapped port)
+  - 5G SA path:             python3 sip_traffic_sim.py --host 10.89.0.23 --port 5060
+    -> from inside a UE container, with the kamailio /32 routed via the
+       uesimtun0 interface, so SIP traverses the 5G user plane
+       (UE tun -> N3 GTP-U -> UPF ogstun -> bridge -> Kamailio)
 """
+import argparse
 import hashlib
 import socket
 import time
@@ -14,7 +23,7 @@ def calculate_digest_response(username, realm, password, method, uri, nonce):
     ha2 = hashlib.md5(f"{method}:{uri}".encode()).hexdigest()
     return hashlib.md5(f"{ha1}:{nonce}:{ha2}".encode()).hexdigest()
 
-def register_subscriber(username, password, port=5066):
+def register_subscriber(username, password, host="127.0.0.1", port=5066):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(3)
     
@@ -31,7 +40,7 @@ def register_subscriber(username, password, port=5066):
         f"Expires: 3600\r\n"
         f"Content-Length: 0\r\n\r\n"
     )
-    s.sendto(req1.encode(), ('127.0.0.1', port))
+    s.sendto(req1.encode(), (host, port))
     try:
         resp1, _ = s.recvfrom(2048)
         resp1_str = resp1.decode('utf-8', errors='ignore')
@@ -68,7 +77,7 @@ def register_subscriber(username, password, port=5066):
         f"Expires: 3600\r\n"
         f"Content-Length: 0\r\n\r\n"
     )
-    s.sendto(req2.encode(), ('127.0.0.1', port))
+    s.sendto(req2.encode(), (host, port))
     try:
         resp2, _ = s.recvfrom(2048)
         resp2_str = resp2.decode('utf-8', errors='ignore')
@@ -85,7 +94,7 @@ def register_subscriber(username, password, port=5066):
         print(f"[-] SIP REGISTER rejected for {username}:\n{resp2_str}")
         return False
 
-def send_sip_invite(caller, callee, password, port=5066):
+def send_sip_invite(caller, callee, password, host="127.0.0.1", port=5066):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(10)
     call_id = f"call-{int(time.time())}@127.0.0.1"
@@ -117,7 +126,7 @@ def send_sip_invite(caller, callee, password, port=5066):
         )
     
     # 1. Unauthenticated INVITE → expect 407 challenge
-    s.sendto(build_invite().encode(), ('127.0.0.1', port))
+    s.sendto(build_invite().encode(), (host, port))
     try:
         resp1, _ = s.recvfrom(2048)
         resp1_str = resp1.decode('utf-8', errors='ignore')
@@ -143,7 +152,7 @@ def send_sip_invite(caller, callee, password, port=5066):
     digest = calculate_digest_response(caller, "localhost", password, "INVITE", uri, nonce)
     auth_header = (f'Digest username="{caller}", realm="localhost", nonce="{nonce}", '
                    f'uri="{uri}", response="{digest}"')
-    s.sendto(build_invite(auth_header).encode(), ('127.0.0.1', port))
+    s.sendto(build_invite(auth_header).encode(), (host, port))
     try:
         resp2, _ = s.recvfrom(2048)
         resp2_str = resp2.decode('utf-8', errors='ignore')
@@ -160,10 +169,18 @@ def send_sip_invite(caller, callee, password, port=5066):
         return False
 
 if __name__ == "__main__":
-    print("=== Registering Callee 15557654321 ===")
-    reg_ok = register_subscriber("15557654321", "testpass")
+    parser = argparse.ArgumentParser(description="MVNO SIP traffic simulator")
+    parser.add_argument("--host", default="127.0.0.1", help="Kamailio target host (127.0.0.1 = 2G/IMS path via host port; 10.89.0.23 = 5G SA path from a UE container)")
+    parser.add_argument("--port", type=int, default=5066, help="Kamailio target port (5066 = host-mapped, 5060 = container-internal)")
+    parser.add_argument("--caller", default="15551234567", help="Calling subscriber")
+    parser.add_argument("--callee", default="15557654321", help="Called subscriber (registered by this script)")
+    parser.add_argument("--password", default="testpass", help="SIP digest password (auth_db)")
+    args = parser.parse_args()
+
+    print(f"=== Registering Callee {args.callee} (via {args.host}:{args.port}) ===")
+    reg_ok = register_subscriber(args.callee, args.password, args.host, args.port)
     time.sleep(1)
     print("=== Sending Real SIP INVITE Call (digest-authenticated) ===")
-    inv_ok = send_sip_invite("15551234567", "15557654321", "testpass")
+    inv_ok = send_sip_invite(args.caller, args.callee, args.password, args.host, args.port)
     if not (reg_ok and inv_ok):
         sys.exit(1)

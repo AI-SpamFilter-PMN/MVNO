@@ -54,10 +54,23 @@ echo -e "${YELLOW}[4/13] 💳 Querying Subscriber Balance (E.164 MSISDN: 1555123
 curl -s -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -m json.tool
 echo -e "${GREEN}✓ Subscriber Balance retrieved: 100 credits${NC}\n"
 
-# Item 5: Voice Call Interception Simulation
+# Item 5: Voice Call Interception Simulation (2G/IMS direct path)
 echo -e "${YELLOW}[5/13] 📞 Simulating Authorized IMS VoIP Call Interception Flow (SIP INVITE ➔ Kamailio)...${NC}"
 python3 scripts/testing/sip_traffic_sim.py
-echo -e "${GREEN}✓ Real SIP INVITE processed by Kamailio (REST Intercept & RTPEngine Anchored)${NC}\n"
+echo -e "${GREEN}✓ 2G/IMS path: Real SIP INVITE processed by Kamailio (REST Intercept & RTPEngine Anchored)${NC}\n"
+
+# Item 5b: 5G SA path — same simulator, SIP over the 5G user plane (UE tun → N3 → UPF → Kamailio)
+echo -e "${YELLOW}[5b/13] 📡 Simulating SIP over the 5G SA User Plane (UE tun → N3 GTP-U → UPF ogstun → Kamailio)...${NC}"
+podman exec mvno-ueransim-ue-1 sh -c 'ip route replace 10.89.0.23/32 dev uesimtun0 2>/dev/null' || true
+podman cp scripts/testing/sip_traffic_sim.py mvno-ueransim-ue-1:/tmp/sip_traffic_sim.py >/dev/null
+BEFORE=$(podman exec mvno-upf ip -s link show ogstun | awk '/RX:/{getline; print $1}')
+OUT=$(podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py --host 10.89.0.23 --port 5060 --callee 15559998888 --caller 15551234567 2>&1) || true
+AFTER=$(podman exec mvno-upf ip -s link show ogstun | awk '/RX:/{getline; print $1}')
+echo "$OUT"
+echo "$OUT" | grep -q "SIP REGISTER 200 OK" || { echo "[-] Error: 5G-path REGISTER did not succeed" >&2; exit 1; }
+echo "$OUT" | grep -q "INVITE Response" || { echo "[-] Error: 5G-path INVITE did not succeed" >&2; exit 1; }
+[ "${AFTER:-0}" -gt "${BEFORE:-0}" ] || { echo "[-] Error: ogstun RX did not move (5G path dead)" >&2; exit 1; }
+echo -e "${GREEN}✓ 5G SA path: SIP REGISTER + INVITE traversed the 5G user plane (ogstun RX +$((AFTER-BEFORE)) bytes)${NC}\n"
 
 # Item 6: Zero-Balance Call Block & SIP 403 Assertion (digest-authenticated)
 echo -e "${YELLOW}[6/13] 🚫 Testing Zero-Balance Call Block (SIP 407 Challenge → Digest → 403 Forbidden)...${NC}"
