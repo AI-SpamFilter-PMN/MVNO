@@ -1,5 +1,7 @@
 package com.mvno.intercept.transcription;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.annotation.PreDestroy;
 
@@ -38,13 +41,20 @@ public class NativeVoskService {
     private static final Logger logger = LoggerFactory.getLogger(NativeVoskService.class);
     private final String spoolDir;
     private final String modelPath;
+    private final Counter transcriptions;
+    private final Counter decodeErrors;
+    private final AtomicInteger modelReady = new AtomicInteger(0);
     private Model voskModel;
 
     public NativeVoskService(
             @Value("${vosk.spool-dir:/var/spool/rtpengine}") final String spoolDir,
-            @Value("${vosk.model-path:/opt/vosk-model-small-en-us-0.15}") final String modelPath) {
+            @Value("${vosk.model-path:/opt/vosk-model-small-en-us-0.15}") final String modelPath,
+            final MeterRegistry meterRegistry) {
         this.spoolDir = spoolDir;
         this.modelPath = modelPath;
+        this.transcriptions = meterRegistry.counter("mvno.vosk.transcriptions");
+        this.decodeErrors = meterRegistry.counter("mvno.vosk.decode.errors");
+        meterRegistry.gauge("mvno.vosk.model.ready", modelReady);
         initModel();
     }
 
@@ -53,6 +63,7 @@ public class NativeVoskService {
             final File mDir = new File(modelPath);
             if (mDir.exists()) {
                 this.voskModel = new Model(modelPath);
+                modelReady.set(1);
                 logger.info("Native Vosk Java 21 ASR Model loaded successfully from {}", modelPath);
             } else {
                 logger.warn("Vosk ASR model directory not found at {}. Native Java ASR standby mode.", modelPath);
@@ -92,8 +103,10 @@ public class NativeVoskService {
             while ((bytesRead = fis.read(buffer)) >= 0) {
                 recognizer.acceptWaveForm(buffer, bytesRead);
             }
+            transcriptions.increment();
             return recognizer.getResult();
         } catch (final Exception e) {
+            decodeErrors.increment();
             logger.error("Native Java 21 Vosk ASR decoding error: {}", e.getMessage());
             return "";
         }
