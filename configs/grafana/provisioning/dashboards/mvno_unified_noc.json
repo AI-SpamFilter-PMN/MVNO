@@ -1,7 +1,7 @@
 {
   "__inputs": [],
   "__requires": [],
-  "title": "MVNO NOC — Unified",
+  "title": "MVNO NOC \u2014 Unified",
   "uid": "mvno-unified-noc",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -9,193 +9,491 @@
   "liveNow": true,
   "refresh": "5s",
   "schemaVersion": 39,
-  "tags": ["mvno", "plane:core", "component:unified", "noc", "sota"],
+  "tags": [
+    "mvno",
+    "plane:core",
+    "component:unified",
+    "noc",
+    "sota"
+  ],
   "time": {
     "from": "now-15m",
     "to": "now"
   },
   "timepicker": {
-    "refresh_intervals": ["5s", "10s", "30s", "1m"]
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m"
+    ]
   },
   "timezone": "browser",
   "panels": [
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "id": 100,
-      "title": "⚡ HIGH-DENSITY KPI HERO OVERVIEW",
+      "title": "\u26a1 HIGH-DENSITY KPI HERO OVERVIEW",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#00F2FE" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#00F2FE", "value": null }] }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#00F2FE"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00F2FE",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
       "id": 1,
       "options": {
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_sms_requests_total) default 0", "refId": "A" }],
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(mvno_sms_requests_total) default 0",
+          "refId": "A"
+        }
+      ],
       "title": "Total SMS Requests",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#7928CA" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#7928CA", "value": null }] }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#7928CA"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#7928CA",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
       "id": 2,
       "options": {
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_call_requests_total) default 0", "refId": "A" }],
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(mvno_call_requests_total) default 0",
+          "refId": "A"
+        }
+      ],
       "title": "Total Voice Call Requests",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#00E676", "value": null },
-              { "color": "#FF0844", "value": 1 }
+              {
+                "color": "#00E676",
+                "value": null
+              },
+              {
+                "color": "#FF0844",
+                "value": 1
+              }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
       "id": 3,
       "options": {
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(mvno_eir_sim_swap_detected_total) default 0", "refId": "A" }],
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(mvno_eir_sim_swap_detected_total) default 0",
+          "refId": "A"
+        }
+      ],
       "title": "EIR SIM-Swaps Detected",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#FF9100" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#FF9100", "value": null }] }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FF9100"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#FF9100",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
       "id": 4,
       "options": {
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "(sum(mvno_sms_blocked_total) + sum(mvno_call_blocked_total) + sum(mvno_call_blocked_eir_total)) default 0", "refId": "A" }],
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "(sum(mvno_sms_blocked_total) + sum(mvno_call_blocked_total) + sum(mvno_call_blocked_eir_total)) default 0",
+          "refId": "A"
+        }
+      ],
       "title": "Interceptions Blocked",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#00E676" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#00E676", "value": null }] }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#00E676"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00E676",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
       "id": 5,
       "options": {
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size default 0", "refId": "A" }],
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "mvno_eir_cache_size default 0",
+          "refId": "A"
+        }
+      ],
       "title": "Active EIR Cache Size",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#FF0844", "value": null },
-              { "color": "#00E676", "value": 7 }
+              {
+                "color": "#FF0844",
+                "value": null
+              },
+              {
+                "color": "#00E676",
+                "value": 7
+              }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
       "id": 6,
       "options": {
         "colorMode": "background",
         "graphMode": "area",
         "justifyMode": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "textMode": "auto"
       },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "sum(up) default 0", "refId": "A" }],
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(up) default 0",
+          "refId": "A"
+        }
+      ],
       "title": "Active Scrape Targets",
       "type": "stat"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
       "id": 105,
-      "title": "🌐 DYNAMIC CANVAS TOPOLOGY & TELECOM DATA FLOW",
+      "title": "\ud83c\udf10 DYNAMIC CANVAS TOPOLOGY & TELECOM DATA FLOW",
       "type": "row"
     },
     {
-      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 6 },
+      "gridPos": {
+        "h": 7,
+        "w": 20,
+        "x": 0,
+        "y": 6
+      },
       "id": 106,
       "options": {
-        "content": "<div style=\"display: flex; align-items: center; justify-content: space-around; padding: 15px; background: rgba(15, 23, 42, 0.6); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px);\">\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(0,242,254,0.15), rgba(0,242,254,0.05)); border: 1px solid #00F2FE; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(0,242,254,0.2);\">\n    <div style=\"font-size: 24px;\">📱</div>\n    <div style=\"font-weight: bold; color: #00F2FE; margin-top: 4px; font-size: 14px;\">UERANSIM RAN</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">UE &amp; gNB (3GPP Rel-16)<br>PLMN: 001/01 | TAC: 1</div>\n  </div>\n  <div style=\"font-size: 22px; color: #00F2FE; font-weight: bold;\">➔</div>\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(121,40,202,0.15), rgba(121,40,202,0.05)); border: 1px solid #7928CA; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(121,40,202,0.2);\">\n    <div style=\"font-size: 24px;\">⚙️</div>\n    <div style=\"font-weight: bold; color: #7928CA; margin-top: 4px; font-size: 14px;\">5G SA Core</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">AMF | SMF | UPF | NRF<br>NGAP (SCTP 38412) · PFCP (UDP 8805)</div>\n  </div>\n  <div style=\"font-size: 22px; color: #7928CA; font-weight: bold;\">➔</div>\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,230,118,0.05)); border: 1px solid #00E676; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(0,230,118,0.2);\">\n    <div style=\"font-size: 24px;\">📞</div>\n    <div style=\"font-weight: bold; color: #00E676; margin-top: 4px; font-size: 14px;\">SIP/IMS Proxy</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">Kamailio &amp; RTPEngine<br>UDP 5066 &amp; RTPEngine NG 22222</div>\n  </div>\n  <div style=\"font-size: 22px; color: #00E676; font-weight: bold;\">➔</div>\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(255,145,0,0.15), rgba(255,145,0,0.05)); border: 1px solid #FF9100; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(255,145,0,0.2);\">\n    <div style=\"font-size: 24px;\">🛡️</div>\n    <div style=\"font-weight: bold; color: #FF9100; margin-top: 4px; font-size: 14px;\">Telecom Gateway</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">Spring Boot | EIR Tracker<br>Prepaid OCS Check</div>\n  </div>\n  <div style=\"font-size: 22px; color: #FF9100; font-weight: bold;\">➔</div>\n  <div style=\"flex: 1; margin: 0 8px; padding: 12px; background: linear-gradient(135deg, rgba(255,8,68,0.15), rgba(255,8,68,0.05)); border: 1px solid #FF0844; border-radius: 10px; text-align: center; box-shadow: 0 0 15px rgba(255,8,68,0.2);\">\n    <div style=\"font-size: 24px;\">🤖</div>\n    <div style=\"font-weight: bold; color: #FF0844; margin-top: 4px; font-size: 14px;\">AI Classifier</div>\n    <div style=\"font-size: 11px; color: #94A3B8;\">Python Model Server (mock)<br>POST /api/v1/classify</div>\n  </div>\n</div>",
+        "content": "<div style=\"display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(15,23,42,0.6); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);\">\n  <div style=\"font-size: 12px; color: rgba(255,255,255,0.7);\">VOICE PATH \u2014 SipClient (SIP 5066)</div>\n  <div style=\"display: flex; align-items: center; justify-content: space-around;\">\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,242,254,0.15), rgba(0,242,254,0.05)); border:1px solid #00F2FE; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udcde</div><div style=\"font-weight:bold; color:#00F2FE; font-size:13px;\">SipClient UA</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">SIP RFC 3261 \u00b7 5066:5060/udp</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(121,40,202,0.15), rgba(121,40,202,0.05)); border:1px solid #7928CA; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udce1</div><div style=\"font-weight:bold; color:#7928CA; font-size:13px;\">Kamailio SIP Proxy</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">REGISTER+INVITE 407 digest \u00b7 INTERCEPT callout</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(255,145,0,0.15), rgba(255,145,0,0.05)); border:1px solid #FF9100; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udee1\ufe0f</div><div style=\"font-weight:bold; color:#FF9100; font-size:13px;\">Telecom Gateway</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">Spring Boot \u00b7 X-API-Key \u00b7 OCS \u00b7 EIR</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,230,118,0.05)); border:1px solid #00E676; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83e\udd16</div><div style=\"font-weight:bold; color:#00E676; font-size:13px;\">AI Classifier</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">POST /api/v1/classify \u00b7 SLA fail-open</div>\n    </div>\n  </div>\n  <div style=\"font-size:12px; color:rgba(255,255,255,0.7);\">SMS PATH \u2014 sms-client (SMPP 3.4)</div>\n  <div style=\"display: flex; align-items: center; justify-content: space-around;\">\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,230,118,0.12), rgba(0,230,118,0.04)); border:1px solid #00E676; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udcac</div><div style=\"font-weight:bold; color:#00E676; font-size:13px;\">sms-client ESME</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">SMPP 3.4 \u00b7 deliver_sm</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,242,254,0.12), rgba(0,242,254,0.04)); border:1px solid #00F2FE; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\uddc4\ufe0f</div><div style=\"font-weight:bold; color:#00F2FE; font-size:13px;\">OsmoSMSC</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">SMPP 2775 \u00b7 hold &amp; verify</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(255,145,0,0.12), rgba(255,145,0,0.04)); border:1px solid #FF9100; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udee1\ufe0f</div><div style=\"font-weight:bold; color:#FF9100; font-size:13px;\">Telecom Gateway</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">POST /intercept/sms + X-API-Key</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,230,118,0.12), rgba(0,230,118,0.04)); border:1px solid #00E676; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83e\udd16</div><div style=\"font-weight:bold; color:#00E676; font-size:13px;\">AI Classifier</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">POST /api/v1/classify</div>\n    </div>\n  </div>\n  <div style=\"font-size:12px; color:rgba(255,255,255,0.7);\">5G RADIO TRACK \u2014 registration only (voice/SMS are external-path demos; SMS-over-NAS on roadmap)</div>\n  <div style=\"display: flex; align-items: center; justify-content: space-around;\">\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(121,40,202,0.12), rgba(121,40,202,0.04)); border:1px solid #7928CA; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udcf1</div><div style=\"font-weight:bold; color:#7928CA; font-size:13px;\">UERANSIM</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">gNB + 3 UEs \u00b7 ran_ue gauge</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(121,40,202,0.12), rgba(121,40,202,0.04)); border:1px solid #7928CA; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\u2699\ufe0f</div><div style=\"font-weight:bold; color:#7928CA; font-size:13px;\">Open5GS 5GC</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">AMF \u00b7 SMF \u00b7 UPF \u00b7 NRF \u2014 NGAP 38412 \u00b7 PFCP 8805</div>\n    </div>\n  </div>\n</div>",
         "mode": "html"
       },
       "title": "MVNO Core Interception Path Topology Flow",
       "type": "text"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#FF0844",
+                "value": null
+              },
+              {
+                "color": "#00E676",
+                "value": 3
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 20,
+        "y": 6
+      },
+      "id": 99,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "ran_ue default 0",
+          "legendFormat": "registered UEs",
+          "refId": "A"
+        }
+      ],
+      "title": "5G SA UE Registration",
+      "type": "stat"
+    },
+    {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
       "id": 101,
-      "title": "📡 TELECOM TRAFFIC & INTERCEPTION THROUGHPUT",
+      "title": "\ud83d\udce1 TELECOM TRAFFIC & INTERCEPTION THROUGHPUT",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -207,27 +505,78 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "SMS Requests Total" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#00F2FE", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "SMS Requests Total"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00F2FE",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "SMS Blocked Total" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#FF0844", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "SMS Blocked Total"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0844",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 14 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
       "id": 7,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_requests_total default 0", "legendFormat": "SMS Requests Total", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_sms_blocked_total default 0", "legendFormat": "SMS Blocked Total", "refId": "B" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "mvno_sms_requests_total default 0",
+          "legendFormat": "SMS Requests Total",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "mvno_sms_blocked_total default 0",
+          "legendFormat": "SMS Blocked Total",
+          "refId": "B"
+        }
       ],
       "title": "SMS Interception Traffic Volume",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -239,39 +588,114 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Call Requests Total" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#7928CA", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "Call Requests Total"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#7928CA",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Call Blocked Total" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#FF9100", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "Call Blocked Total"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9100",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Call Blocked (EIR Fraud)" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#FF0844", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "Call Blocked (EIR Fraud)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0844",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 14 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
       "id": 8,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_requests_total default 0", "legendFormat": "Call Requests Total", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_blocked_total default 0", "legendFormat": "Call Blocked Total", "refId": "B" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_call_blocked_eir_total default 0", "legendFormat": "Call Blocked (EIR Fraud)", "refId": "C" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "mvno_call_requests_total default 0",
+          "legendFormat": "Call Requests Total",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "mvno_call_blocked_total default 0",
+          "legendFormat": "Call Blocked Total",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "mvno_call_blocked_eir_total default 0",
+          "legendFormat": "Call Blocked (EIR Fraud)",
+          "refId": "C"
+        }
       ],
       "title": "Voice Call Interception Traffic Volume",
       "type": "timeseries"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
       "id": 102,
-      "title": "🛡️ SECURITY & ANTI-FRAUD DECISION PIPELINE",
+      "title": "\ud83d\udee1\ufe0f SECURITY & ANTI-FRAUD DECISION PIPELINE",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -283,27 +707,78 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "SIM Swap Anomalies" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#FF0844", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "SIM Swap Anomalies"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0844",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Tracked IMEIs" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#00E676", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "Tracked IMEIs"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00E676",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 23 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
       "id": 9,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_sim_swap_detected_total default 0", "legendFormat": "SIM Swap Anomalies", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_eir_cache_size default 0", "legendFormat": "Tracked IMEIs", "refId": "B" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "mvno_eir_sim_swap_detected_total default 0",
+          "legendFormat": "SIM Swap Anomalies",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "mvno_eir_cache_size default 0",
+          "legendFormat": "Tracked IMEIs",
+          "refId": "B"
+        }
       ],
       "title": "Equipment Identity Register (EIR) SIM-Swap Tracker",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -315,29 +790,66 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "OCS Subscriber Queries" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#FFD600", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "OCS Subscriber Queries"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FFD600",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 23 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
       "id": 10,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "mvno_subscriber_lookups_total default 0", "legendFormat": "OCS Subscriber Queries", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "mvno_subscriber_lookups_total default 0",
+          "legendFormat": "OCS Subscriber Queries",
+          "refId": "A"
+        }
       ],
       "title": "Prepaid Online Charging System (OCS) Queries",
       "type": "timeseries"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
       "id": 103,
-      "title": "🖥️ INFRASTRUCTURE & MEDIA PLANE HEALTH",
+      "title": "\ud83d\udda5\ufe0f INFRASTRUCTURE & MEDIA PLANE HEALTH",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -349,17 +861,38 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 31 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 31
+      },
       "id": 11,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=~\"telecom-api|rtpengine|vmagent|open5gs|mongodb|victoria-metrics\"} default 0", "legendFormat": "{{job}} ({{instance}})", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "up{job=~\"telecom-api|rtpengine|vmagent|open5gs|mongodb|victoria-metrics\"} default 0",
+          "legendFormat": "{{job}} ({{instance}})",
+          "refId": "A"
+        }
       ],
       "title": "Service Target Liveness (up)",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -371,139 +904,363 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 31 },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 31
+      },
       "id": 12,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions default 0", "legendFormat": "Active Sessions ({{type}})", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_sessions default 0",
+          "legendFormat": "Active Sessions ({{type}})",
+          "refId": "A"
+        }
       ],
       "title": "RTPEngine Media Relay Performance",
       "type": "timeseries"
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 38
+      },
       "id": 104,
       "title": "RTP ENGINE DEEP DIVE",
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "#00F2FE", "value": null }]
+            "steps": [
+              {
+                "color": "#00F2FE",
+                "value": null
+              }
+            ]
           },
           "unit": "s"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 39 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 39
+      },
       "id": 20,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_uptime_seconds default 0", "refId": "A" }],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_uptime_seconds default 0",
+          "refId": "A"
+        }
+      ],
       "title": "RTPEngine Uptime",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "#00F2FE", "value": null }, { "color": "#FF9100", "value": 500 }, { "color": "#FF0844", "value": 1000 }]
+            "steps": [
+              {
+                "color": "#00F2FE",
+                "value": null
+              },
+              {
+                "color": "#FF9100",
+                "value": 15
+              },
+              {
+                "color": "#FF0844",
+                "value": 25
+              }
+            ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 39 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 39
+      },
       "id": 13,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions default 0", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_sessions default 0",
+          "refId": "A"
+        }
       ],
       "title": "Active RTP Sessions",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "#00F2FE", "value": null }]
+            "steps": [
+              {
+                "color": "#00F2FE",
+                "value": null
+              }
+            ]
           },
           "unit": "decbytes"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 39 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 39
+      },
       "id": 14,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total default 0", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_bytes_total default 0",
+          "refId": "A"
+        }
       ],
       "title": "Media Bytes Total",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "#00F2FE", "value": null }, { "color": "#FF9100", "value": 100 }, { "color": "#FF0844", "value": 500 }]
+            "steps": [
+              {
+                "color": "#00F2FE",
+                "value": null
+              },
+              {
+                "color": "#FF9100",
+                "value": 100
+              },
+              {
+                "color": "#FF0844",
+                "value": 500
+              }
+            ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 39 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 39
+      },
       "id": 15,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packet_errors_total default 0", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_packet_errors_total default 0",
+          "refId": "A"
+        }
       ],
       "title": "Packet Errors",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "#00E676", "value": null }, { "color": "#FF9100", "value": 50 }, { "color": "#FF0844", "value": 10 }]
+            "steps": [
+              {
+                "color": "#FF0844",
+                "value": null
+              },
+              {
+                "color": "#FF9100",
+                "value": 10
+              },
+              {
+                "color": "#00E676",
+                "value": 50
+              }
+            ]
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 39 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 39
+      },
       "id": 16,
-      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
       "pluginVersion": "11.6.0",
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_ports_free default 0", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_ports_free default 0",
+          "refId": "A"
+        }
       ],
       "title": "Media Ports Free",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisBorderShow": false,
             "drawPoints": "off",
@@ -516,21 +1273,52 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 39 },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 39
+      },
       "id": 17,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_sessions_total default 0", "legendFormat": "Total Sessions", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_closed_sessions_total default 0", "legendFormat": "Closed ({{reason}})", "refId": "B" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_sessions_total default 0",
+          "legendFormat": "Total Sessions",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_closed_sessions_total default 0",
+          "legendFormat": "Closed ({{reason}})",
+          "refId": "B"
+        }
       ],
       "title": "Session Lifecycle",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisBorderShow": false,
             "drawPoints": "off",
@@ -543,21 +1331,52 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 43 },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
       "id": 18,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packets_total default 0", "legendFormat": "Packets Total", "refId": "A" },
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_packet_errors_total default 0", "legendFormat": "Packet Errors", "refId": "B" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rate(rtpengine_packets_total[$__rate_interval]) default 0",
+          "legendFormat": "Packets/s",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rate(rtpengine_packet_errors_total[$__rate_interval]) default 0",
+          "legendFormat": "Errors/s",
+          "refId": "B"
+        }
       ],
       "title": "Packet Rate & Errors",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisBorderShow": false,
             "drawPoints": "off",
@@ -570,11 +1389,29 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 43 },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
       "id": 19,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "rtpengine_bytes_total default 0", "legendFormat": "Media Bytes Total", "refId": "A" }
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rate(rtpengine_bytes_total[$__rate_interval]) default 0",
+          "legendFormat": "Bytes/s",
+          "refId": "A"
+        }
       ],
       "title": "Media Throughput",
       "type": "timeseries"

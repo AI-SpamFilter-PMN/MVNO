@@ -35,7 +35,7 @@ This document outlines upcoming architectural enhancements, operational backlog 
 - [ ] **Orphaned State File Cleanup**: Create automated cleanup utility for orphaned temporary database lock files (`*.db-shm`, `*.db-wal`) in `./state/`.
 - [x] **VictoriaMetrics Self-Scrape Job**: Add `victoria-metrics` (`victoria-metrics:8428/metrics`) scrape job to `configs/victoria-metrics/scrape.yml` to collect `vm_*` internal TSDB metrics and `vmagent_remotewrite_*` pipeline stats.
 - [ ] **VictoriaMetrics System NOC Dashboard**: Create `noc_victoriametrics.json` Grafana dashboard (cache entries, ingestion rate `vm_rows_added_total`, disk usage `vm_fsdata_bytes`, `vmagent` remoteWrite stats).
-- [ ] **vmagent RemoteWrite Alert Panel**: Add a `vmagent_remotewrite_blocks_failed_total` alerting panel to `noc_overview.json` to make telemetry write failures immediately visible at a glance.
+- [ ] **vmagent RemoteWrite Alert Panel**: Add a `vmagent_remotewrite_blocks_failed_total` alerting panel to `mvno_unified_noc.json` to make telemetry write failures immediately visible at a glance.
 - [ ] **Kamailio JSON-Regex Hardening (F13)**: Hardening SIP body regex parsing in Kamailio routing script for multi-part boundary headers.
 - [ ] **Open5GS UDM `no_tls` Evaluation**: Verify UDM HTTP/2 cleartext framing settings against 3GPP Rel-16 specs.
 - [ ] **Kamailio `jsonrpcs` Evaluation**: Evaluate Kamailio `jsonrpcs` management interface for live NOC runtime stats.
