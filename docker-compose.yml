@@ -96,7 +96,8 @@ services:
       mongodb:
         condition: service_healthy
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.22
     restart: unless-stopped
 
   # ─── Open5GS NRF (Network Repository Function) ───
@@ -112,7 +113,8 @@ services:
       mongodb:
         condition: service_healthy
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.11
     restart: unless-stopped
 
   # ─── Open5GS AMF (Access and Mobility Management Function) ───
@@ -128,7 +130,8 @@ services:
       nrf:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.12
     restart: unless-stopped
 
   # ─── Open5GS SMF (Session Management Function) ───
@@ -146,7 +149,8 @@ services:
       upf:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.13
     restart: unless-stopped
 
   # ─── Open5GS UPF (User Plane Function) ───
@@ -166,7 +170,8 @@ services:
       nrf:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.14
     restart: unless-stopped
 
   # ─── Open5GS AUSF (Authentication Server Function) ───
@@ -182,7 +187,8 @@ services:
       nrf:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.15
     restart: unless-stopped
 
   # ─── Open5GS BSF (Binding Support Function) ───
@@ -198,7 +204,8 @@ services:
       nrf:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.16
     restart: unless-stopped
 
   # ─── Open5GS UDM (Unified Data Management) ───
@@ -214,7 +221,8 @@ services:
       nrf:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.17
     restart: unless-stopped
 
   # ─── Open5GS UDR (Unified Data Repository) ───
@@ -230,7 +238,8 @@ services:
       nrf:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.18
     restart: unless-stopped
 
   # ─── Open5GS PCF (Policy Control Function) ───
@@ -246,7 +255,8 @@ services:
       nrf:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.19
     restart: unless-stopped
 
   # ─── Open5GS NSSF (Network Slice Selection Function) ───
@@ -262,7 +272,8 @@ services:
       nrf:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.20
     restart: unless-stopped
 
   # ─── UERANSIM gNB (5G NR Base Station Simulator) ───
@@ -275,6 +286,8 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_PTRACE
+    devices:
+      - /dev/net/tun:/dev/net/tun
     depends_on:
       amf:
         condition: service_started
@@ -285,7 +298,8 @@ services:
       retries: 3
       start_period: 15s
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.30
     restart: unless-stopped
 
   # ─── UERANSIM UE-1 (Primary Subscriber IMSI 001010000000001) ───
@@ -298,11 +312,14 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_PTRACE
+    devices:
+      - /dev/net/tun:/dev/net/tun
     depends_on:
       ueransim-gnb:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.31
     restart: unless-stopped
 
   # ─── UERANSIM UE-2 (Spam Subscriber IMSI 001010000000002) ───
@@ -315,11 +332,14 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_PTRACE
+    devices:
+      - /dev/net/tun:/dev/net/tun
     depends_on:
       ueransim-gnb:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.32
     restart: unless-stopped
 
   # ─── UERANSIM UE-3 (Zero Balance Subscriber IMSI 001010000000003) ───
@@ -332,11 +352,14 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_PTRACE
+    devices:
+      - /dev/net/tun:/dev/net/tun
     depends_on:
       ueransim-gnb:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.33
     restart: unless-stopped
 
   # ─── RTPEngine In-Kernel Media Proxy & Audio Forker ───
@@ -367,10 +390,11 @@ services:
       - ./configs/kamailio:/etc/kamailio:z
       - ./state/kamailio/kamailio.db:/etc/kamailio/kamailio.db:z
     depends_on:
-      rtpengine:
+      victoria-metrics:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.23
     restart: unless-stopped
 
   # ─── Osmocom Home Location Register (HLR) Core ───
@@ -430,7 +454,8 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.46 # static pin required: unpinned services get auto-allocated IPs that collide with pinned ones (IPAM conflict on network recreate)
     restart: unless-stopped
 
   # ─── AI Spam Filtration System (Mock API Endpoint) ───

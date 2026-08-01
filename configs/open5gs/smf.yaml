@@ -36,6 +36,9 @@ smf:
       - address: 0.0.0.0
   session:
     - subnet: 10.45.0.0/16
+      gateway: 10.45.0.1
+      range: # UE address pool: starts at .2 so ogstun gateway .1 is never allocated to a UE
+        - 10.45.0.2-10.45.0.254
       dnn: internet
   dns:
     - 8.8.8.8

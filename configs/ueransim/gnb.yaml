@@ -8,7 +8,7 @@ idLength: 32
 tac: 1
 linkIp: 0.0.0.0
 ngapIp: 0.0.0.0 # NGAP: NG Application Protocol (SCTP control plane to AMF)
-gtpIp: 0.0.0.0  # GTP-U: GPRS Tunnelling Protocol User Plane (UDP 2152 to UPF)
+gtpIp: 10.89.0.30 # GTP-U: GPRS Tunnelling Protocol User Plane (UDP 2152 to UPF); advertised in NGAP F-TEID (static IP from compose)
 ignoreStreamIds: true
 amfConfigs: # AMF: Access and Mobility Management Function (port 38412)
   - address: amf
