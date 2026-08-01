@@ -116,7 +116,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "(sum(mvno_sms_blocked_total) + sum(mvno_call_blocked_total)) default 0", "refId": "A" }],
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "(sum(mvno_sms_blocked_total) + sum(mvno_call_blocked_total) + sum(mvno_call_blocked_eir_total)) default 0", "refId": "A" }],
       "title": "Interceptions Blocked",
       "type": "stat"
     },
@@ -353,7 +353,7 @@
       "id": 11,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
-        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=~\"telecom-api|rtpengine|vmagent|open5gs|mongodb\"} default 0", "legendFormat": "{{job}} ({{instance}})", "refId": "A" }
+        { "datasource": { "type": "prometheus", "uid": "victoriametrics" }, "expr": "up{job=~\"telecom-api|rtpengine|vmagent|open5gs|mongodb|victoria-metrics\"} default 0", "legendFormat": "{{job}} ({{instance}})", "refId": "A" }
       ],
       "title": "Service Target Liveness (up)",
       "type": "timeseries"
