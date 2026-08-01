@@ -36,8 +36,8 @@ This document outlines upcoming architectural enhancements, operational backlog 
 - [x] **VictoriaMetrics Self-Scrape Job**: Add `victoria-metrics` (`victoria-metrics:8428/metrics`) scrape job to `configs/victoria-metrics/scrape.yml` to collect `vm_*` internal TSDB metrics and `vmagent_remotewrite_*` pipeline stats.
 - [x] **VictoriaMetrics System NOC Dashboard**: Created `noc_victoriametrics.json` Grafana dashboard (cache entries, ingestion rate `rate(vm_rows_added_to_storage_total[5m])`, disk usage `vm_data_size_bytes` / `vm_free_disk_space_bytes`, `vmagent` remoteWrite stats).
 - [x] **vmagent RemoteWrite Alert Panels**: Added `vmagent_remotewrite_blocks_sent_total` / `vmagent_remotewrite_errors_total` / `vmagent_remotewrite_push_failures_total` panels to `noc_victoriametrics.json` to make telemetry write failures immediately visible at a glance.
-- [ ] **Kamailio JSON-Regex Hardening (F13)**: Hardening SIP body regex parsing in Kamailio routing script for multi-part boundary headers.
-- [ ] **Open5GS UDM `no_tls` Evaluation**: Verify UDM HTTP/2 cleartext framing settings against 3GPP Rel-16 specs.
+- [ ] **Kamailio JSON-Response Parsing Hardening (F13)**: Replace regex `allow:false` matching on the gateway HTTP response (`kamailio.cfg` `route[INTERCEPT]`, `$var(res_body) =~ ".*\"allow\"[[:space:]]*:...false.*"`) with structured jansson `json_get_field()` parsing for reliable interception decisions. (Backlog — avoid touching the working interception path near demo day; current regex verified working live.)
+- [x] **Open5GS UDM `no_tls` Evaluation**: Verified `no_tls: true` HTTP/2 cleartext (h2c) SBI framing in `udm.yaml` (and all NF configs: amf/ausf/bsf/nrf/nssf/pcf/smf/udr; UPF exempt — PFCP, no SBI) against 3GPP Rel-16 TS 29.500/29.501 — see `docs/ISSUES.md` Issue 5.4.
 - [ ] **Kamailio `jsonrpcs` Evaluation**: Evaluate Kamailio `jsonrpcs` management interface for live NOC runtime stats.
 
 ---

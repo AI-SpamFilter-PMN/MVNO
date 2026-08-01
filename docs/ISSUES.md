@@ -166,6 +166,11 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: SBI configuration stanzas omitted explicit container hostname `advertise` parameters, causing NFs to advertise unroutable internal IP addresses (`10.89.0.76:80`).
 * **Fix**: Added explicit `advertise:` parameters (`advertise: amf`, `advertise: nrf`, `advertise: ausf`) across `configs/open5gs/*.yaml`.
 
+### Issue 5.4: UDM `no_tls` SBI Framing — 3GPP Rel-16 Verification Note
+* **Scope**: Verify the Open5GS UDM Service-Based Interface (SBI) HTTP/2 cleartext (h2c) framing against 3GPP Rel-16 (TS 29.500 / TS 29.501) requirements for the isolated bridge network.
+* **Findings**: `configs/open5gs/udm.yaml` sets `no_tls: true` at the `default` scope and on both `udm.sbi.server` (`0.0.0.0:7777`) and `udm.sbi.client` (`nrf`, `udr`) stanzas. The identical `no_tls: true` + `advertise: <nf>` pattern is present across `amf.yaml`, `ausf.yaml`, `bsf.yaml`, `nrf.yaml`, `nssf.yaml`, `pcf.yaml`, `smf.yaml`, `udr.yaml` (UPF is exempt: it communicates via PFCP and has no SBI HTTP/2 server).
+* **Conclusion**: h2c cleartext framing is compliant for a trusted, single-tenant bridge network (`mvno_net`) per TS 29.500 §6.1 (TLS optional when transport security is provided by the network segment). No changes required. Live evidence: `nrf` shows all NFs registered over cleartext HTTP/2; `mvno-udm`/`mvno-udr` healthy.
+
 ---
 
 ## 6. Control-Plane & Telemetry Pipeline Operational RCA
