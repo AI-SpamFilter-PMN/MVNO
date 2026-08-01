@@ -1,0 +1,101 @@
+apiVersion: 1
+folders:
+  - title: MVNO NOC
+groups:
+  - orgId: 1
+    name: MVNO Infrastructure
+    folder: MVNO NOC
+    interval: 1m
+    rules:
+      - uid: mvno-scrape-targets-down
+        title: MVNO Scrape Targets Down
+        condition: C
+        data:
+          - refId: C
+            datasource:
+              type: prometheus
+              uid: victoriametrics
+            model:
+              expr: count(up{job=~"telecom-api|rtpengine|vmagent|open5gs|mongodb|victoria-metrics"} == 0) > 0
+              instant: true
+              refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "One or more scrape targets are down"
+          description: "{{ $values.C }} targets unreachable for 1 minute (jobs: telecom-api, rtpengine, vmagent, open5gs, mongodb, victoria-metrics)"
+      - uid: mvno-media-ports-free-low
+        title: MVNO Media Ports Free Low
+        condition: A
+        data:
+          - refId: A
+            datasource:
+              type: prometheus
+              uid: victoriametrics
+            model:
+              expr: rtpengine_ports_free < 10
+              instant: true
+              refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Media ports almost exhausted"
+          description: "Only {{ $values.A }} RTP media ports free (port-min=30000, ~25 sessions max)"
+      - uid: mvno-eir-simswap-blocks
+        title: MVNO EIR SIM-Swap Blocks
+        condition: A
+        data:
+          - refId: A
+            datasource:
+              type: prometheus
+              uid: victoriametrics
+            model:
+              expr: sum(rate(mvno_call_blocked_eir_total[5m])) > 0
+              instant: true
+              refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "SIM-swap interception blocking active"
+          description: "{{ $values.A }} EIR blocks/sec in the last 5 minutes"
+      - uid: mvno-ai-failopen-rate
+        title: MVNO AI Fail-Open SLA Rate
+        condition: A
+        data:
+          - refId: A
+            datasource:
+              type: prometheus
+              uid: victoriametrics
+            model:
+              expr: sum(rate(mvno_ai_failopen_total[5m])) > 0
+              instant: true
+              refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI filter failing open"
+          description: "{{ $values.A }} SLA fail-open allows/sec (AI filter down or degraded)"
