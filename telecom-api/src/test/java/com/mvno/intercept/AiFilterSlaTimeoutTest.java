@@ -4,6 +4,7 @@ import com.mvno.intercept.filter.AiFilterService;
 import com.mvno.intercept.subscriber.CallInterceptRequest;
 import com.mvno.intercept.subscriber.InterceptResponse;
 import com.mvno.intercept.subscriber.SMSInterceptRequest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class AiFilterSlaTimeoutTest {
 
     private AiFilterService aiFilterService;
+    private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
@@ -34,7 +36,8 @@ class AiFilterSlaTimeoutTest {
                 .requestFactory(requestFactory)
                 .build();
 
-        aiFilterService = new AiFilterService(restClient, closedPortUrl);
+        meterRegistry = new SimpleMeterRegistry();
+        aiFilterService = new AiFilterService(restClient, closedPortUrl, meterRegistry);
     }
 
     @Test
@@ -75,5 +78,9 @@ class AiFilterSlaTimeoutTest {
         final InterceptResponse response = aiFilterService.classifySms(smsRequest);
         assertTrue(response.allow());
         assertEquals("AI filter circuit open — SLA allow", response.reason());
+
+        // Fail-open counters: 3 unreachable + 1 circuit_open
+        assertEquals(3.0, meterRegistry.get("mvno.ai.failopen").tag("reason", "unreachable").counter().count());
+        assertEquals(1.0, meterRegistry.get("mvno.ai.failopen").tag("reason", "circuit_open").counter().count());
     }
 }

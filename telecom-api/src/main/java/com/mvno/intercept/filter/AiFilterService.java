@@ -3,6 +3,7 @@ package com.mvno.intercept.filter;
 import com.mvno.intercept.subscriber.CallInterceptRequest;
 import com.mvno.intercept.subscriber.InterceptResponse;
 import com.mvno.intercept.subscriber.SMSInterceptRequest;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,13 +39,16 @@ public class AiFilterService {
 
     private final RestClient restClient;
     private final String baseUrl;
+    private final MeterRegistry meterRegistry;
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicLong circuitOpenUntilEpochMs = new AtomicLong(0);
 
     public AiFilterService(final RestClient restClient,
-                           @Value("${ai-filter.url:http://ai-filter:8000/api/v1/classify}") final String baseUrl) {
+                           @Value("${ai-filter.url:http://ai-filter:8000/api/v1/classify}") final String baseUrl,
+                           final MeterRegistry meterRegistry) {
         this.restClient = restClient;
         this.baseUrl = baseUrl;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -55,7 +59,7 @@ public class AiFilterService {
      */
     public InterceptResponse classifySms(final SMSInterceptRequest req) {
         if (isCircuitOpen()) {
-            return new InterceptResponse(true, "AI filter circuit open — SLA allow");
+            return failOpen("circuit_open", "AI filter circuit open — SLA allow");
         }
 
         try {
@@ -77,13 +81,13 @@ public class AiFilterService {
                 consecutiveFailures.set(0);
                 return new InterceptResponse(result.allow(), result.reason());
             }
-            return new InterceptResponse(true, "AI filter returned empty response — SLA allow");
+            return failOpen("empty_response", "AI filter returned empty response — SLA allow");
         } catch (final RestClientException e) {
             recordFailure(e);
-            return new InterceptResponse(true, "AI filter unreachable — SLA allow");
+            return failOpen("unreachable", "AI filter unreachable — SLA allow");
         } catch (final Exception e) {
             logger.error("Unexpected error in SMS AI classification: {}", e.getMessage(), e);
-            return new InterceptResponse(true, "Gateway internal error — SLA allow");
+            return failOpen("internal", "Gateway internal error — SLA allow");
         }
     }
 
@@ -95,7 +99,7 @@ public class AiFilterService {
      */
     public InterceptResponse classifyCall(final CallInterceptRequest req) {
         if (isCircuitOpen()) {
-            return new InterceptResponse(true, "AI filter circuit open — SLA allow");
+            return failOpen("circuit_open", "AI filter circuit open — SLA allow");
         }
 
         try {
@@ -117,14 +121,20 @@ public class AiFilterService {
                 consecutiveFailures.set(0);
                 return new InterceptResponse(result.allow(), result.reason());
             }
-            return new InterceptResponse(true, "AI filter returned empty response — SLA allow");
+            return failOpen("empty_response", "AI filter returned empty response — SLA allow");
         } catch (final RestClientException e) {
             recordFailure(e);
-            return new InterceptResponse(true, "AI filter unreachable — SLA allow");
+            return failOpen("unreachable", "AI filter unreachable — SLA allow");
         } catch (final Exception e) {
             logger.error("Unexpected error in Call AI classification: {}", e.getMessage(), e);
-            return new InterceptResponse(true, "Gateway internal error — SLA allow");
+            return failOpen("internal", "Gateway internal error — SLA allow");
         }
+    }
+
+    private InterceptResponse failOpen(final String reason, final String message) {
+        meterRegistry.counter("mvno.ai.failopen", "reason", reason).increment();
+        logger.warn("AI filter SLA fail-open ({}): {}", reason, message);
+        return new InterceptResponse(true, message);
     }
 
     private boolean isCircuitOpen() {
