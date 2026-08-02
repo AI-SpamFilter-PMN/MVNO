@@ -1,4 +1,72 @@
-# Implementation Plan: Phase 0 — 5G SA User-Plane Data Gate & Documentation
+# Implementation Plan — Master Plan v6 (Goal 0 ✅ COMPLETE; Goal 1 NEXT)
+
+Consolidated roadmap for the MVNO repo (`/home/zkhattab/AI-SpamFilter-PMN/MVNO`).
+Teammate repos (`AI-Filteration-System`, `SipClient`, `sms-client`) are **read-only external** — integrate only, never edit.
+
+## Dependency map
+```
+Goal 0 (freeze/baseline) ──▶ everything
+Goal 4 (5G SMS) ─┐
+Goal 5 (2G)     ─┼─ feature chain ─▶ Goal 6 (IP-SM-GW) ─▶ Goal 7 (e2e) ─▶ Goal 8 (obs/docs)
+Goal 1 (portability) ── parallel; finish before Goal 7/8
+Goal 2 (scripts)     ── parallel; finish before Goal 7
+Goal 3 (integration) ── parallel; MVNO-side only, zero teammate-repo edits
+```
+
+## Goal 0 — Baseline & Working-Tree Freeze ✅ COMPLETE
+- Freeze WIP → `8b44f29 chore: snapshot working-tree baseline`.
+- **Fixed latent repro bug:** statically pinned ALL 27 services (`f057a77`) to prevent IPAM
+  collision `10.89.0.4` on fresh-network creation (previously only mongodb pinned; unpinned
+  services dynamically stole pinned IPs — the compose comment's own "static pin required" warning).
+- Live proof: **27/27 Up (0 unhealthy)**, `ran_ue=3`, api/actuator UP, ogstun N6 (rx=0/tx=240),
+  counters 0/0→post-runbook 7/1, `kamailio -c` exit 0, `demo_runbook.sh` **ALL 13 PASSED**
+  (incl. 5G user-plane traversal ogstun TX +2769 B).
+
+## Goal 1 — Portability Hardening (NEXT)
+- Regen `scripts/bootstrap.sh` pins to match compose (mongo:7.0, vm/vmagent v1.147.0,
+  kamailio 5.7.2, rtpengine mr9.4.0.0, vector 0.44.0-alpine, grafana 11.6.0) + add
+  `percona/mongodb_exporter:0.41`; add `podman image exists <exact-tag>` gate in `up.sh`.
+- `scripts/load-offline.sh --verify-tags` (tarball tags vs compose pins; exit≠0 on drift).
+- `scripts/preflight.sh`: compose plugin, sqlite3, nc, curl, tun, sctp module, multicast,
+  `ss -lun | grep :5060` conflict (host Asterisk owns 5060; canonical = 5066).
+- Vector socket runtime-agnostic; relative-link sweep (76 `file:///home/zkhattab` occurrences).
+- `docs/ENVIRONMENT_MATRIX.md`: amd64 Linux + rootless Podman only; macOS/arm64 unsupported.
+
+## Goal 2 — Script Right-Sizing
+- `scripts/lib/common.sh` (detect_runtime/os/install_packages/try_log) shared by 5 scripts.
+- Trim dead `scripts/testing/requirements.txt` (requests/smpplib unused — stdlib only).
+- `demo_runbook.sh` shells out to existing send-* scripts (single source of truth).
+
+## Goal 3 — Integration-Only (no teammate edits)
+- `docs/INTEGRATION_CONTRACT.md`: interfaces MVNO exposes (SIP 5066, SMPP 2775, REST /intercept).
+- Optional env-gated `MVNO_PUBLISH_5060` (default-off; blocked here — Asterisk owns 5060).
+- Doc: "5066 canonical; host 5060 occupied by host Asterisk; teammate clients target 5066."
+
+## Goal 4 — Dual-Access SMS Phase 1 (5G/IMS SMS twin)
+- kamailio.cfg: OPTIONS→200, top-level CANCEL, MESSAGE→digest→`http_client_request` POST
+  (JSON-escape `$rb`) → route[INTERCEPT_SMS] → lookup→relay. New `scripts/testing/ims_terminal.py`.
+- Gates: kamailio -c → restart → runbook regression → SMS printed on ue-2 → N6 delta → counter.
+
+## Goal 5 — Dual-Access SMS Phase 2 (2G twin)
+- New `mvno-2g-core` (osmo-bsc 1.14.1, osmo-bts-virtual 1.11.0, osmo-stp 2.2.1, osmo-mgw 1.15.0).
+- Handsets via apt `osmocom-bb-layer23` + `osmocom-bb-virtphy` (0.2.0) — no source build.
+- Edit osmo-smsc.cfg adding `msc` A-interface node + sms-routing + sms-over-gsup + smsc db;
+  HLR provision 2G IMSIs. Keep SMPP ESME semantics. **Checkpoint before image build.**
+
+## Goal 6 — IP-SM-GW bridge
+- `scripts/ip_sm_gw.py`: 2G→5G (SC queue → Kamailio MESSAGE), 5G→2G (SIP → submit_sm).
+
+## Goal 7 — e2e_runbook.sh
+- SIP-method × SMS-path × 4-cell matrix; deterministic AI-block (config-only mock rule).
+
+## Goal 8 — Observability & Docs
+- New SMS counters; vector parse; Grafana 2G/5G panel; ISSUES/ROADMAP/README/ENVIRONMENT_MATRIX.
+
+---
+
+# HISTORICAL RECORD (prior to Plan v6) — Phase 0 / 1 / 2
+
+## Phase 0 — 5G SA User-Plane Data Gate & Documentation (COMPLETED)
 
 ## Problem
 Phase 0 data-plane gate: prove UL + DL user plane end-to-end (UE tun → N3 GTP-U → UPF → N6 ogstun)
