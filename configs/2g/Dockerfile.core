@@ -1,0 +1,40 @@
+# ==============================================================================
+# MVNO Cellular Core — Osmocom 2G BSS Container Dockerfile (Goal 5)
+# ==============================================================================
+# Builds a Debian 12 (Bookworm) container hosting the 2G Base Station Subsystem:
+# - osmo-bts-virtual: virtual BTS speaking GSMTAP multicast to the virtual Um
+# - osmo-bsc:         Base Station Controller (Abis + A-interface/SCCP-M3UA)
+# - osmo-stp:         Signaling Transfer Point routing BSC <-> MSC over M3UA
+# - osmo-mgw:         Media Gateway (MGCP endpoint, RTP anchoring)
+# ==============================================================================
+
+FROM debian:12.10-slim
+
+# Install prerequisite tools for GPG keyring fetching
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add official Osmocom release GPG signing key and repository
+RUN wget -q -O /usr/share/keyrings/osmocom.asc \
+    https://downloads.osmocom.org/packages/osmocom:/latest/Debian_12/Release.key \
+    && echo "deb [signed-by=/usr/share/keyrings/osmocom.asc] \
+    https://downloads.osmocom.org/packages/osmocom:/latest/Debian_12 ./" \
+    > /etc/apt/sources.list.d/osmocom.list
+
+# Install Osmocom 2G BSS binaries
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    osmo-bsc \
+    osmo-bts-virtual \
+    osmo-stp \
+    osmo-mgw \
+    && rm -rf /var/lib/apt/lists/*
+
+# Persistent volume mounts for VTY configuration
+VOLUME ["/etc/osmocom"]
+
+EXPOSE 4242 4243 2905 3003 2427
+
+CMD ["osmo-stp", "-c", "/etc/osmocom/osmo-stp.cfg"]

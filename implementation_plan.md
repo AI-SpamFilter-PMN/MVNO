@@ -1,4 +1,4 @@
-# Implementation Plan — Master Plan v7 (Goals 0–3 ✅ COMPLETE; Goal 4 NEXT)
+# Implementation Plan — Master Plan v7 (Goals 0–5 ✅ COMPLETE; Goal 6 NEXT)
 
 Consolidated roadmap for the MVNO repo (`/home/zkhattab/AI-SpamFilter-PMN/MVNO`).
 Teammate repos (`AI-Filteration-System`, `SipClient`, `sms-client`) are **read-only external** — integrate only, never edit.
@@ -49,33 +49,38 @@ Goal 1 (portability) ── ✅ done; Goal 2 (scripts) ── ✅ done; Goal 3 (
 - `docker-compose.5060.yml`: extra `5060:5060/udp` publish, default-off, `preflight.sh`-gated.
 - Gate: `podman compose config` parses with and without override; no absolute paths in doc.
 
-## Goal 4 — Dual-Access SMS Phase 1 (5G/IMS SMS twin) — NEXT
-- kamailio.cfg (additive, before `route[WITHINDLG]`): top-level `OPTIONS→200`, top-level
-  `CANCEL` (before `loose_route`), `MESSAGE` digest-auth → `route[INTERCEPT_SMS]` →
-  `http_client_request` POST (module exports NO `http_client_post`; JSON-escape `$rb` — strip
-  quotes/newlines) → lookup → relay.
-- New `scripts/testing/ims_terminal.py` (digest REGISTER → MESSAGE → print `<msisdn>: <body>`);
-  deploy into ue-1 (10.45.0.3) / ue-2 (10.45.0.4) with existing route-replace steering
-  (`ip route replace 10.89.0.23/32 dev uesimtun0`).
-- Gates: `kamailio -c` exit 0 → restart → runbook 5/5b/6 regression → SMS printed on ue-2 →
-  ogstun N6 TX delta>0 → `mvno_sms_requests_total` increments. Rollback: revert cfg/script (no
-  image change). (No `options.so`/`presence.*` in image — use sl/tmx.)
+## Goal 4 — Dual-Access SMS Phase 1 (5G/IMS SMS twin) ✅ COMPLETE (`add8130`)
+- kamailio.cfg: top-level `OPTIONS→200`, top-level `CANCEL`, `MESSAGE` digest-auth →
+  `route[INTERCEPT_SMS]` → `http_client_query` POST (4-arg; `http_client_post` not exported;
+  JSON-escape `$rb` — strip quotes/newlines) → lookup → relay. SMS POST header string fixed
+  (no trailing CRLF) so `curl_slist_append` emits headers then body.
+- `scripts/testing/ims_terminal.py` deployed into ue-1 (10.45.0.2, :5091) / ue-2 (10.45.0.4, :5090);
+  `_reply_ok` echoes ALL Via headers in order so tm matches the Kamailio-generated top branch.
+- Gates PASSED: `kamailio -c` exit 0 → restart → runbook 5/5b/6 regression → MESSAGE delivered
+  (digest) + printed on ue-2 → ogstun N6 TX delta>0 → `mvno_sms_requests_total` 4→6. debug=1 restored.
 
-## Goal 5 — Dual-Access SMS Phase 2 (2G twin) — CHECKPOINT BEFORE IMAGE BUILD
+## Goal 5 — Dual-Access SMS Phase 2 (2G twin) ✅ COMPLETE
 - New `mvno-2g-core`: apt `osmo-bsc` 1.14.1, `osmo-bts-virtual` 1.11.0, `osmo-stp` 2.2.1,
   `osmo-mgw` 1.15.0 (from verified-reachable osmocom Debian_12 repo — no source builds).
 - New `mvno-2g-ms`: apt `osmocom-bb-layer23` + `osmocom-bb-virtphy` (0.2.0) → `mobile`+`virtphy`.
-- Edit osmo-smsc.cfg adding `msc` A-interface node (SCCP/M3UA via STP) + sms-routing +
-  sms-over-gsup + SC db; HLR provision 2G IMSIs. Keep SMPP ESME semantics.
+- Edit osmo-smsc.cfg adding `msc` A-interface node (SCCP/M3UA via STP) + built-in SC db; HLR
+  provision 2G IMSIs. Keep SMPP ESME semantics.
 - **Facts overruling older drafts:** binary is `osmo-msc` (package `osmo-msc`, not "osmo-smsc");
-  real VTY injection = `subscriber msisdn <R> sms sender msisdn <S> send <TEXT>`, assert via
-  `show sms-queue` (virtual-Um flaky — Osmocom Bug #2942); `send_db_sms.sh` invented schema →
-  DROP (decision); `send_vty_sms.sh` must use the real command.
-- **Prereq gates:** multicast 239.193.23.1:4729 (GSMTAP) before enabling virtual-Um; SCTP module
-  for STP/M3UA. Add both images to `bootstrap.sh` SAVE_IMAGES. MT assert mechanism (decision):
-  container `podman logs` on the 2G handset container.
-- Gates: BTS/BSC UP → `show sms-queue` → SMPP submit → store&fwd → MT log line on handset →
-  no SMPP→telecom-api regression.
+  `send_db_sms.sh` invented schema → DROP (decision); `send_vty_sms.sh` must use the real command.
+- **MO-SMS routing:** `sms-over-gsup` is a kill-switch that DISABLES the built-in SMSC's local
+  MO store&forward and forwards MO via HLR to an external SMSC GSUP entity — but osmo-msc's
+  built-in SMSC has NO `MO_FORWARD_SM_REQUEST` rx handler and no separate `osmo-smsc` binary
+  exists, so MO always failed (HLR ROUTING_ERROR). FIX: DO NOT enable `sms-over-gsup`; built-in
+  SMSC handles MO locally (`gsm340_rx_sms_submit` → `sms_route_mt_sms` → store → MT).
+- **Facts:** BTS is DCS1800 ARFCN 871 → mobile.cfg needs `stick 871` + `min-rxlev -110`
+  (default GSM900 ARFCN 1 scan never camps). `sms-service-center 15550000000` required in
+  mobile.cfg or MO is rejected ("SMS sms-service-center not defined"). Two UEs share the same
+  GSMTAP multicast (many-to-many). MS1 IMSI …004/MSISDN 15554443322, MS2 IMSI …005/MSISDN 15557778888.
+  MT assert = `cat /root/.osmocom/bb/sms.txt` inside handset container (needs
+  `mkdir -p /root/.osmocom/bb && touch sms.txt`; missing file → RP-ERROR cause 22).
+- Gates PASSED: BTS/BSC UP → both MS attached (MSC `show subscriber cache`) → **MO UE1→UE2 and
+  UE2→UE1 delivered** (sms.txt) → SMPP MT delivered → `show sms-queue` pending 0 → telecom-api
+  `/actuator/health` UP (no SMPP→telecom-api regression).
 
 ## Goal 6 — IP-SM-GW bridge
 - `scripts/ip_sm_gw.py` (TS 23.204): 2G→5G (poll SC queue for non-2G recipients → Kamailio
