@@ -118,7 +118,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 3.6: Unauthenticated SIP INVITE Proxying (Zero-Trust Section 1.1)
 * **Symptom**: Any unauthenticated SIP client could trigger policy interception calls and reach RTPEngine — no credential check on inbound `INVITE` dialogs.
 * **Root Cause**: `configs/kamailio/kamailio.cfg` only enforced digest auth on `REGISTER`; the `INVITE` branch proxied straight into `route[INTERCEPT]` with no `auth_db` challenge.
-* **Fix**: Added a 407 digest challenge on the `INVITE` branch in [kamailio.cfg](file:///home/zkhattab/MVNO/configs/kamailio/kamailio.cfg): `if ($au == "" && !auth_check("$fd","subscriber","1")) { auth_challenge("$fd","0"); exit; }` before `route(INTERCEPT)`. Updated [sip_traffic_sim.py](file:///home/zkhattab/MVNO/scripts/testing/sip_traffic_sim.py) with a full 407→digest→INVITE handshake (`send_sip_invite(caller, callee, password)`), and rewrote runbook step 6 to assert the handshake still yields `403 Forbidden` for zero-balance callers. Verified live: unauth INVITE → `407 Proxy Authentication Required`; valid digest + zero balance → `403`; `REGISTER` flow unaffected.
+* **Fix**: Added a 407 digest challenge on the `INVITE` branch in [kamailio.cfg](configs/kamailio/kamailio.cfg): `if ($au == "" && !auth_check("$fd","subscriber","1")) { auth_challenge("$fd","0"); exit; }` before `route(INTERCEPT)`. Updated [sip_traffic_sim.py](scripts/testing/sip_traffic_sim.py) with a full 407→digest→INVITE handshake (`send_sip_invite(caller, callee, password)`), and rewrote runbook step 6 to assert the handshake still yields `403 Forbidden` for zero-balance callers. Verified live: unauth INVITE → `407 Proxy Authentication Required`; valid digest + zero balance → `403`; `REGISTER` flow unaffected.
 
 ---
 
@@ -174,25 +174,25 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 5.5: `ogs_tun_set_ip()` is a No-Op on Linux — ogstun Gateway Never Configured
 * **Symptom**: UPF's N6 tunnel device `ogstun` existed inside `mvno-upf` but had **no IP address and no route** (`ip addr` empty, `10.45.0.0/16` route absent). All user-plane packets written to the tun by the UPF were silently dropped by the kernel (device RX/TX counters stayed at 0). Symptom seen as "UPF receives GTP-U but no N6 write" (`[RECV] GPU-U` traces present, `ogstun` RX = 0).
 * **Root Cause**: `ogs_tun_set_ip()` in Open5GS `lib/tun/linux-setup.c` is a **deliberate no-op returning `OGS_OK`** on Linux — verified identical in v2.7.7 and v2.8.0. The comment in `src/upf/gtp-path.c` states "Note that Linux will skip this configuration": on Linux the operator must configure the TUN externally (`ip tuntap add` / `ip addr add` + route). The containerized UPF entrypoint never did this, so the UPF opened `ogstun` (device created via `TUNSETIFF`) but the device had no addressing.
-* **Fix**: [configs/open5gs/entrypoint.sh](file:///home/zkhattab/MVNO/configs/open5gs/entrypoint.sh) UPF branch polls for `ogstun` to appear (≤30 s), then applies:
+* **Fix**: [configs/open5gs/entrypoint.sh](configs/open5gs/entrypoint.sh) UPF branch polls for `ogstun` to appear (≤30 s), then applies:
   ```bash
   ip addr replace 10.45.0.1/16 dev ogstun
   ip -6 addr replace 2001:db8:cafe::1/48 dev ogstun
   ip link set ogstun up
   ```
-  (`iproute2` added to the runtime stage of [configs/open5gs/Dockerfile](file:///home/zkhattab/MVNO/configs/open5gs/Dockerfile)).
+  (`iproute2` added to the runtime stage of [configs/open5gs/Dockerfile](configs/open5gs/Dockerfile)).
 * **Verification**: `podman exec mvno-upf ip addr show ogstun` → `inet 10.45.0.1/16`, `inet6 2001:db8:cafe::1/48`, `UP,LOWER_UP`; `ip route` → `10.45.0.0/16 dev ogstun proto kernel scope link src 10.45.0.1`. UL probe: 5 UDP packets from a UE tun reach `ogstun` RX (+165 bytes); DL probe: packets from the UPF netns reach the UE tun.
 
 ### Issue 5.6: Fresh v2.8.0 Source Rebuild Regresses SBI HTTP/2 Clients (30 s Heartbeat Death)
 * **Symptom**: After rebuilding the Open5GS container from the `v2.8.0` tag source, every NF's SBI connection to the NRF died at the first heartbeat (~30-35 s after registration): `[sbi] WARNING: Error in the HTTP2 framing layer (16)` (lib/sbi/client.c:767, `CURLE_HTTP2`), followed by NRF `[nrf] WARNING: No heartbeat` → de-registration. All NFs de-registered on a fixed cadence regardless of NRF restart order.
 * **Root Cause**: The freshly built daemon binaries (from-source v2.8.0 tag, verified tag peel `157f611a...` 2026-06-20 Release-19) exhibited a regressed HTTP/2 client behavior compared to the known-good 07-26 image (`mvno-open5gs:latest`, image `a2f041bbd267`). A 2×2 matrix (old/new image × NRF/client) proved: any *new-image client* fails; any *known-good client* works against either NRF. Runtime libraries were byte-identical (libcurl3-gnutls 7.88.1-10+deb12u15, libgnutls30 3.7.9-2+deb12u7, libnghttp2-14 1.52.0-1+deb12u3, libssl3 3.0.20-1~deb12u2); only the Open5GS daemon binaries differed (md5).
-* **Fix**: [configs/open5gs/Dockerfile](file:///home/zkhattab/MVNO/configs/open5gs/Dockerfile) is now **layered on the known-good image** (`FROM mvno-open5gs:latest`) adding only `iproute2` + the fixed `entrypoint.sh` — it does **not** rebuild Open5GS from source. The Dockerfile carries an explicit banner: do not switch the base back to a fresh source build until the HTTP/2 client regression is root-caused upstream. Rebuilt image `mvno-open5gs:2.8.0` daemon binaries now md5-match the known-good image.
+* **Fix**: [configs/open5gs/Dockerfile](configs/open5gs/Dockerfile) is now **layered on the known-good image** (`FROM mvno-open5gs:latest`) adding only `iproute2` + the fixed `entrypoint.sh` — it does **not** rebuild Open5GS from source. The Dockerfile carries an explicit banner: do not switch the base back to a fresh source build until the HTTP/2 client regression is root-caused upstream. Rebuilt image `mvno-open5gs:2.8.0` daemon binaries now md5-match the known-good image.
 * **Verification**: Full stack recreate → NRF shows 8 NF registrations, **0 de-registrations** past the 90 s heartbeat checkpoint; only a few startup-race framings (all before the settle timestamp), none after.
 
 ### Issue 5.7: SMF UE Pool Allocates the ogstun Gateway Address (10.45.0.1) to UEs
 * **Symptom**: Intermittently a UE was handed `10.45.0.1/32` — the same address as the `ogstun` gateway (e.g. wave 1: ue-1=.3, ue-2=**10.45.0.1**, ue-3=.4). Traffic to `10.45.0.1:9` from that UE self-routed into its own tun, breaking probes and shadowing the real gateway.
 * **Root Cause**: `configs/open5gs/smf.yaml` session stanza declared only `subnet: 10.45.0.0/16`, so the SMF's allocatable UE pool began at the subnet base — including the gateway address the UPF's ogstun uses.
-* **Fix**: [configs/open5gs/smf.yaml](file:///home/zkhattab/MVNO/configs/open5gs/smf.yaml):
+* **Fix**: [configs/open5gs/smf.yaml](configs/open5gs/smf.yaml):
   ```yaml
   session:
     - subnet: 10.45.0.0/16
@@ -227,7 +227,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 6.4: PromQL Syntax Error in Grafana Stat Cards (`|| vector(0)`)
 * **Symptom**: Grafana Stat Panels displayed "No data" and red parsing error icons, while time-series line graphs below rendered live values.
 * **Root Cause**: Stat panel targets used non-standard `|| vector(0)` operator syntax instead of standard PromQL `default 0` fallback syntax.
-* **Fix**: Replaced `|| vector(0)` with `default 0` (e.g. `sum(mvno_sms_requests_total) default 0`) across [configs/grafana/provisioning/dashboards/mvno_unified_noc.json](file:///home/zkhattab/MVNO/configs/grafana/provisioning/dashboards/mvno_unified_noc.json).
+* **Fix**: Replaced `|| vector(0)` with `default 0` (e.g. `sum(mvno_sms_requests_total) default 0`) across [configs/grafana/provisioning/dashboards/mvno_unified_noc.json](configs/grafana/provisioning/dashboards/mvno_unified_noc.json).
 
 ### Issue 6.5: Legacy Metric Schema Mismatches in Subsystem Dashboards
 * **Symptom**: `noc_rtpengine.json` panels rendered "No data" for throughput and error rate, while `noc_telecom_api.json` and `noc_overview.json` rendered rate `0`.
@@ -273,7 +273,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 8.3: Missing Kamailio Outbound HTTP REST Interception Callout
 * **Symptom**: Kamailio proxied incoming SIP `INVITE` dialogs directly to RTPEngine without querying `mvno-api:8080/api/v1/intercept/call` for policy authorization.
 * **Root Cause**: `configs/kamailio/kamailio.cfg` did not load `http_client.so` and lacked an HTTP REST callout route.
-* **Fix**: Added `loadmodule "http_client.so"` and `route[INTERCEPT]` using `http_client_query("http://mvno-api:8080/api/v1/intercept/call", ...)` before location lookup in [configs/kamailio/kamailio.cfg](file:///home/zkhattab/MVNO/configs/kamailio/kamailio.cfg).
+* **Fix**: Added `loadmodule "http_client.so"` and `route[INTERCEPT]` using `http_client_query("http://mvno-api:8080/api/v1/intercept/call", ...)` before location lookup in [configs/kamailio/kamailio.cfg](configs/kamailio/kamailio.cfg).
 
 ### Issue 8.4: Open5GS SBI HTTP/2 Framing Layer (Code 16) Heartbeat De-Registration
 * **Symptom**: Open5GS AMF and NFs logged `Error in the HTTP2 framing layer (16)` every 11 seconds and de-registered from NRF.
@@ -283,17 +283,17 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 8.6: Open5GS WebUI Next.js Module Resolution Failure (`modules/store.js`)
 * **Symptom**: HTTP 500 error on `http://localhost:9999` with `Module not found: Can't resolve 'modules/store.js' in '/usr/src/app/pages'`.
 * **Root Cause**: Open5GS WebUI Next.js server bound to `127.0.0.1` inside container (blocking host port forward) and Webpack lacked `NODE_PATH=src` module resolution paths for `src/` subdirectories (`modules`, `containers`, `components`, `helpers`).
-* **Fix**: Added `HOST=0.0.0.0`, `PORT=3000`, and `NODE_PATH=src` in `docker-compose.yml`, and created symlinks pointing `src/*` into `/usr/src/app/node_modules` and `/usr/src/app/pages` in [configs/open5gs/Dockerfile.webui](file:///home/zkhattab/MVNO/configs/open5gs/Dockerfile.webui).
+* **Fix**: Added `HOST=0.0.0.0`, `PORT=3000`, and `NODE_PATH=src` in `docker-compose.yml`, and created symlinks pointing `src/*` into `/usr/src/app/node_modules` and `/usr/src/app/pages` in [configs/open5gs/Dockerfile.webui](configs/open5gs/Dockerfile.webui).
 
 ### Issue 8.7: Open5GS WebUI React 15 JSX Transpilation & Node 18 Runtime (`ReferenceError: React is not defined`)
 * **Symptom**: HTTP 500 internal server error on `http://localhost:9999` with `ReferenceError: React is not defined` at `Auth.render` or Node ESM syntax errors (`Cannot use import statement outside a module`).
 * **Root Cause**: Next.js 3 compiles `pages/` but does not transpile `src/` modules imported via `NODE_PATH=src`. Node 19+ strict ESM loader threw SyntaxError on `import` statements outside modules, and React 15 JSX transpilation required `var React = require('react')` injection.
-* **Fix**: Rebased container on official `node:18-bookworm-slim` base image, added Babel 7 CLI + `@babel/preset-env` + `@babel/preset-react` + `@babel/plugin-transform-class-properties` + `@babel/plugin-transform-modules-commonjs` transpilation step in [configs/open5gs/Dockerfile.webui](file:///home/zkhattab/MVNO/configs/open5gs/Dockerfile.webui), and injected `var React = require('react')` to compiled JSX files. Verified `curl http://localhost:9999` returns `HTTP 200 OK` (`<title>Open5gs - Login</title>`).
+* **Fix**: Rebased container on official `node:18-bookworm-slim` base image, added Babel 7 CLI + `@babel/preset-env` + `@babel/preset-react` + `@babel/plugin-transform-class-properties` + `@babel/plugin-transform-modules-commonjs` transpilation step in [configs/open5gs/Dockerfile.webui](configs/open5gs/Dockerfile.webui), and injected `var React = require('react')` to compiled JSX files. Verified `curl http://localhost:9999` returns `HTTP 200 OK` (`<title>Open5gs - Login</title>`).
 
 ### Issue 8.8: Open5GS UPF PFCP Client Address Target Resolution (`No Heartbeat from SMF`)
 * **Symptom**: System journal reported `[pfcp] WARNING: No Heartbeat from SMF` and `[smf] ERROR: Cannot find PFCP-Node: type [1] node_id NULL from [127.0.0.1]:8805`.
 * **Root Cause**: `configs/open5gs/upf.yaml` lacked `pfcp.client.smf` section, defaulting PFCP client heartbeat target to loopback `127.0.0.1:8805` instead of container network hostname `smf`.
-* **Fix**: Added `pfcp.client.smf: - address: smf` to [configs/open5gs/upf.yaml](file:///home/zkhattab/MVNO/configs/open5gs/upf.yaml). PFCP heartbeats between SMF and UPF are now associated and healthy across `mvno-net`.
+* **Fix**: Added `pfcp.client.smf: - address: smf` to [configs/open5gs/upf.yaml](configs/open5gs/upf.yaml). PFCP heartbeats between SMF and UPF are now associated and healthy across `mvno-net`.
 * **Status**: > [!NOTE] Superseded by Issue 8.10 (SMF acts as sole PFCP client initiator per 3GPP TS 29.244).
 
 ### Issue 8.9: Open5GS SBI Cleartext HTTP/2 (`no_tls: true`) Configuration Across All NFs
@@ -304,42 +304,42 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 8.10: Open5GS UPF PFCP State Machine Dual-Initiator Collision
 * **Symptom**: SMF & UPF logged `PFCP[REQ] has already been associated` and `invalid step[0] type[6]`.
 * **Root Cause**: `configs/open5gs/upf.yaml` erroneously configured `pfcp.client.smf`, causing UPF to initiate PFCP association back to SMF simultaneously, colliding with SMF's PFCP association request.
-* **Fix**: Removed `pfcp.client` section from [configs/open5gs/upf.yaml](file:///home/zkhattab/MVNO/configs/open5gs/upf.yaml). SMF acts as sole PFCP client initiator per 3GPP TS 29.244.
+* **Fix**: Removed `pfcp.client` section from [configs/open5gs/upf.yaml](configs/open5gs/upf.yaml). SMF acts as sole PFCP client initiator per 3GPP TS 29.244.
 
 ### Issue 8.11: EIR SIM-Swap Fraud State Erasure Across Cache Purges
 * **Symptom**: Active SIM-swap blocks were bypassed after scheduled 10-minute cache purges or capacity eviction.
 * **Root Cause**: `EirTracker.java` evaluated raw call count instead of distinct SIM insertions per IMEI, and called `imeiSwapCounter.clear()`, wiping active fraud states (`swaps > 3`).
-* **Fix**: Refactored [EirTracker.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/subscriber/EirTracker.java) to track distinct MSISDN bindings (`ConcurrentHashMap<String, Set<String>>`) per IMEI, selectively prune low-activity entries (`removeIf(entry -> entry.getValue().size() <= 1)`), and restrict `reset()` method to test scope.
+* **Fix**: Refactored [EirTracker.java](telecom-api/src/main/java/com/mvno/intercept/subscriber/EirTracker.java) to track distinct MSISDN bindings (`ConcurrentHashMap<String, Set<String>>`) per IMEI, selectively prune low-activity entries (`removeIf(entry -> entry.getValue().size() <= 1)`), and restrict `reset()` method to test scope.
 
 ### Issue 8.12: Split-Brain SQLite Database File Mount (`kamailio` vs `telecom-api`)
 * **Symptom**: Kamailio registered subscribers to `./state/kamailio.db` while `telecom-api` read from `./state/kamailio/kamailio.db`, causing subscriber data divergence.
 * **Root Cause**: In `docker-compose.yml`, `kamailio` mounted single file `./state/kamailio.db:/etc/kamailio/kamailio.db:z` while `telecom-api` mounted directory `./state/kamailio:/etc/kamailio:z`.
-* **Fix**: Unified volume mount in [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml) for `kamailio` service to `./state/kamailio/kamailio.db:/etc/kamailio/kamailio.db:z` and updated [Makefile](file:///home/zkhattab/MVNO/Makefile) `init-db` target.
+* **Fix**: Unified volume mount in [docker-compose.yml](docker-compose.yml) for `kamailio` service to `./state/kamailio/kamailio.db:/etc/kamailio/kamailio.db:z` and updated [Makefile](Makefile) `init-db` target.
 
 ### Issue 8.13: RTPEngine PCAP vs Audio Recording Method Compatibility with Vosk ASR
 * **Symptom**: Native Vosk ASR service polled for audio captures in `/var/spool/rtpengine`, while RTPEngine recorded in binary PCAP format (`recording-method=pcap`).
 * **Root Cause**: RTPEngine `mr9.4` supports `recording-method=pcap|proc` and `recording-format=raw|eth` (`fork` is unsupported on this build). Unconditional `Files.deleteIfExists()` in older service builds deleted audio evidence regardless of transcription status.
-* **Fix**: Maintained [rtpengine.conf](file:///home/zkhattab/MVNO/configs/rtpengine/rtpengine.conf) baseline `recording-method=pcap` and `recording-format=eth`, restricted [NativeVoskService.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/transcription/NativeVoskService.java) `DirectoryStream` filter to audio captures, and implemented evidence archiving to `state/spool/archived/`.
+* **Fix**: Maintained [rtpengine.conf](configs/rtpengine/rtpengine.conf) baseline `recording-method=pcap` and `recording-format=eth`, restricted [NativeVoskService.java](telecom-api/src/main/java/com/mvno/intercept/transcription/NativeVoskService.java) `DirectoryStream` filter to audio captures, and implemented evidence archiving to `state/spool/archived/`.
 
 ### Issue 8.17: Unauthenticated Intercept REST Endpoints (Zero-Trust Section 1.2)
 * **Symptom**: `POST /api/v1/intercept/sms`, `GET /api/v1/intercept/call`, and `POST /api/v1/intercept/call` accepted requests with no credential of any kind, so any reachable client could trigger interception or read subscriber state.
 * **Root Cause**: `SubscriberController` and the Kamailio `http_client_query` callout relied on network position (bridge-internal) rather than an application-layer credential.
-* **Fix**: Added [ApiKeyInterceptor.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/config/ApiKeyInterceptor.java) + [WebConfig.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/config/WebConfig.java) (registered on `/api/v1/intercept/**`) with `intercept.api-key: ${X_API_KEY:mvno-demo-key-2026}` in `application.yml`; Kamailio callout switched to 4-arg `http_client_query(url, "", "X-API-Key: ...\r\n", res)` (empty post-data → GET with headers). All consumers keyed: Makefile `make test-api/test-sms/test-call` and runbook steps 4/7/8. `/actuator/*` intentionally left open for vmagent scraping. Verified live: missing/wrong key → `401`; valid key → normal flow; 3 new tests (`ApiKeyInterceptorTest`) → suite now 22/22.
+* **Fix**: Added [ApiKeyInterceptor.java](telecom-api/src/main/java/com/mvno/intercept/config/ApiKeyInterceptor.java) + [WebConfig.java](telecom-api/src/main/java/com/mvno/intercept/config/WebConfig.java) (registered on `/api/v1/intercept/**`) with `intercept.api-key: ${X_API_KEY:mvno-demo-key-2026}` in `application.yml`; Kamailio callout switched to 4-arg `http_client_query(url, "", "X-API-Key: ...\r\n", res)` (empty post-data → GET with headers). All consumers keyed: Makefile `make test-api/test-sms/test-call` and runbook steps 4/7/8. `/actuator/*` intentionally left open for vmagent scraping. Verified live: missing/wrong key → `401`; valid key → normal flow; 3 new tests (`ApiKeyInterceptorTest`) → suite now 22/22.
 
 ### Issue 8.14: Rootless Podman Docker Socket Path Permission for Vector
 * **Symptom**: Vector container failed to collect docker logs with `No such file or directory: /var/run/docker.sock`.
 * **Root Cause**: Rootless Podman exposes user-level socket at `/run/user/1000/podman/podman.sock` instead of root system path `/var/run/docker.sock`.
-* **Fix**: Updated `vector` volume mount in [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml) to `/run/user/1000/podman/podman.sock:/var/run/docker.sock:ro,z`.
+* **Fix**: Updated `vector` volume mount in [docker-compose.yml](docker-compose.yml) to `/run/user/1000/podman/podman.sock:/var/run/docker.sock:ro,z`.
 
 ### Issue 8.15: Stale Java Container Tags in `bootstrap.sh`
 * **Symptom**: Offline bootstrap save step (`bootstrap.sh --offline`) skipped saving Java image archives.
 * **Root Cause**: `SAVE_IMAGES` array in `bootstrap.sh` contained stale `eclipse-temurin:25-jre` tags while `PREBUILT_IMAGES` used Java 21 LTS (`eclipse-temurin:21-jre`).
-* **Fix**: Updated `SAVE_IMAGES` array tags in [scripts/bootstrap.sh](file:///home/zkhattab/MVNO/scripts/bootstrap.sh) to `eclipse-temurin-21-jre` and `maven-3.9-eclipse-temurin-21`.
+* **Fix**: Updated `SAVE_IMAGES` array tags in [scripts/bootstrap.sh](scripts/bootstrap.sh) to `eclipse-temurin-21-jre` and `maven-3.9-eclipse-temurin-21`.
 
 ### Issue 8.16: Osmocom VTY Script Container Engine Portability (`vty.sh`)
 * **Symptom**: `scripts/vty.sh` hardcoded `podman` engine invocation and relied strictly on container `/dev/tcp` socket redirection.
 * **Root Cause**: Non-bash container shells (Alpine/busybox) lack `/dev/tcp` socket redirection syntax, causing execution failure on minimalist images.
-* **Fix**: Refactored [scripts/vty.sh](file:///home/zkhattab/MVNO/scripts/vty.sh) with container runtime auto-detection (`podman`/`docker`) and added `nc -w 3 127.0.0.1 <port>` socket redirection fallback.
+* **Fix**: Refactored [scripts/vty.sh](scripts/vty.sh) with container runtime auto-detection (`podman`/`docker`) and added `nc -w 3 127.0.0.1 <port>` socket redirection fallback.
 
 ### Issue 8.18: `docker build` vs `podman build` Store Divergence
 * **Symptom**: A fresh `docker build` of the Open5GS container produced a different image than the previously built `podman` image — identical `Dockerfile` and context, different daemon binary md5s and different `imageId`, even though layer hashes appeared equal.
@@ -350,13 +350,13 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 8.19: docker-compose IPAM Collision — Unpinned Static IP Grabs Another Service's Address
 * **Symptom**: `telecom-api` intermittently came up without its intended static address; a concurrent container (e.g. `mongodb`) had already claimed `10.89.0.4`, and `telecom-api` grabbed a different address (e.g. `10.89.0.46`) — breaking configs that hardcode the gateway's FQDN/address.
 * **Root Cause**: `docker-compose.yml` left `telecom-api` `ipv4_address` unpinned at times (or assigned last), while other services used fixed IPs; the bridge IPAM hands out addresses in order, so two services raced for the same subnet slot.
-* **Fix**: [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml) pins every service's `ipv4_address` explicitly in a conflict-free plan (e.g. `telecom-api: 10.89.0.46`, `mongodb: 10.89.0.4`), with the plan audited via `podman compose config` (no duplicate IP assertions).
+* **Fix**: [docker-compose.yml](docker-compose.yml) pins every service's `ipv4_address` explicitly in a conflict-free plan (e.g. `telecom-api: 10.89.0.46`, `mongodb: 10.89.0.4`), with the plan audited via `podman compose config` (no duplicate IP assertions).
 * **Verification**: `podman compose config` exits 0; `podman exec mvno-api ip addr` shows `10.89.0.46/24`; no `Network address already in use` errors across full-stack recreates.
 
 ### Issue 8.20: Rootless Podman Has No Host Route to Container IPs — UE↔Bridge Needs UPF-Internal SNAT
 * **Symptom**: `sudo ip route add 10.45.0.0/16 via 10.89.0.14` on the host fails with `Error: Nexthop has invalid gateway`; `curl http://10.89.0.46:8080/...` from the host is unreachable even though the container answers on published ports.
 * **Root Cause**: Rootless Podman (pasta/slirp) keeps the compose bridge subnet `10.89.0.0/24` inside its **user network namespace** — no host interface carries it, so the host cannot route to container IPs at all. The "host route via the UPF" design (valid for rootful/native deployments) is impossible here; return traffic for anything forwarded out of `ogstun` (10.45.0.0/16) to the bridge would be dropped at the host.
-* **Fix**: The UPF entrypoint ([configs/open5gs/entrypoint.sh](file:///home/zkhattab/MVNO/configs/open5gs/entrypoint.sh)) installs an idempotent SNAT rule inside the UPF netns — the whole UE→bridge round-trip stays in-netns:
+* **Fix**: The UPF entrypoint ([configs/open5gs/entrypoint.sh](configs/open5gs/entrypoint.sh)) installs an idempotent SNAT rule inside the UPF netns — the whole UE→bridge round-trip stays in-netns:
   ```bash
   iptables -t nat -A POSTROUTING -s 10.45.0.0/16 ! -o ogstun -j MASQUERADE
   ```

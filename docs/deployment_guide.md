@@ -140,7 +140,7 @@ The `docker-compose.yml` is configured for **rootless Podman** execution:
 - SELinux contexts are dynamically modified using `:z` volume flags.
 - Databases use strict RAM caps suitable for unprivileged execution.
 
-#### [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml)
+#### [docker-compose.yml](docker-compose.yml)
 
 ```yaml
 networks:

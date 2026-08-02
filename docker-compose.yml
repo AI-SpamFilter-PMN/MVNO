@@ -494,12 +494,16 @@ services:
   vector:
     image: timberio/vector:0.44.0-alpine
     container_name: mvno-vector
+    # Runtime-agnostic container socket: defaults to the rootless Podman socket
+    # (set by up.sh via PODMAN_USER_UID). Docker users override with, e.g.:
+    #   DOCKER_SOCK=/var/run/docker.sock podman compose up -d
+    # or add `DOCKER_SOCK=/var/run/docker.sock` to a top-level .env file.
     environment:
       VECTOR_LOG: error
     volumes:
       - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
       - ./state/logs/vector:/var/log/vector:z
-      - /run/user/${PODMAN_USER_UID:-1000}/podman/podman.sock:/var/run/docker.sock:ro,z
+      - ${DOCKER_SOCK:-/run/user/${PODMAN_USER_UID:-1000}/podman/podman.sock}:/var/run/docker.sock:ro,z
     networks:
       mvno_net:
         ipv4_address: 10.89.0.40
