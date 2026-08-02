@@ -1,4 +1,4 @@
-# Implementation Plan — Master Plan v6 (Goal 0 ✅ COMPLETE; Goal 1 NEXT)
+# Implementation Plan — Master Plan v7 (Goals 0–3 ✅ COMPLETE; Goal 4 NEXT)
 
 Consolidated roadmap for the MVNO repo (`/home/zkhattab/AI-SpamFilter-PMN/MVNO`).
 Teammate repos (`AI-Filteration-System`, `SipClient`, `sms-client`) are **read-only external** — integrate only, never edit.
@@ -8,9 +8,7 @@ Teammate repos (`AI-Filteration-System`, `SipClient`, `sms-client`) are **read-o
 Goal 0 (freeze/baseline) ──▶ everything
 Goal 4 (5G SMS) ─┐
 Goal 5 (2G)     ─┼─ feature chain ─▶ Goal 6 (IP-SM-GW) ─▶ Goal 7 (e2e) ─▶ Goal 8 (obs/docs)
-Goal 1 (portability) ── parallel; finish before Goal 7/8
-Goal 2 (scripts)     ── parallel; finish before Goal 7
-Goal 3 (integration) ── parallel; MVNO-side only, zero teammate-repo edits
+Goal 1 (portability) ── ✅ done; Goal 2 (scripts) ── ✅ done; Goal 3 (integration) ── ✅ done
 ```
 
 ## Goal 0 — Baseline & Working-Tree Freeze ✅ COMPLETE
@@ -18,53 +16,90 @@ Goal 3 (integration) ── parallel; MVNO-side only, zero teammate-repo edits
 - **Fixed latent repro bug:** statically pinned ALL 27 services (`f057a77`) to prevent IPAM
   collision `10.89.0.4` on fresh-network creation (previously only mongodb pinned; unpinned
   services dynamically stole pinned IPs — the compose comment's own "static pin required" warning).
+  **These pins are load-bearing — never unpin.**
 - Live proof: **27/27 Up (0 unhealthy)**, `ran_ue=3`, api/actuator UP, ogstun N6 (rx=0/tx=240),
   counters 0/0→post-runbook 7/1, `kamailio -c` exit 0, `demo_runbook.sh` **ALL 13 PASSED**
-  (incl. 5G user-plane traversal ogstun TX +2769 B).
+  (incl. 5G user-plane traversal ogstun TX +2769 B). Recorded in `65bf520 docs(plan): Master
+  Plan v6 + Goal 0 completion`.
 
-## Goal 1 — Portability Hardening (NEXT)
-- Regen `scripts/bootstrap.sh` pins to match compose (mongo:7.0, vm/vmagent v1.147.0,
+## Goal 1 — Portability Hardening ✅ COMPLETE
+- `e0c5db1`: Regen `scripts/bootstrap.sh` pins to match compose (mongo:7.0, vm/vmagent v1.147.0,
   kamailio 5.7.2, rtpengine mr9.4.0.0, vector 0.44.0-alpine, grafana 11.6.0) + add
-  `percona/mongodb_exporter:0.41`; add `podman image exists <exact-tag>` gate in `up.sh`.
-- `scripts/load-offline.sh --verify-tags` (tarball tags vs compose pins; exit≠0 on drift).
-- `scripts/preflight.sh`: compose plugin, sqlite3, nc, curl, tun, sctp module, multicast,
+  `percona/mongodb_exporter:0.41`; `podman image exists <exact-tag>` gate in `up.sh`;
+  `scripts/load-offline.sh --verify-tags` (tarball tags vs compose pins; exit≠0 on drift);
+  `scripts/preflight.sh`: compose plugin, sqlite3, nc, curl, tun, sctp module, multicast,
   `ss -lun | grep :5060` conflict (host Asterisk owns 5060; canonical = 5066).
-- Vector socket runtime-agnostic; relative-link sweep (76 `file:///home/zkhattab` occurrences).
-- `docs/ENVIRONMENT_MATRIX.md`: amd64 Linux + rootless Podman only; macOS/arm64 unsupported.
+- `a659a73`: Vector socket runtime-agnostic; relative-link sweep (absolute `file:///home/zkhattab`
+  links → repo-relative); `docs/ENVIRONMENT_MATRIX.md`: amd64 Linux + rootless Podman only;
+  macOS/arm64 unsupported.
+- Open (deferred by decision): re-vendoring upstream tarballs (mongo 8.0 vs 7.0, `-latest`
+  tags) — pins + `--verify-tags` gate accepted for this cycle; tracked in ISSUES.md.
 
-## Goal 2 — Script Right-Sizing
-- `scripts/lib/common.sh` (detect_runtime/os/install_packages/try_log) shared by 5 scripts.
-- Trim dead `scripts/testing/requirements.txt` (requests/smpplib unused — stdlib only).
-- `demo_runbook.sh` shells out to existing send-* scripts (single source of truth).
+## Goal 2 — Script Right-Sizing ✅ COMPLETE
+- `a38041c`: `scripts/lib/common.sh` (detect_runtime/os/install_packages/try_log) shared by
+  `vty.sh` + `seed-mongo.sh`; trim dead `scripts/testing/requirements.txt` (requests/smpplib
+  unused — stdlib only); `make test` all suites pass.
 
-## Goal 3 — Integration-Only (no teammate edits)
-- `docs/INTEGRATION_CONTRACT.md`: interfaces MVNO exposes (SIP 5066, SMPP 2775, REST /intercept).
-- Optional env-gated `MVNO_PUBLISH_5060` (default-off; blocked here — Asterisk owns 5060).
-- Doc: "5066 canonical; host 5060 occupied by host Asterisk; teammate clients target 5066."
+## Goal 3 — Integration-Only ✅ COMPLETE (`5774214`)
+- `docs/INTEGRATION_CONTRACT.md`: interfaces MVNO exposes (SIP 5066, SMPP 2775, REST
+  `/api/v1/intercept/*` with `X-API-Key: mvno-demo-key-2026`, AI mock `:8000/api/v1/classify`);
+  per-repo notes (SipClient 5060→5066 rec, sms-client `ai.classify.url=:5000` mismatch rec,
+  `server.port=8080` overlap, AI-FS optional). §3 = optional env-gated `MVNO_PUBLISH_5060`
+  (default-off; blocked here — Asterisk owns 5060) + §4 stability guarantee.
+- `docker-compose.5060.yml`: extra `5060:5060/udp` publish, default-off, `preflight.sh`-gated.
+- Gate: `podman compose config` parses with and without override; no absolute paths in doc.
 
-## Goal 4 — Dual-Access SMS Phase 1 (5G/IMS SMS twin)
-- kamailio.cfg: OPTIONS→200, top-level CANCEL, MESSAGE→digest→`http_client_request` POST
-  (JSON-escape `$rb`) → route[INTERCEPT_SMS] → lookup→relay. New `scripts/testing/ims_terminal.py`.
-- Gates: kamailio -c → restart → runbook regression → SMS printed on ue-2 → N6 delta → counter.
+## Goal 4 — Dual-Access SMS Phase 1 (5G/IMS SMS twin) — NEXT
+- kamailio.cfg (additive, before `route[WITHINDLG]`): top-level `OPTIONS→200`, top-level
+  `CANCEL` (before `loose_route`), `MESSAGE` digest-auth → `route[INTERCEPT_SMS]` →
+  `http_client_request` POST (module exports NO `http_client_post`; JSON-escape `$rb` — strip
+  quotes/newlines) → lookup → relay.
+- New `scripts/testing/ims_terminal.py` (digest REGISTER → MESSAGE → print `<msisdn>: <body>`);
+  deploy into ue-1 (10.45.0.3) / ue-2 (10.45.0.4) with existing route-replace steering
+  (`ip route replace 10.89.0.23/32 dev uesimtun0`).
+- Gates: `kamailio -c` exit 0 → restart → runbook 5/5b/6 regression → SMS printed on ue-2 →
+  ogstun N6 TX delta>0 → `mvno_sms_requests_total` increments. Rollback: revert cfg/script (no
+  image change). (No `options.so`/`presence.*` in image — use sl/tmx.)
 
-## Goal 5 — Dual-Access SMS Phase 2 (2G twin)
-- New `mvno-2g-core` (osmo-bsc 1.14.1, osmo-bts-virtual 1.11.0, osmo-stp 2.2.1, osmo-mgw 1.15.0).
-- Handsets via apt `osmocom-bb-layer23` + `osmocom-bb-virtphy` (0.2.0) — no source build.
-- Edit osmo-smsc.cfg adding `msc` A-interface node + sms-routing + sms-over-gsup + smsc db;
-  HLR provision 2G IMSIs. Keep SMPP ESME semantics. **Checkpoint before image build.**
+## Goal 5 — Dual-Access SMS Phase 2 (2G twin) — CHECKPOINT BEFORE IMAGE BUILD
+- New `mvno-2g-core`: apt `osmo-bsc` 1.14.1, `osmo-bts-virtual` 1.11.0, `osmo-stp` 2.2.1,
+  `osmo-mgw` 1.15.0 (from verified-reachable osmocom Debian_12 repo — no source builds).
+- New `mvno-2g-ms`: apt `osmocom-bb-layer23` + `osmocom-bb-virtphy` (0.2.0) → `mobile`+`virtphy`.
+- Edit osmo-smsc.cfg adding `msc` A-interface node (SCCP/M3UA via STP) + sms-routing +
+  sms-over-gsup + SC db; HLR provision 2G IMSIs. Keep SMPP ESME semantics.
+- **Facts overruling older drafts:** binary is `osmo-msc` (package `osmo-msc`, not "osmo-smsc");
+  real VTY injection = `subscriber msisdn <R> sms sender msisdn <S> send <TEXT>`, assert via
+  `show sms-queue` (virtual-Um flaky — Osmocom Bug #2942); `send_db_sms.sh` invented schema →
+  DROP (decision); `send_vty_sms.sh` must use the real command.
+- **Prereq gates:** multicast 239.193.23.1:4729 (GSMTAP) before enabling virtual-Um; SCTP module
+  for STP/M3UA. Add both images to `bootstrap.sh` SAVE_IMAGES. MT assert mechanism (decision):
+  container `podman logs` on the 2G handset container.
+- Gates: BTS/BSC UP → `show sms-queue` → SMPP submit → store&fwd → MT log line on handset →
+  no SMPP→telecom-api regression.
 
 ## Goal 6 — IP-SM-GW bridge
-- `scripts/ip_sm_gw.py`: 2G→5G (SC queue → Kamailio MESSAGE), 5G→2G (SIP → submit_sm).
+- `scripts/ip_sm_gw.py` (TS 23.204): 2G→5G (poll SC queue for non-2G recipients → Kamailio
+  MESSAGE), 5G→2G (SIP SMS → `submit_sm`); MSISDN↔(UE, access) map from `subscriber` table.
+- Gate: all 4 cross cells (2G→2G, 2G→5G, 5G→2G, 5G→5G) pass once.
 
 ## Goal 7 — e2e_runbook.sh
-- SIP-method × SMS-path × 4-cell matrix; deterministic AI-block (config-only mock rule).
+- SIP-method × SMS-path × 4-cell matrix; deterministic AI-block (config-only mock rule —
+  `allow:false` marker in the inline `mvno-ai-filter` mock, required because mock always
+  returns `allow:true` today). Gate: exit 0 + per-leg asserts.
 
 ## Goal 8 — Observability & Docs
 - New SMS counters; vector parse; Grafana 2G/5G panel; ISSUES/ROADMAP/README/ENVIRONMENT_MATRIX.
 
+## Open decisions (defaults applied — revisit only on user request)
+1. Re-vendor upstream tarballs (mongo 8.0 vs 7.0, `-latest` tags): **DEFER**; pins + `--verify-tags`.
+2. `send_db_sms.sh` (invented schema): **DROP**.
+3. Goal 7 AI-block: config-only mock edit: **ACCEPTED**.
+4. 2G MT assert: container logs on handset container: **ACCEPTED**.
+5. Commit order: Goal 3 → 4 → 5 (checkpoint) → 6 → 7 → 8.
+
 ---
 
-# HISTORICAL RECORD (prior to Plan v6) — Phase 0 / 1 / 2
+# HISTORICAL RECORD (prior to Plan v6 — superseded by v7; retained verbatim) — Phase 0 / 1 / 2
 
 ## Phase 0 — 5G SA User-Plane Data Gate & Documentation (COMPLETED)
 
