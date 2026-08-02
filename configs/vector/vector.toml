@@ -9,7 +9,7 @@
 
 [sources.container_logs]
 type = "docker_logs"
-include_containers = ["mvno-kamailio", "mvno-api", "mvno-osmosmsc"]
+include_containers = ["*"]
 
 [transforms.parse_telecom_events]
 type = "remap"
@@ -33,8 +33,8 @@ if contains(to_string!(.message), "INVITE") {
 }
 '''
 
-[sinks.stdout]
-type = "console"
+[sinks.file_sink]
+type = "file"
 inputs = ["parse_telecom_events"]
-target = "stdout"
+path = "/var/log/vector/telecom_events.json"
 encoding.codec = "json"

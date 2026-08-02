@@ -12,6 +12,9 @@ import org.vosk.Recognizer;
 
 import java.io.File;
 import java.io.FileInputStream;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,18 +55,23 @@ public class NativeVoskService {
             final MeterRegistry meterRegistry) {
         this.spoolDir = spoolDir;
         this.modelPath = modelPath;
+        // Micrometer telemetry counters and gauge for Vosk ASR health monitoring
         this.transcriptions = meterRegistry.counter("mvno.vosk.transcriptions");
         this.decodeErrors = meterRegistry.counter("mvno.vosk.decode.errors");
         meterRegistry.gauge("mvno.vosk.model.ready", modelReady);
         initModel();
     }
 
+    /**
+     * Initializes the native C++ Vosk ASR model into off-heap memory via JNI bindings.
+     */
     private void initModel() {
         try {
             final File mDir = new File(modelPath);
             if (mDir.exists()) {
+                // Instantiates native C++ Model struct in off-heap memory
                 this.voskModel = new Model(modelPath);
-                modelReady.set(1);
+                modelReady.set(1); // Set Prometheus gauge ready state = 1
                 logger.info("Native Vosk Java 21 ASR Model loaded successfully from {}", modelPath);
             } else {
                 logger.warn("Vosk ASR model directory not found at {}. Native Java ASR standby mode.", modelPath);
@@ -73,11 +81,14 @@ public class NativeVoskService {
         }
     }
 
+    /**
+     * Spring Bean destruction hook: ensures native off-heap Vosk C++ memory is freed cleanly.
+     */
     @PreDestroy
     public void destroyModel() {
         if (voskModel != null) {
             try {
-                voskModel.close();
+                voskModel.close(); // Release JNI native pointers
                 logger.info("Native Vosk JNI off-heap memory model resources closed successfully.");
             } catch (final Exception e) {
                 logger.error("Error closing native Vosk ASR model: {}", e.getMessage());
@@ -88,23 +99,25 @@ public class NativeVoskService {
     /**
      * Decodes 16kHz mono WAV audio file in JVM memory and returns transcribed text string.
      * 
-     * @param wavFile Target audio file.
-     * @return Transcribed text string.
+     * @param wavFile Target audio file captured by RTPEngine.
+     * @return Transcribed text string extracted by Vosk ASR.
      */
     public String transcribeWav(final File wavFile) {
         if (voskModel == null) {
             return "Vosk model unavailable";
         }
-        try (final FileInputStream fis = new FileInputStream(wavFile);
-             final Recognizer recognizer = new Recognizer(voskModel, 16000)) {
+        // Open WAV audio stream and create a Vosk Recognizer matching the audio sample rate
+        try (final AudioInputStream ais = AudioSystem.getAudioInputStream(wavFile);
+             final Recognizer recognizer = new Recognizer(voskModel, ais.getFormat().getSampleRate())) {
             
+            // Read raw PCM audio stream in 4KB byte chunks and pass directly to JNI C++ recognizer
             final byte[] buffer = new byte[4096];
             int bytesRead;
-            while ((bytesRead = fis.read(buffer)) >= 0) {
+            while ((bytesRead = ais.read(buffer)) >= 0) {
                 recognizer.acceptWaveForm(buffer, bytesRead);
             }
-            transcriptions.increment();
-            return recognizer.getResult();
+            transcriptions.increment(); // Increment Micrometer transcription metric
+            return recognizer.getResult(); // Return JSON string containing transcribed text
         } catch (final Exception e) {
             decodeErrors.increment();
             logger.error("Native Java 21 Vosk ASR decoding error: {}", e.getMessage());
@@ -126,19 +139,34 @@ public class NativeVoskService {
                 return;
             }
 
+            // Filter for .wav files in RTPEngine spool directory
             try (final DirectoryStream<Path> stream = Files.newDirectoryStream(spoolPath, entry -> {
                 String name = entry.getFileName().toString().toLowerCase();
                 return name.endsWith(".wav");
             })) {
+                // Ensure 'archived' subdirectory exists for processed audio files
                 final Path archiveDir = spoolPath.resolve("archived");
                 if (!Files.exists(archiveDir)) {
                     Files.createDirectories(archiveDir);
                 }
+                
+                // Process each .wav file that has finished writing (file age > 3000ms)
                 for (final Path path : stream) {
                     final File file = path.toFile();
                     if (!file.isDirectory() && System.currentTimeMillis() - file.lastModified() > 3000) {
+                        // Transcribe WAV audio to text
                         final String text = transcribeWav(file);
                         logger.info("Native Java 21 Vosk ASR Transcribed [{}]: {}", file.getName(), text);
+                        
+                        // Save text transcription file (.txt) alongside archived WAV audio
+                        try {
+                            final String txtFileName = file.getName().replaceAll("(?i)\\.wav$", ".txt");
+                            Files.writeString(archiveDir.resolve(txtFileName), text, StandardCharsets.UTF_8);
+                        } catch (final Exception e) {
+                            logger.error("Failed writing transcription txt file: {}", e.getMessage());
+                        }
+                        
+                        // Move processed audio file to 'archived' directory
                         Files.move(path, archiveDir.resolve(path.getFileName()), StandardCopyOption.REPLACE_EXISTING);
                     }
                 }

@@ -34,12 +34,17 @@ import java.util.concurrent.atomic.AtomicLong;
 public class AiFilterService {
 
     private static final Logger logger = LoggerFactory.getLogger(AiFilterService.class);
+    // Threshold: 3 consecutive HTTP/network failures trip the circuit breaker OPEN
     private static final int MAX_CONSECUTIVE_FAILURES = 3;
+
+    // Circuit Breaker Duration: When open, bypass HTTP calls for 30,000ms (30 seconds)
     private static final long CIRCUIT_OPEN_DURATION_MS = 30_000L;
 
     private final RestClient restClient;
     private final String baseUrl;
     private final MeterRegistry meterRegistry;
+
+    // Thread-safe atomic counters for tracking consecutive failures & circuit cooldown epoch
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicLong circuitOpenUntilEpochMs = new AtomicLong(0);
 
@@ -53,16 +58,19 @@ public class AiFilterService {
 
     /**
      * Constructs SMS classification payload and proxies it to AI filter.
+     * Enforces SLA fail-open rules if AI server is unreachable or circuit is open.
      * 
      * @param req Incoming SMS interception request.
-     * @return InterceptResponse decision.
+     * @return InterceptResponse decision (allow: true/false).
      */
     public InterceptResponse classifySms(final SMSInterceptRequest req) {
+        // Step 1: Fast-path check — if circuit breaker is OPEN, fail-open immediately (~0.1ms)
         if (isCircuitOpen()) {
             return failOpen("circuit_open", "AI filter circuit open — SLA allow");
         }
 
         try {
+            // Step 2: Build JSON classification request payload for SMS
             final Map<String, Object> body = Map.of(
                 "event_type", "SMS",
                 "sender_msisdn", req.sender(),
@@ -71,21 +79,29 @@ public class AiFilterService {
                 "timestamp_epoch_ms", System.currentTimeMillis()
             );
 
+            // Step 3: Execute POST request to external AI model microservice
             final TranscriptionResult result = restClient.post()
                     .uri(baseUrl)
                     .body(body)
                     .retrieve()
                     .body(TranscriptionResult.class);
 
+            // Step 4: On successful response, reset consecutive failure counter to 0
             if (result != null) {
                 consecutiveFailures.set(0);
                 return new InterceptResponse(result.allow(), result.reason());
             }
+
+            // Fallback for null response body
             return failOpen("empty_response", "AI filter returned empty response — SLA allow");
+
         } catch (final RestClientException e) {
+            // Network / Timeout Exception: record failure & trigger SLA fail-open
             recordFailure(e);
             return failOpen("unreachable", "AI filter unreachable — SLA allow");
+
         } catch (final Exception e) {
+            // Unexpected internal error: log & trigger SLA fail-open
             logger.error("Unexpected error in SMS AI classification: {}", e.getMessage(), e);
             return failOpen("internal", "Gateway internal error — SLA allow");
         }
@@ -93,16 +109,19 @@ public class AiFilterService {
 
     /**
      * Constructs Voice Call classification payload and proxies it to AI filter.
+     * Enforces SLA fail-open rules if AI server is unreachable or circuit is open.
      * 
      * @param req Incoming Call interception request.
-     * @return InterceptResponse decision.
+     * @return InterceptResponse decision (allow: true/false).
      */
     public InterceptResponse classifyCall(final CallInterceptRequest req) {
+        // Step 1: Fast-path check — if circuit breaker is OPEN, fail-open immediately (~0.1ms)
         if (isCircuitOpen()) {
             return failOpen("circuit_open", "AI filter circuit open — SLA allow");
         }
 
         try {
+            // Step 2: Build JSON classification request payload for Voice Call
             final Map<String, Object> body = Map.of(
                 "event_type", "VOICE_CALL",
                 "caller_msisdn", req.caller(),
@@ -111,32 +130,46 @@ public class AiFilterService {
                 "timestamp_epoch_ms", System.currentTimeMillis()
             );
 
+            // Step 3: Execute POST request to external AI model microservice
             final TranscriptionResult result = restClient.post()
                     .uri(baseUrl)
                     .body(body)
                     .retrieve()
                     .body(TranscriptionResult.class);
 
+            // Step 4: On successful response, reset consecutive failure counter to 0
             if (result != null) {
                 consecutiveFailures.set(0);
                 return new InterceptResponse(result.allow(), result.reason());
             }
+
+            // Fallback for null response body
             return failOpen("empty_response", "AI filter returned empty response — SLA allow");
+
         } catch (final RestClientException e) {
+            // Network / Timeout Exception: record failure & trigger SLA fail-open
             recordFailure(e);
             return failOpen("unreachable", "AI filter unreachable — SLA allow");
+
         } catch (final Exception e) {
+            // Unexpected internal error: log & trigger SLA fail-open
             logger.error("Unexpected error in Call AI classification: {}", e.getMessage(), e);
             return failOpen("internal", "Gateway internal error — SLA allow");
         }
     }
 
+    /**
+     * Carrier SLA Fallback: Increments Prometheus counter 'mvno.ai.failopen' and returns allow: true.
+     */
     private InterceptResponse failOpen(final String reason, final String message) {
         meterRegistry.counter("mvno.ai.failopen", "reason", reason).increment();
         logger.warn("AI filter SLA fail-open ({}): {}", reason, message);
         return new InterceptResponse(true, message);
     }
 
+    /**
+     * Checks whether the circuit breaker is currently in the OPEN cooldown state.
+     */
     private boolean isCircuitOpen() {
         if (System.currentTimeMillis() < circuitOpenUntilEpochMs.get()) {
             logger.warn("AI filter circuit breaker OPEN — skipping HTTP call and returning SLA allow immediately.");
@@ -145,6 +178,9 @@ public class AiFilterService {
         return false;
     }
 
+    /**
+     * Increments consecutive failure counter and trips circuit breaker OPEN for 30s if threshold (3) is reached.
+     */
     private void recordFailure(final Exception e) {
         final int failures = consecutiveFailures.incrementAndGet();
         logger.warn("AI filter connection error (consecutive failure #{}/{}): {}", failures, MAX_CONSECUTIVE_FAILURES, e.getMessage());

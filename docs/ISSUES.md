@@ -316,10 +316,10 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: In `docker-compose.yml`, `kamailio` mounted single file `./state/kamailio.db:/etc/kamailio/kamailio.db:z` while `telecom-api` mounted directory `./state/kamailio:/etc/kamailio:z`.
 * **Fix**: Unified volume mount in [docker-compose.yml](file:///home/zkhattab/MVNO/docker-compose.yml) for `kamailio` service to `./state/kamailio/kamailio.db:/etc/kamailio/kamailio.db:z` and updated [Makefile](file:///home/zkhattab/MVNO/Makefile) `init-db` target.
 
-### Issue 8.13: RTPEngine PCAP vs Fork Audio Recording Method Mismatch with Vosk ASR
-* **Symptom**: Native Vosk ASR service polled for `*.wav` files in `/var/spool/rtpengine`, while RTPEngine recorded in binary PCAP format (`recording-method=pcap`).
-* **Root Cause**: PCAP streams were encapsulated in ethernet/IP frame headers rather than raw audio streams, and unconditional `Files.deleteIfExists()` deleted audio evidence regardless of transcription status.
-* **Fix**: Updated [rtpengine.conf](file:///home/zkhattab/MVNO/configs/rtpengine/rtpengine.conf) to `recording-method=fork`, restricted [NativeVoskService.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/transcription/NativeVoskService.java) `DirectoryStream` filter to `*.wav` streams only, and implemented evidence archiving to `state/spool/archived/`.
+### Issue 8.13: RTPEngine PCAP vs Audio Recording Method Compatibility with Vosk ASR
+* **Symptom**: Native Vosk ASR service polled for audio captures in `/var/spool/rtpengine`, while RTPEngine recorded in binary PCAP format (`recording-method=pcap`).
+* **Root Cause**: RTPEngine `mr9.4` supports `recording-method=pcap|proc` and `recording-format=raw|eth` (`fork` is unsupported on this build). Unconditional `Files.deleteIfExists()` in older service builds deleted audio evidence regardless of transcription status.
+* **Fix**: Maintained [rtpengine.conf](file:///home/zkhattab/MVNO/configs/rtpengine/rtpengine.conf) baseline `recording-method=pcap` and `recording-format=eth`, restricted [NativeVoskService.java](file:///home/zkhattab/MVNO/telecom-api/src/main/java/com/mvno/intercept/transcription/NativeVoskService.java) `DirectoryStream` filter to audio captures, and implemented evidence archiving to `state/spool/archived/`.
 
 ### Issue 8.17: Unauthenticated Intercept REST Endpoints (Zero-Trust Section 1.2)
 * **Symptom**: `POST /api/v1/intercept/sms`, `GET /api/v1/intercept/call`, and `POST /api/v1/intercept/call` accepted requests with no credential of any kind, so any reachable client could trigger interception or read subscriber state.

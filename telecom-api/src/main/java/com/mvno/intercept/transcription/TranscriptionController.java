@@ -31,36 +31,46 @@ public class TranscriptionController {
     /**
      * Receives and processes post-call speech transcription and acoustic biometrics payloads.
      * 
-     * @param req TranscriptionRequest payload record.
-     * @return ResponseEntity JSON status acknowledgement.
+     * @param req TranscriptionRequest payload record containing text, biometrics, and DTMF data.
+     * @return ResponseEntity JSON status acknowledgement ("status": "received").
      */
     @PostMapping
     public ResponseEntity<Map<String, String>> receiveTranscription(@RequestBody final TranscriptionRequest req) {
         if (req == null || req.transcript() == null || req.transcript().isBlank()) {
             logger.warn("Received empty or missing speech transcript payload for callId: {}", req != null ? req.callId() : "null");
         } else {
+            // Truncate transcript snippet for clean log formatting
             final String snippet = req.transcript().length() > 50 ? req.transcript().substring(0, 50) + "..." : req.transcript();
             logger.info("Received transcription payload for callId [{}]: snippet='{}', biometrics={}", req.callId(), snippet, req.biometrics());
         }
         return ResponseEntity.ok(Map.of("status", "received"));
     }
 
+    /**
+     * DTO Record representing the post-call analytics payload.
+     */
     public record TranscriptionRequest(
-        String callId,
-        String audioFile,
-        String transcript,
-        BiometricsData biometrics,
-        List<DtmfEvent> dtmfEvents
+        String callId,           // Unique SIP Call-ID string
+        String audioFile,        // Original WAV audio filename in spool directory
+        String transcript,       // Full Speech-to-Text transcribed string
+        BiometricsData biometrics, // Acoustic biometrics metadata (silence ratio, spectral flatness)
+        List<DtmfEvent> dtmfEvents // Keypress touch-tone events captured during call
     ) {}
 
+    /**
+     * DTO Record representing acoustic biometrics for robocall & synthetic voice deepfake detection.
+     */
     public record BiometricsData(
-        double silenceRatio,
-        double spectralFlatness,
-        double durationSeconds
+        double silenceRatio,    // Silence ratio (pauses vs speech) to detect robocall bots
+        double spectralFlatness,// Spectral flatness via FFT to flag synthetic TTS voice deepfakes
+        double durationSeconds  // Total audio call duration in seconds
     ) {}
 
+    /**
+     * DTO Record representing in-band touch-tone keypress events.
+     */
     public record DtmfEvent(
-        int digit,
-        long timestamp
+        int digit,        // Touch-tone key pressed (0-9, *, #)
+        long timestamp    // Relative timestamp epoch ms when keypress occurred
     ) {}
 }

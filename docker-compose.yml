@@ -49,7 +49,7 @@ services:
   mongodb:
     image: mongo:7.0
     container_name: mvno-mongodb
-    command: mongod --wiredTigerCacheSizeGB 0.25
+    command: mongod --wiredTigerCacheSizeGB 0.25 --quiet
     ports:
       - "127.0.0.1:27017:27017"
     volumes:
@@ -490,8 +490,11 @@ services:
   vector:
     image: timberio/vector:0.44.0-alpine
     container_name: mvno-vector
+    environment:
+      VECTOR_LOG: error
     volumes:
       - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
+      - ./state/logs/vector:/var/log/vector:z
       - /run/user/${PODMAN_USER_UID:-1000}/podman/podman.sock:/var/run/docker.sock:ro,z
     networks:
       - mvno_net

@@ -37,7 +37,8 @@ init-db:
 	@mkdir -p state/mongodb state/spool/archived state/hlr state/kamailio state/vm-data state/grafana state/logs/kamailio state/logs/osmocom
 	@sqlite3 state/kamailio/kamailio.db \
 		"CREATE TABLE IF NOT EXISTS version (id INTEGER PRIMARY KEY, table_name TEXT UNIQUE, table_version INTEGER);" \
-		"INSERT OR IGNORE INTO version VALUES (1, 'version', 1);" \
+		"INSERT OR IGNORE INTO version VALUES (1, 'version', 1), (2, 'location', 9), (3, 'subscriber', 7);" \
+		"CREATE TABLE IF NOT EXISTS location (id INTEGER PRIMARY KEY AUTOINCREMENT, username VARCHAR(64) NOT NULL DEFAULT '', domain VARCHAR(64) DEFAULT NULL, contact VARCHAR(512) NOT NULL DEFAULT '', received VARCHAR(128) DEFAULT NULL, path VARCHAR(512) DEFAULT NULL, expires DATETIME NOT NULL DEFAULT '2030-05-28 21:32:15', q FLOAT NOT NULL DEFAULT 1.0, callid VARCHAR(255) NOT NULL DEFAULT 'Default-Call-ID', cseq INTEGER NOT NULL DEFAULT 1, flags INTEGER NOT NULL DEFAULT 0, cflags INTEGER NOT NULL DEFAULT 0, user_agent VARCHAR(255) NOT NULL DEFAULT '', socket VARCHAR(64) DEFAULT NULL, methods INTEGER DEFAULT NULL, instance VARCHAR(255) DEFAULT NULL, reg_id INTEGER NOT NULL DEFAULT 0, server_id INTEGER NOT NULL DEFAULT 0, connection_id INTEGER NOT NULL DEFAULT 0, keepalive INTEGER NOT NULL DEFAULT 0, partition INTEGER NOT NULL DEFAULT 0, last_modified DATETIME NOT NULL DEFAULT '2030-05-28 21:32:15', ruid VARCHAR(64) NOT NULL DEFAULT '', CONSTRAINT location_ruid_idx UNIQUE (ruid));" \
 		"CREATE TABLE IF NOT EXISTS subscriber ( \
 			id INTEGER PRIMARY KEY AUTOINCREMENT, \
 			username VARCHAR(64) NOT NULL DEFAULT '', \
