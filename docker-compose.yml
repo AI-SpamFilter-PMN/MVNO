@@ -78,7 +78,8 @@ services:
       - "--mongodb.uri=mongodb://mongodb:27017"
       - "--collect-all"
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.47
     restart: unless-stopped
 
   # ─── Open5GS Subscriber WebUI Management ───
@@ -377,7 +378,8 @@ services:
       - ./configs/rtpengine:/etc/rtpengine:z
       - ./state/spool:/var/spool/rtpengine:z
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.48
     restart: unless-stopped
 
   # ─── Kamailio SIP Registrar & Interception Proxy ───
@@ -434,7 +436,8 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.49
     restart: unless-stopped
 
   # ─── Spring Boot Interception Gateway & Vosk ASR JNI Runtime ───
@@ -483,7 +486,8 @@ services:
                 self.wfile.write(b'OK')
         HTTPServer(('0.0.0.0', 8000), H).serve_forever()
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.44
     restart: unless-stopped
 
   # ─── Vector Log Shipper ───
@@ -497,7 +501,8 @@ services:
       - ./state/logs/vector:/var/log/vector:z
       - /run/user/${PODMAN_USER_UID:-1000}/podman/podman.sock:/var/run/docker.sock:ro,z
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.40
     restart: unless-stopped
 
   # ─── VictoriaMetrics Time-Series Database ───
@@ -509,7 +514,8 @@ services:
     volumes:
       - ./state/vm-data:/victoria-metrics-data:z
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.41
     restart: unless-stopped
 
   # ─── VictoriaMetrics Telemetry Scraper (vmagent) ───
@@ -527,7 +533,8 @@ services:
       victoria-metrics:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.42
     restart: unless-stopped
 
   # ─── Grafana Real-Time Telecom NOC Dashboard ───
@@ -547,5 +554,6 @@ services:
       victoria-metrics:
         condition: service_started
     networks:
-      - mvno_net
+      mvno_net:
+        ipv4_address: 10.89.0.43
     restart: unless-stopped
