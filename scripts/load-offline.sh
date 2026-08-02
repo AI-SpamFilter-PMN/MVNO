@@ -57,6 +57,56 @@ echo "╚═══════════════════════�
 
 detect_runtime
 
+# ─── --verify-tags: drift gate (Goal 1) ─────────────────────────────────────
+# Compares the image tags embedded in vendor/docker/*.tar against the image: pins
+# in docker-compose.yml. Exits non-zero if any compose pin has no matching tarball,
+# so silent version-skew (vendored :latest but compose wants :5.7.2) fails LOUDLY.
+# Usage: ./scripts/load-offline.sh --verify-tags
+if [ "${1:-}" = "--verify-tags" ]; then
+    echo "=== Verifying vendored tags vs docker-compose.yml pins ==="
+    if [ ! -d "$VENDOR_DIR/docker" ]; then
+        echo "  ✗ vendor/docker/ not found — run bootstrap.sh first"; exit 1
+    fi
+    # Collect the image tags present in vendored tarballs.
+    # `podman/docker load` prints "Loaded image: <repo:tag>"; we mirror that by
+    # inspecting each tar's manifest via the engine if available, else fall back to
+    # the tarball filename convention used by bootstrap.sh SAVE_IMAGES keys.
+    declare -a VENDOR_TAGS=()
+    for tar in "$VENDOR_DIR/docker"/*.tar; do
+        [ -f "$tar" ] || continue
+        # Inspect the tar for repository tags (works for docker save format).
+        tags=$($DOCKER_CMD load -i "$tar" 2>/dev/null | grep -oE 'Loaded image[^:]*: [^ ]+' | sed -E 's/Loaded image[^:]*: //')
+        if [ -z "$tags" ]; then
+            # Fallback: skip (cannot determine tag) — recorded as unknown.
+            VENDOR_TAGS+=("UNKNOWN:$(basename "$tar" .tar)")
+        else
+            while IFS= read -r t; do [ -n "$t" ] && VENDOR_TAGS+=("$t"); done <<< "$tags"
+        fi
+    done
+    DRIFT=0
+    while IFS= read -r pin; do
+        [ -n "$pin" ] || continue
+        found=0
+        for vt in "${VENDOR_TAGS[@]}"; do
+            if [ "$vt" = "$pin" ]; then found=1; break; fi
+        done
+        if [ "$found" -eq 0 ]; then
+            echo "  ✗ MISSING in vendor: $pin"
+            DRIFT=$((DRIFT+1))
+        else
+            echo "  ✓ present: $pin"
+        fi
+    done < <(grep -oE 'image: .*' "$PROJECT_DIR/docker-compose.yml" | sed -E 's/image: *"?([^"]+)"?/\1/' | sort -u)
+    echo "----------------------------------------------"
+    if [ "$DRIFT" -ne 0 ]; then
+        echo "RESULT: ✗ $DRIFT compose pin(s) have no matching vendored tarball (version-skew)."
+        echo "Re-run ./scripts/bootstrap.sh (online) to re-vendor with the exact tags."
+        exit 1
+    fi
+    echo "RESULT: ✓ All compose image pins have matching vendored tarballs (no drift)."
+    exit 0
+fi
+
 if [ ! -d "$VENDOR_DIR/docker" ]; then
     echo "ERROR: $VENDOR_DIR/docker/ not found."
     echo "Run bootstrap.sh first on an internet-connected machine, then copy vendor/ here."

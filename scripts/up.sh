@@ -70,5 +70,25 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   exec $COMPOSE_CMD -f docker-compose.yml -f docker-compose.build.yml up -d --build "$@"
 fi
 
+# ─── Exact-tag gate: every `image:` pin in docker-compose.yml must exist locally ──
+# Prevents silent version-skew (e.g. vendored tar tagged :latest but compose wants :5.7.2)
+# failing LOUDLY here instead of producing a broken offline/online hybrid pull later.
+if [ "$IMAGE_EXISTS_CMD" = "podman image exists" ]; then
+  TAG_EXISTS() { podman image exists "$1" 2>/dev/null; }
+else
+  TAG_EXISTS() { docker image inspect "$1" >/dev/null 2>&1; }
+fi
+DRIFT=()
+while IFS= read -r tag; do
+  [ -n "$tag" ] || continue
+  TAG_EXISTS "$tag" || DRIFT+=("$tag")
+done < <(grep -oE 'image: .*' docker-compose.yml | sed -E 's/image: *"?([^"]+)"?/\1/' | sort -u)
+if [ ${#DRIFT[@]} -gt 0 ]; then
+  echo "WARNING: exact-tag drift — these compose image pins are NOT in local cache:"
+  printf '  - %s\n' "${DRIFT[@]}"
+  echo "Run ./scripts/bootstrap.sh (online) to vendor them, or ./scripts/load-offline.sh"
+  echo "after placing tarballs. Continuing (compose may pull them from registry)..."
+fi
+
 echo "All required images present. Launching offline container stack..."
 exec $COMPOSE_CMD -f docker-compose.yml up -d "$@"

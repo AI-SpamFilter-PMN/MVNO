@@ -187,11 +187,15 @@ preflight
 detect_runtime
 
 # ─── Step 1: Pull pre-built images ─────────────────────
+# NOTE: image tags MUST mirror docker-compose.yml exactly. Drift here silently breaks
+# the offline-first path (load-offline.sh loads tarballs that compose then can't match).
+# See scripts/preflight.sh and `load-offline.sh --verify-tags` for the drift gate.
 PREBUILT_IMAGES=(
-    "mongo:7.0.6"
+    "mongo:7.0"
+    "percona/mongodb_exporter:0.41"
     "drachtio/rtpengine:mr9.4.0.0"
-    "victoriametrics/victoria-metrics:v1.101.0"
-    "victoriametrics/vmagent:v1.101.0"
+    "victoriametrics/victoria-metrics:v1.147.0"
+    "victoriametrics/vmagent:v1.147.0"
     "grafana/grafana-oss:11.6.0"
     "debian:bookworm-slim"
     "python:3.11-alpine"
@@ -261,11 +265,12 @@ for svc in osmo-smsc telecom-api; do
 done
 
 declare -A SAVE_IMAGES=(
-    ["mongo-7.0.6"]="mongo:7.0.6"
+    ["mongo-7.0"]="mongo:7.0"
+    ["percona-mongodb_exporter-0.41"]="percona/mongodb_exporter:0.41"
     ["drachtio-rtpengine-mr9.4.0.0"]="drachtio/rtpengine:mr9.4.0.0"
-    ["mvno-kamailio-5.7.4"]="mvno-kamailio:5.7.4"
-    ["victoria-metrics-v1.101.0"]="victoriametrics/victoria-metrics:v1.101.0"
-    ["vmagent-v1.101.0"]="victoriametrics/vmagent:v1.101.0"
+    ["mvno-kamailio-5.7.2"]="mvno-kamailio:5.7.2"
+    ["victoria-metrics-v1.147.0"]="victoriametrics/victoria-metrics:v1.147.0"
+    ["vmagent-v1.147.0"]="victoriametrics/vmagent:v1.147.0"
     ["grafana-oss-11.6.0"]="grafana/grafana-oss:11.6.0"
     ["debian-bookworm-slim"]="debian:bookworm-slim"
     ["python-3.11-alpine"]="python:3.11-alpine"
@@ -277,6 +282,7 @@ declare -A SAVE_IMAGES=(
     ["mvno-telecom-api-1.0.0"]="mvno-telecom-api:1.0.0"
     ["maven-3.9-eclipse-temurin-21"]="maven:3.9-eclipse-temurin-21"
     ["mvno-open5gs-2.8.0"]="mvno-open5gs:2.8.0"
+    ["mvno-open5gs-webui-2.8.0"]="mvno-open5gs-webui:2.8.0"
     ["mvno-ueransim-3.2.6"]="mvno-ueransim:3.2.6"
 )
 
