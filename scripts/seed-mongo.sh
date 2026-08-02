@@ -15,15 +15,13 @@
 
 set -euo pipefail
 
-# Auto-detect container runtime engine (podman preferred)
-if command -v podman >/dev/null 2>&1; then
-    ENGINE="podman"
-elif command -v docker >/dev/null 2>&1; then
-    ENGINE="docker"
-else
-    echo "ERROR: Neither podman nor docker found in PATH." >&2
-    exit 1
-fi
+# Source the shared runtime-detection helper (Goal-2 right-sizing).
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/common.sh
+source "${SCRIPT_DIR}/lib/common.sh"
+
+detect_runtime
+ENGINE="$RUNTIME"
 
 echo "Using container engine: ${ENGINE}"
 

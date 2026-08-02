@@ -14,20 +14,18 @@
 
 set -euo pipefail
 
+# Source the shared runtime-detection helper (Goal-2 right-sizing).
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/common.sh
+source "${SCRIPT_DIR}/lib/common.sh"
+
 if [ "$#" -lt 3 ]; then
     echo "Usage: $0 <container_name> <vty_port> <command1> [command2 ...]"
     exit 1
 fi
 
-# Auto-detect container runtime (Podman or Docker)
-if command -v podman &>/dev/null; then
-    CONTAINER_CMD="podman"
-elif command -v docker &>/dev/null; then
-    CONTAINER_CMD="docker"
-else
-    echo "ERROR: No container engine found (podman or docker)"
-    exit 1
-fi
+detect_runtime
+CONTAINER_CMD="$DOCKER_CMD"
 
 CONTAINER="$1"
 PORT="$2"

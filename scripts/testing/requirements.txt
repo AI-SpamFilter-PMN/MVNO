@@ -1,3 +1,8 @@
 # Python Dependencies for MVNO Core Testing & Traffic Simulation
-requests>=2.31.0
-smpplib>=2.2.0
+#
+# NOTE: All testing/traffic scripts (scripts/testing/*.py and the demo_runbook
+# inline python3 -c blocks) use the PYTHON STANDARD LIBRARY ONLY (socket, struct,
+# hashlib, argparse, urllib, json, wave, math, os, sys). No third-party wheels
+# are required — verified by grep: zero `import requests` / `import smpplib`.
+#
+# (Previously listed `requests` and `smpplib` were unused dead deps and removed.)
