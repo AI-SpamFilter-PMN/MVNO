@@ -2,8 +2,9 @@
 
 A hands-on, terminal-by-terminal guide for verifying **every** active flow in the MVNO
 private-mobile-network core: **2G SMS, 5G/IMS SMS, 2G↔5G SMS bridging (IP-SM-GW),
-SIP/IMS calls, RTPEngine media plane, Vosk speech-to-text, call recording, and the
-deterministic AI spam-block path**.
+SIP/IMS calls, RTPEngine media plane, Vosk speech-to-text, live call recording +
+ASR transcription, Grafana alerting, the deterministic AI spam-block path, and the
+automated demo/e2e gates**.
 
 All commands below were **empirically verified** against the running stack
 (`podman compose up`). Each flow is shown as a set of commands you paste into
@@ -27,7 +28,10 @@ All commands below were **empirically verified** against the running stack
 12. [Flow J — Grafana NOC & VictoriaMetrics telemetry](#flow-j--grafana-noc--victoriametrics-telemetry)
 13. [Flow K — AI Spam Block (deterministic E2E-BLOCK)](#flow-k--ai-spam-block-deterministic-e2e-block)
 14. [Flow L — Automated E2E Gate (e2e_runbook.sh)](#flow-l--automated-e2e-gate-e2e_runbooksh)
-15. [Troubleshooting & Known Quirks](#troubleshooting--known-quirks)
+15. [Flow M — Call Recording → ASR Transcription (RTPEngine pcap → WAV → Vosk)](#flow-m--call-recording--asr-transcription-rtpengine-pcap--wav--vosk)
+16. [Flow N — Automated Demo Gate (demo_runbook.sh)](#flow-n--automated-demo-gate-demo_runbooksh)
+17. [Flow O — Failure-Path & Resilience Checks](#flow-o--failure-path--resilience-checks)
+18. [Troubleshooting & Known Quirks](#troubleshooting--known-quirks)
 
 ## 1. Prerequisites & Reference Data
 
@@ -80,6 +84,9 @@ Open these terminal tabs and keep them running *before* you start a flow:
 | **T3** | SMS queue state | `watch -n2 "python3 -c \"import sqlite3;c=sqlite3.connect('state/hlr/smsc.db');c.row_factory=sqlite3.Row;print(list(c.execute('SELECT id,src_addr,dest_addr,text,sent,deliver_attempts FROM SMS')))\""` |
 | **T4** | 2G MS receiver (to receive SMS) | see Flow A |
 | **T5** | 5G/IMS terminal (receiver or sender) | see Flow B/C/D |
+| **T6** | Voice UAS terminal (answers the call, streams RTP) | see Flow E |
+| **T7** | Voice caller terminal (dials, streams RTP, hangs up) | see Flow E |
+| **T8** | RTPEngine / VictoriaMetrics live counters | `watch -n1 "curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_total' | python3 -m json.tool --no-ensure-ascii | grep value"` |
 
 ### Reusable helper — dedicated IMS terminal container
 
@@ -107,7 +114,8 @@ podman logs ims-tx             # expect "[+] MESSAGE delivered (digest)"
 podman rm -f ims-rx ims-tx
 ```
 
-Free static IPs reserved for this: **10.89.0.54 / 10.89.0.55 / 10.89.0.56**.
+Free static IPs reserved for this: **10.89.0.54 / 10.89.0.55 / 10.89.0.56**
+(SMS terminals) and **10.89.0.58 / 10.89.0.59** (voice UAS / caller — see Flow E).
 All SIP digest passwords default to `testpass`; registered subscribers live in
 Kamailio's `subscriber` table.
 
@@ -304,27 +312,105 @@ podman logs ims-tx55
 
 ---
 
-## Flow E — SIP/IMS Voice Call (RTPEngine anchored)
+## Flow E — SIP/IMS Voice Call (RTPEngine anchored, full media dialog)
 
-**Goal**: establish an end-to-end SIP INVITE dialog between two IMS UEs with media
-anchored through RTPEngine.
+**Goal**: establish a real end-to-end SIP INVITE dialog between two IMS terminals with
+media anchored through RTPEngine: **407 → 100 → 180 → 200 OK → ACK → RTP ↔ → BYE → 200**.
+The caller streams G.711 PCMU RTP for N seconds and hangs up; the UAS answers, counts
+the RTP it received, and streams its own leg back. Every call is **recorded to pcap** by
+RTPEngine (see Flow M for the transcript pipeline).
 
-**Verify in**: T1 (Kamailio), plus RTPEngine logs.
+**Verify in**: T6 (UAS), T7 (caller), T8 (RTP counters), T1 (Kamailio).
 
-The parameterised simulator drives REGISTER + INVITE dialogs (it registers the
-callee itself):
+> Each role must run in its **own container with its own IP** on `mvno_mvno_net`
+> (10.89.0.58 / 10.89.0.59). The script binds its listen socket to that IP before
+> registering, so Kamailio's `fix_nated_contact()` stores a reachable contact — an
+> unbound register stores the socket's ephemeral port, which dies with the process
+> and calls silently 408 (see ISSUES.md §8.27).
+
+### Terminal T6 — UAS (answer the call, run first)
 
 ```bash
-# From the host (host-mapped 5066) or from a UE container (10.89.0.23:5060):
-python3 scripts/testing/sip_traffic_sim.py --host 127.0.0.1 --port 5066 \
-  --caller 15551234567 --callee 15557654321
+podman run -d --name ims-uas58 --network mvno_mvno_net --ip 10.89.0.58 \
+  -v $PWD/scripts/testing:/scripts:z python:3.11-alpine \
+  python3 /scripts/sip_traffic_sim.py --uas 15559998888 --rtp 5 \
+  --host 10.89.0.23 --port 5060 --bind-ip 10.89.0.58 --listen-port 5070
+podman logs -f ims-uas58
 ```
 
-**Expected**:
-- The caller sends `INVITE sip:15557654321@...`; Kamailio routes to the callee.
-- The callee answers `200 OK`; an `ACK` completes the dialog.
-- RTPEngine logs show a session being created for the media leg.
-- Grafana's `rtpengine_sessions_total` increments.
+**Expected** (watch it register, then answer):
+
+```
+[+] SIP REGISTER 200 OK for subscriber 15559998888
+[UAS] registered 15559998888, listening 10.89.0.58:5070 (media 10.89.0.58:5071)
+[UAS] <- INVITE sip:15559998888@10.89.0.23:5060 SIP/2.0
+[UAS] <- ACK sip:15559998888@10.89.0.58:5070 SIP/2.0
+[UAS] outgoing RTP sent: 248 packets to 10.89.0.59:5091
+[UAS] <- BYE sip:15559998888@10.89.0.58:5070 SIP/2.0
+[UAS] call ended; RTP payload bytes received: 47520
+```
+
+### Terminal T7 — caller (dial + stream + hang up)
+
+```bash
+podman run -d --name ims-caller59 --network mvno_mvno_net --ip 10.89.0.59 \
+  -v $PWD/scripts/testing:/scripts:z python:3.11-alpine \
+  python3 /scripts/sip_traffic_sim.py --rtp 6 --caller 15551234567 \
+  --callee 15559998888 --host 10.89.0.23 --port 5060 \
+  --bind-ip 10.89.0.59 --listen-port 5090
+podman logs -f ims-caller59
+```
+
+**Expected** (full dialog trace):
+
+```
+=== Full IMS call with RTP media (15551234567 -> 15559998888, 6s) ===
+    <- SIP/2.0 407 Proxy Authentication Required
+    <- SIP/2.0 100 Trying
+    <- SIP/2.0 180 Ringing
+    <- SIP/2.0 200 OK
+[+] call answered; media -> 10.89.0.58:5071
+[+] RTP media sent: 297 packets to 10.89.0.58:5071
+    <- SIP/2.0 200 OK
+```
+
+### Terminal T8 — live RTPEngine counters (while the call runs)
+
+```bash
+watch -n1 "curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_total' | grep value; \
+  curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_bytes_total' | grep value"
+```
+
+**Expected**: both counters jump **while the call is up** and freeze after BYE.
+Reference figures from the certified 2026-08-03 run (`--rtp 6` caller / `--rtp 5` UAS):
+
+```
+rtpengine_packets_total  0  -> 594   (both legs through the media proxy)
+rtpengine_bytes_total    0  -> 102168
+```
+
+Cross-checks (all expected to pass):
+
+```bash
+# Session created and closed cleanly after BYE:
+curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_sessions_total'        # +1 per call
+curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_closed_sessions_total' # +1 after BYE
+# Zero-packet fault counter stays flat (healthy media):
+curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_zero_packet_streams_total'
+# Kamailio relayed the dialog:
+podman logs mvno-kamailio --since 3m | grep -iE 'INVITE|ACK|BYE' | head
+```
+
+### Cleanup
+
+```bash
+podman rm -f ims-uas58 ims-caller59
+```
+
+> Legacy smoke test (no media): `python3 scripts/testing/sip_traffic_sim.py`
+> (defaults: host `127.0.0.1:5066`, registers the callee, sends one digest INVITE).
+> This still works from the host for a quick `407 → 100 → 200` check, but the full
+> media dialog above is the certified flow.
 
 ---
 
@@ -337,8 +423,12 @@ python3 scripts/testing/sip_traffic_sim.py --host 127.0.0.1 --port 5066 \
 curl -s http://localhost:9464/metrics | grep -i rtpengine | head
 ```
 
-**Expected (Grafana)**: the Media Plane row shows `rtpengine_sessions_total`
-and packet/byte counters incrementing while calls are active.
+**Expected (Grafana)**: the **RTP ENGINE DEEP DIVE** row shows `rtpengine_sessions_total`
+and packet/byte counters incrementing while calls are active, and the **Active RTP
+Sessions** gauge shows the live call. The **Zero-Packet RTP Streams (media stuck)**
+panel stays green on healthy calls and only turns red when a stream recently received
+zero packets (`rate(rtpengine_zero_packet_streams_total[5m]) > 0` — the raw counter is
+cumulative and would sit permanently red).
 
 > The single authoritative RTPEngine metric is **`rtpengine_sessions_total`**.
 > The older names `rtpengine_active_calls` / `rtpengine_sessions_total_count`
@@ -447,6 +537,25 @@ curl -s -u admin:admin http://localhost:3000/api/search?query=mvno | python3 -m 
 
 Open `http://localhost:3000` → **MVP Unified NOC** dashboard.
 
+### Alert rules — must evaluate `health: ok`
+
+All 4 provisioned alert rules (scrape targets down, media ports free low, EIR SIM-swap
+blocks, AI fail-open rate) must evaluate cleanly. A broken rule shows
+`health: error` with `can not get data source by uid, uid is empty` — meaning it can
+never fire (fixed 2026-08-03 by moving to top-level `datasourceUid` in
+`configs/grafana/provisioning/alerting/rules.yml`).
+
+```bash
+curl -s -u admin:admin http://localhost:3000/api/prometheus/grafana/api/v1/rules \
+  | python3 -c "
+import json,sys
+for g in json.load(sys.stdin)['data']['groups']:
+    for r in g['rules']:
+        print(r['name'],'| state:',r['state'],'| health:',r.get('health'))"
+```
+
+**Expected**: all four rules report `state: inactive | health: ok`.
+
 ---
 
 ## Flow K — AI Spam Block (deterministic E2E-BLOCK)
@@ -514,6 +623,128 @@ cleans them up; any failure exits non-zero at the summary.
 
 ---
 
+## Flow M — Call Recording → ASR Transcription (RTPEngine pcap → WAV → Vosk)
+
+**Goal**: take the call you just made in Flow E, extract the G.711 audio from
+RTPEngine's pcap recording, and get a **Vosk transcription of the recorded call**.
+
+Every call is recorded to `state/spool/pcaps/call-*.pcap` by RTPEngine
+(`recording-method=pcap`, `recording-format=eth` — the mr9.4 image cannot write WAV
+directly, see `configs/rtpengine/rtpengine.conf`). `scripts/testing/pcap_to_wav.py`
+parses both RTP legs, decodes the u-law payloads, and interleaves them by capture time
+into a 16-bit 8 kHz mono WAV (PCMU's native rate). The Vosk ASR watcher polls
+`state/spool/` every ~3 s and writes the transcript to `state/spool/archived/`.
+
+### Terminal T6b — extract the latest recorded call
+
+```bash
+# 1) Find the newest recording (also in state/spool/metadata/):
+ls -t state/spool/pcaps/ | head -1
+
+# 2) Extract it to the Vosk spool root (watcher polls this directory):
+python3 scripts/testing/pcap_to_wav.py $(ls -t state/spool/pcaps/*.pcap | head -1)
+cp $(ls -t state/spool/pcaps/*.wav | head -1) state/spool/
+```
+
+**Expected**:
+
+```
+[+] WAV extracted: state/spool/pcaps/call-1785779063@mvno-xxxxxxxx.pcap.wav (10.9s audio)
+```
+
+### Terminal T6c — read the transcript
+
+```bash
+sleep 5
+cat state/spool/archived/call-*.txt   # newest = the call you just made
+```
+
+**Expected**: a JSON transcript line per recording. The certified 2026-08-03 run
+(synthetic 440 Hz tone) produced `{"text": ""}` — correct for a tone. For **real
+speech**, expect the words: the same pipeline transcribed
+"the one two three four five six seven eight either" in earlier mic tests.
+
+> **Sample-rate caveat**: `pcap_to_wav.py` writes 8 kHz (PCMU native). The Vosk model
+> is 16 kHz, so an 8 kHz file transcribes reliably but with reduced fidelity — if a
+> transcript comes back empty for real speech, upsample first:
+> `ffmpeg -i state/spool/call-*.wav -ar 16000 state/spool/call-16k.wav`
+> (or `sox ... rate 16000`).
+
+---
+
+## Flow N — Automated Demo Gate (demo_runbook.sh)
+
+**Goal**: run the 13-check graduation demo as a single self-verifying gate — the same
+script used to certify the project demo (13/13 passed, two consecutive runs
+2026-08-03). It covers far more than the e2e gate: health probes, 5G UE registration,
+Vector log aggregation, balance query, authorized VoIP call, **zero-balance call
+block (407 → 403)**, **EIR SIM-swap fraud block**, 5G SMS interception, Vosk ASR,
+SMPP PDU, VictoriaMetrics PromQL, Grafana NOC, and overall readiness.
+
+```bash
+./scripts/testing/demo_runbook.sh
+echo "exit=$?"    # 0 = ALL 13 CHECKS PASS
+```
+
+**Expected output** (final line):
+
+```
+  🎉 ALL 13 DEMO ITEMS PASSED — GRADUATION PROJECT DEMO READY!
+```
+
+> The 5G-path check (`[5b]`) runs `sip_traffic_sim.py` inside `mvno-ueransim-ue-1`
+> over the real 5G user plane and asserts the UPF `ogstun` TX byte counter moves
+> (+2684 bytes) — proof SIP traversed GTP-U, not the test network.
+
+---
+
+## Flow O — Failure-Path & Resilience Checks
+
+**Goal**: watch the core fail safely: unregistered destinations, bounded retries, and
+spam rejection — without breaking the happy paths.
+
+### O.1 — SMS to an unregistered 5G subscriber (Kamailio 404)
+
+Sender: run `ims-tx` as in Flow D but with a **peer that is NOT registered**
+(no UAS/recv terminal running, e.g. `15559998888` after Flow E cleanup):
+
+```bash
+podman run -d --name ims-tx404 --network mvno_mvno_net --ip 10.89.0.55 \
+  -v $PWD/scripts/testing:/scripts:z python:3.11-alpine \
+  python3 /scripts/ims_terminal.py --mode send --msisdn 15551234567 \
+  --peer 15559998888 --body "who is there" \
+  --host 10.89.0.23 --port 5060 --bind-ip 10.89.0.55
+podman logs ims-tx404
+```
+
+**Expected**: `MESSAGE not accepted: 404 Not Found` — the bridge never sees the row,
+and the 2G→5G variant (inject to the same unregistered 5G number) gets bounded retries
+instead of an infinite loop.
+
+### O.2 — Bounded retry on a failing 2G→5G row (MAX_ATTEMPTS=5)
+
+With the 5G recipient still unregistered, inject a 2G→5G row and watch T3:
+
+```bash
+python3 scripts/testing/inject_smsc_row.py 15554443322 15559998888 "will retry then drop"
+watch -n2 "python3 -c \"import sqlite3;c=sqlite3.connect('state/hlr/smsc.db');c.row_factory=sqlite3.Row;print(list(c.execute('SELECT id,src_addr,dest_addr,text,sent,deliver_attempts FROM SMS')))\""
+```
+
+**Expected**: `deliver_attempts` climbs to `5` (bridge gets `404` each poll) then the
+row leaves the pending set — bounded, no infinite spin (Troubleshooting #2/#3).
+
+### O.3 — Spam SMS is dropped before relay (already Flow K, quick re-run)
+
+```bash
+python3 scripts/testing/inject_smsc_row.py 15554443322 15551234567 "E2E-BLOCK offer!!"
+podman logs mvno-kamailio --since 2m | grep "SMS BLOCKED BY MVNO INTERCEPTION CORE"
+```
+
+**Expected**: one `SMS BLOCKED...` line; the row is never delivered; the API counter
+`mvno_sms_blocked_total` (actuator) increments.
+
+---
+
 ## Troubleshooting & Known Quirks
 
 ### 1. Kamailio relay loops / 408s with a co-located receiver
@@ -568,9 +799,33 @@ bodies. Verified: `E2E-BLOCK` → `{"allow":false,...}` + counter increments. A 
 FastAPI classifier is unaffected (chunked is handled natively). See
 `docs/ISSUES.md` for the full RCA.
 
+### 7. Voice call rings but dies with 408 / media never flows (FIXED)
+**Symptom (historical)**: the callee registered and the INVITE was accepted, but
+Kamailio forwarded it to a dead port (`Contact: sip:...@10.89.0.58:42461`) and the
+call never completed. Also: caller's ACK/BYE looped back into Kamailio because they
+targeted `sip:...@localhost:5060` instead of the 200 OK Contact.
+**Root cause**: the simulator registered from an **unbound socket** — its source port
+was ephemeral and died with the process — and `fix_nated_contact()` rewrote the stored
+contact to that dead port. `t_relay()` forwards silently.
+**Fix (applied 2026-08-03)**: `register_subscriber()` now binds `(bind_ip,
+listen_port)` and keeps the socket alive; the UAS replies echo `Record-Route`; ACK/BYE
+target the 200 OK Contact. Always run each role in its own container with
+`--bind-ip <container-ip> --listen-port <port>` (see Flow E). Full RCA in
+`docs/ISSUES.md` §8.27.
+
+### 8. Stale contacts linger in `kamailio.db` after test rigs die
+**Symptom**: `state/kamailio/kamailio.db` (usrloc, db_mode=2) can hold old
+ephemeral-port contacts next to the live one until their `Expires` elapses.
+**Effect**: harmless in practice — `t_relay()` forks to **all** contacts, and the
+live one still receives the INVITE. Rows self-expire (`Expires: 3600`); no action
+needed. (The file is owned by the container user `101000`; do not hand-edit it
+from the host.)
+
 ---
 
 *End of manual testing guide. All flows verified against the running stack
-(2026-08-03; e2e_runbook.sh certified green, two consecutive runs).*
+(2026-08-03; e2e_runbook.sh 7/7 and demo_runbook.sh 13/13 certified green, each on
+two consecutive runs; full-media voice call + pcap→WAV→Vosk recording pipeline
+verified end-to-end).*
 
 
