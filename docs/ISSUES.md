@@ -393,6 +393,12 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Fix**: Strip the header prefix when collecting (`ln.strip().split(":", 1)[1].strip()`) so the re-emitted header is a single `Via:`.
 * **Verification**: Sender now prints `[+] MESSAGE delivered (digest)` (receives the final 200 OK), exactly **one** `[RELAY]` line per SMS, exactly one copy in `sms.txt`, and bridge counters move +1 only. Both `e2e_runbook.sh` Cells 3/4 assert clean single-delivery behavior and pass.
 
+### Issue 8.26: Bridge 2G-MSISDN SIP Registrations Die Silently After Hours — 5G→2G Leg Returns 404
+* **Symptom**: After ~4 h of bridge uptime, the 5G→2G leg stopped working: the sending terminal got `MESSAGE not accepted: SIP/2.0 404 Not Found` while its own REGISTER succeeded, `mvno_bridge_sms_5g_to_2g_total` never moved, the bridge logged no `[RELAY]`, and the 2G handset received nothing. `e2e_runbook.sh` Cell 3 failed (1 failure, 6 ok) although 2G→2G, 2G→5G, 5G→5G and the AI-block cell all passed. A live probe (fresh terminal → 15554443322) reproduced the 404 deterministically, proving Kamailio's `lookup("location")` had lost the bridge's registration of the 2G MSISDNs (usrloc memory state; `db_mode=2` write-back means the sqlite file never reflected live bindings).
+* **Root Cause**: The bridge re-registered the 2G MSISDNs (`Expires: 1800`) only every **1500 s** (`if time.time() - last_reg > 1500`), and a failed refresh was retried only after another full interval — a single lost challenge/response on the shared UDP socket (the same socket also serves `send_message()` and the relay listener) left the registration to expire 5 min later with no fast recovery, keeping the 2G leg dead for hours.
+* **Fix**: `scripts/ip_sm_gw.py` — refresh every **900 s** (2× margin under the 1800 s expiry); if any MSISDN's REGISTER fails, retry after **30 s** instead of a full interval and log the outcome per MSISDN.
+* **Verification**: Bridge restart + immediate probe: `[REGISTER] … 200 OK` for both 2G MSISDNs, sender got `[+] MESSAGE delivered (digest)`, bridge logged `[RELAY]` → `[SMPP] BIND_TRANSCEIVER OK` → `[SMPP] SUBMIT_SM OK`, exactly one copy in MS1 `sms.txt`. `e2e_runbook.sh` then passed **two consecutive full runs (7 ok, EXIT=0)**.
+
 
 ---
 

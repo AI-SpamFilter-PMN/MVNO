@@ -448,12 +448,19 @@ class Gateway:
         for msisdn in sorted(MSISDN_2G):
             self.sip.register(msisdn)
         last_reg = time.time()
+        reg_ok = True
 
         while True:
-            # 5G->2G leg: 1st SIP registration refresh after 25 min
-            if time.time() - last_reg > 1500:
+            # 5G->2G leg: keep the bridge's 2G-MSISDN registrations live
+            # (Expires: 1800). Refresh every 15 min (2x margin); if a refresh
+            # fails (e.g. lost challenge/response on the shared UDP socket)
+            # retry after 30 s instead of waiting a full interval, so the 2G
+            # leg cannot stay dead for extended periods.
+            if time.time() - last_reg > (900 if reg_ok else 30):
+                reg_ok = True
                 for msisdn in sorted(MSISDN_2G):
-                    self.sip.register(msisdn)
+                    if not self.sip.register(msisdn):
+                        reg_ok = False
                 last_reg = time.time()
 
             # 2G->5G leg: drain store-and-forward queue
