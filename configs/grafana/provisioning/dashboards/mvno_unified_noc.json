@@ -1401,6 +1401,68 @@
             "mode": "absolute",
             "steps": [
               {
+                "color": "#00E676",
+                "value": null
+              },
+              {
+                "color": "#FF0844",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 39
+      },
+      "id": 113,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.6.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_zero_packet_streams_total default 0",
+          "refId": "A"
+        }
+      ],
+      "title": "Zero-Packet RTP Streams (media stuck)",
+      "type": "stat",
+      "description": "Non-zero while sessions exist without bidirectional media \u2014 signals a media-plane fault, not an idle system."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
                 "color": "#00F2FE",
                 "value": null
               }
