@@ -4,6 +4,9 @@
 [![Orchestration](https://img.shields.io/badge/Orchestration-Podman--Compose_%7C_Docker-orange?style=for-the-badge&logo=podman)](docs/deployment_guide.md)
 [![Database](https://img.shields.io/badge/Database-SQLite_WAL_%7C_MongoDB-green?style=for-the-badge&logo=sqlite)](docs/deployment_guide.md)
 [![Observability](https://img.shields.io/badge/Observability-VictoriaMetrics_%7C_Grafana-purple?style=for-the-badge&logo=grafana)](docs/deployment_guide.md)
+[![SMS Interworking](https://img.shields.io/badge/2G%E2%86%945G_SMS-IP--SM--GW_%7C_Kamailio-blue?style=for-the-badge)](docs/implementation_guide.md)
+[![AI Block](https://img.shields.io/badge/AI_Spam_Block-Deterministic_E2E--BLOCK-red?style=for-the-badge)](docs/MANUAL_TESTING_GUIDE.md)
+[![E2E Gate](https://img.shields.io/badge/E2E_Runbook-5_of_5_Cells_Green-brightgreen?style=for-the-badge)](scripts/testing/e2e_runbook.sh)
 
 Simulates an MVNO / Private Mobile Network core for the companion [AI Spam Filter](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) platform. Handles SMS routing and SIP/VoIP calling, intercepts payloads in real-time, and enforces allow/block decisions from the AI filter REST API.
 
@@ -136,7 +139,7 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | **vmagent Scraper** | `mvno-vmagent` | `8429` | HTTP | Telemetry scraper target health API |
 | **Grafana NOC** | `mvno-grafana` | `3000` | HTTP | Real-time telecom NOC dashboard UI |
 | **Open5GS WebUI** | `mvno-open5gs-webui`| `9999` | HTTP | Subscriber SIM & Profile Management UI |
-| **AI Spam Model** | `ai-filter` | `8008 (host) → 8000` | HTTP / REST | External AI Spam Model Server (mock) |
+| **AI Spam Model** | `ai-filter` | `8008 (host) → 8000` | HTTP / REST | Inline mock classifier (deterministic `E2E-BLOCK` → `allow:false`; authoritative for the demo) |
 
 ---
 
@@ -155,13 +158,15 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | 9 | **SMS-over-NAS** | 5G NAS SMS routing architecture contract (Mock / Roadmap item). |
 | 10 | **MongoDB Seed** | Atomic init script (`scripts/seed-mongo.sh`) provisions 3 UEs into `open5gs.subscribers` avoiding WebUI admin hash bug. |
 | 11 | **IP-SM-GW 2G↔5G SMS Bridge** | TS 23.204 interworking bridge (`mvno-ip-sm-gw`): polls 2G SMSC store-and-forward DB and relays to 5G/IMS via SIP MESSAGE; backhauls 5G SMS to SMSC via SMPP submit_sm. Both legs verified end-to-end. |
+| 12 | **Deterministic AI Spam Block** | Inline `ai-filter` mock returns `allow:false` when the payload contains `E2E-BLOCK`; Kamailio replies `403 SMS Intercepted / Blocked`, `mvno_sms_blocked_total` increments, message never delivered. Certified by the e2e runbook AI-block cell. |
+| 13 | **E2E SMS Interworking Gate** | `scripts/testing/e2e_runbook.sh`: 5-cell matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) asserting on live metrics; **exit 0 = all cells green** (two consecutive certified runs). |
 
 ---
 
 ## 7. Documentation
 
 * [ONBOARDING.md](ONBOARDING.md): Team onboarding guide, setup instructions, make targets, and Section 14 integration specs.
-* [docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md): Full multi-terminal manual testing guide — all MVP flows (2G/5G SMS, 2G↔5G IP-SM-GW bridging, SIP/IMS calls, RTP engine media, Vosk STT, recording, interception REST API, Grafana/VictoriaMetrics telemetry).
+* [docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md): Full multi-terminal manual testing guide — all MVP flows (2G/5G SMS, 2G↔5G IP-SM-GW bridging, SIP/IMS calls, RTP engine media, Vosk STT, recording, interception REST API, AI spam block, automated e2e gate, Grafana/VictoriaMetrics telemetry).
 * [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Public AI Spam Filter REST API contract & JSON schemas for teammates.
 * [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
 * [docs/ROADMAP.md](docs/ROADMAP.md): Architectural roadmap and operational backlog (SIP 407 + API keys implemented; VictoriaLogs, healthchecks, SBI eval open).

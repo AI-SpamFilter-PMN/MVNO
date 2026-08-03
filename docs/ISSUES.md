@@ -381,6 +381,18 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Fix**: **Test methodology fix only.** Dedicated receiver containers (e.g., `ue1-recv-test` @ `10.89.0.60`) must be used for verification. This ensures clean IP separation for Kamailio's `lookup("location")` and routing logic.
 * **Verification**: Verified 5G→2G leg (leg 2) using a dedicated container; bridge log showed `[RELAY] 5G->2G` → `[SMPP] SUBMIT_SM OK`.
 
+### Issue 8.24: AI-Filter Mock Ignores Chunked Request Bodies — Every SMS Allowed (Blocked Counter Stuck at 0)
+* **Symptom**: `POST /api/v1/intercept/sms` on `mvno-api` returned `{"allow":true,"reason":"Clean content"}` even when the `content` field contained the `E2E-BLOCK` marker; `mvno_sms_blocked_total` (actuator prometheus) never incremented, while direct `curl` POSTs to `mvno-ai-filter:8008/api/v1/classify` with the same marker correctly returned `allow:false`. The e2e runbook's AI-block cell could never pass.
+* **Root Cause**: Spring's `RestClient` (JDK HttpClient) sends the classification POST with `Transfer-Encoding: chunked` and **no `Content-Length`** (verified on the wire: `CL=None TE=chunked`). The inline mock's `do_POST` only read `int(self.headers.get('Content-Length', 0))` bytes, so it always saw an empty body `b''` and fell into the `allow:true` branch. Diagnosed via bytecode inspection of `app.jar` (`AiFilterService` builds `content_text` from `req.content()`) plus a temporary body-logging mock variant that printed the API's actual request (`BODY-LOG b'' CT=application/json CL=None TE=chunked`).
+* **Fix**: `docker-compose.yml` inline mock now parses chunked transfer-encoding (read size lines until zero chunk) before falling back to Content-Length. Config-only change; the real FastAPI classifier (AI-Filteration-System) is unaffected (chunked handled natively).
+* **Verification**: Same probe now returns `{"allow":false,"reason":"Spam (E2E deterministic block)"}`, `mvno_sms_blocked_total` increments per blocked message, and `e2e_runbook.sh` Cell 5 (AI-block) passes — two consecutive full runs exit 0.
+
+### Issue 8.25: Bridge 5G→2G 200 OK Malformed (`Via: Via:`) — Kamailio Retransmit Storm & Duplicate Deliveries
+* **Symptom**: A single 5G→2G SMS was relayed ~9 times (`[RELAY]` logged at exponential intervals) and delivered repeatedly to the 2G handset (`sms.txt` accumulated copies); the sending terminal never received its final response (`MESSAGE not accepted: no response`).
+* **Root Cause**: `reply_ok()` in `scripts/ip_sm_gw.py` collected the relayed request's `Via:` lines **whole** (`vias = [ln.strip() ...]`) and then re-emitted them as `f"Via: {v}"`, producing an invalid `Via: Via: SIP/2.0/UDP ...` header in the 200 OK. Kamailio's tm module could not match the transaction branch, so it kept retransmitting the MESSAGE per its retransmit timer (observed 0.5s/1s/2s/4s/8s pattern). The terminal's own reply builder (which strips the prefix) was correct — only the bridge's copy was broken.
+* **Fix**: Strip the header prefix when collecting (`ln.strip().split(":", 1)[1].strip()`) so the re-emitted header is a single `Via:`.
+* **Verification**: Sender now prints `[+] MESSAGE delivered (digest)` (receives the final 200 OK), exactly **one** `[RELAY]` line per SMS, exactly one copy in `sms.txt`, and bridge counters move +1 only. Both `e2e_runbook.sh` Cells 3/4 assert clean single-delivery behavior and pass.
+
 
 ---
 

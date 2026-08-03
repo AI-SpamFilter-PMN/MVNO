@@ -167,6 +167,14 @@
       <text x="12" y="94" class="text-body">• Zero GC engine</text>
       <text x="12" y="108" class="text-link">Native Log Shipper</text>
     </g>
+
+    <!-- IP-SM-GW Bridge -->
+    <g transform="translate(15, 525)">
+      <rect width="220" height="75" class="box" />
+      <text x="12" y="22" class="text-title">IP-SM-GW Bridge (Go)</text>
+      <text x="12" y="42" class="text-body">• Polls smsc.db → SIP MESSAGE</text>
+      <text x="12" y="60" class="text-body">• :5090 SMPP backhaul → SMSC</text>
+    </g>
   </g>
 
   <!-- ==================== 4. AI SPAM PLATFORM (X: 1040, W: 240) ==================== -->
@@ -180,7 +188,7 @@
       <text x="12" y="46" class="text-body">• Python REST Model Server (mock)</text>
       <text x="12" y="66" class="text-body">• SMS Spam Classifier</text>
       <text x="12" y="86" class="text-body">• Voice Biometric Evaluator</text>
-      <text x="12" y="106" class="text-body">• Real-time allow/block decision</text>
+      <text x="12" y="106" class="text-body">• E2E-BLOCK marker → allow:false</text>
       <text x="12" y="126" class="text-body">• POST /api/v1/classify</text>
       <text x="12" y="146" class="text-body">• Carrier SLA Response &lt; 5s</text>
       <text x="12" y="166" class="text-link">HTTP Port 8000</text>
@@ -238,6 +246,14 @@
   <!-- 6. SMS Intercept Check: OsmoSMSC -> telecom-api -->
   <path d="M 590,490 L 650,490 L 650,215 L 698,215" class="solid-arrow" marker-end="url(#arrow-head-cyan)" />
   <text x="598" y="475" class="text-label" fill="#00e5ff">6. Intercept Check</text>
+
+  <!-- 6b. 2G<->5G SMS Interworking: OsmoSMSC <-> IP-SM-GW (poll / SMPP submit) -->
+  <path d="M 590,545 L 650,545 L 650,620 L 698,620" class="solid-arrow" marker-start="url(#arrow-head-cyan)" marker-end="url(#arrow-head-cyan)" />
+  <text x="592" y="533" class="text-label" fill="#00e5ff">6b. Poll / SMPP (2G↔5G)</text>
+
+  <!-- 6c. SIP relay + :5090 backhaul: IP-SM-GW <-> Kamailio -->
+  <path d="M 715,680 L 705,680 L 705,230 L 590,230" class="solid-arrow" marker-start="url(#arrow-head-cyan)" marker-end="url(#arrow-head-cyan)" />
+  <text x="711" y="480" class="text-label" fill="#00e5ff">6c. SIP relay / SMPP :5090</text>
 
   <!-- 7. Outbound AI Classification: telecom-api -> AI Spam Platform -->
   <path d="M 945,210 L 1040,210" class="ai-arrow" marker-end="url(#arrow-head-orange)" />
