@@ -1,4 +1,46 @@
-# Implementation Plan — Master Plan v7 (Goals 0–6 ✅ COMPLETE; Goal 7 IN PROGRESS)
+# Implementation Plan — Master Plan v7 (Goals 0–8; ALL DELIVERED ✅)
+
+> **LIVE STATUS (final):** Goals 0–6 ✅, Goal 7 ✅, Goal 8 ✅ — all delivered & pushed to
+> `origin/main`. `e2e_runbook.sh` exits 0 with **all 5 cells green** (4-cell SMS
+> interworking matrix + AI-block), verified across two consecutive runs
+> (2026-08-03 15:17 / 15:18 UTC, 7 ok each, EXIT=0).
+
+## Goal 7 — e2e_runbook.sh ✅ COMPLETE
+
+**Final result (two consecutive green runs, 15:17 / 15:18 UTC):**
+
+| Cell | Assertion | Status | Implementation |
+|------|-----------|--------|----------------|
+| 1 | 2G→2G direct | ✅ PASS | `send_smpp_sms.py` → 2G SMSC; bridge counters verified unchanged |
+| 2 | 2G→5G bridge | ✅ PASS | `inject_smsc_row.py` row → bridge poll → Kamailio relay → recv terminal (10.89.0.54) |
+| 3 | 5G→2G bridge | ✅ PASS | dedicated sender (10.89.0.55) → bridge :5090 → SMPP → SMSC → MS1 sms.txt |
+| 4 | 5G→5G Kamailio | ✅ PASS | sender (10.89.0.55) → twin relay → recv terminal (10.89.0.56); bridge counters unchanged |
+| 5 | AI-block | ✅ PASS | E2E-BLOCK marker → mock allow:false → 403; `mvno_sms_blocked_total` ++; kamailio logs block |
+
+**Defects found & fixed during the live debug (both verified empirically):**
+1. **AI-filter mock never read chunked bodies** (docker-compose.yml): Spring/JDK
+   `RestClient` sends `Transfer-Encoding: chunked` (no Content-Length); the inline
+   mock only read `Content-Length` → always saw `b''` → every SMS allowed
+   (`allow:true "Clean content"`), `mvno_sms_blocked_total` stayed 0. Fixed with a
+   chunked-parsing branch in the mock's `do_POST`.
+2. **Bridge 5G→2G reply malformed `Via: Via:`** (scripts/ip_sm_gw.py `reply_ok`):
+   the relayed `Via` headers were kept whole and re-prefixed, producing invalid
+   `Via: Via: SIP/2.0/UDP ...` in the 200 OK → Kamailio tm never matched the branch
+   → unbounded retransmit storm (one 5G→2G SMS relayed/delivered ~9×). Fixed by
+   stripping the prefix (`ln.strip().split(":",1)[1].strip()`); sender now receives
+   its final 200 OK and each SMS is relayed exactly once.
+
+**Design decisions (final):**
+- IMS senders/receivers are **dedicated containers** on `mvno_mvno_net` with their
+  own IP (10.89.0.54 recv / 10.89.0.55 send / 10.89.0.56 recv), running
+  `scripts/testing/ims_terminal.py` (`--mode recv/send`), bypassing the UERANSIM
+  5G user-plane — mirrors the proven Goal 6 receiver topology.
+- 2G→5G rows are injected via `scripts/testing/inject_smsc_row.py` into
+  `state/hlr/smsc.db` (the bridge's real polled `SMS` table, `deliver_attempts=0`).
+- `send_db_sms.sh` (invented schema) and `send_vty_sms.sh` (VTY quirks) are NOT used.
+
+---
+
 
 Consolidated roadmap for the MVNO repo (`/home/zkhattab/AI-SpamFilter-PMN/MVNO`).
 Teammate repos (`AI-Filteration-System`, `SipClient`, `sms-client`) are **read-only external** — integrate only, never edit.

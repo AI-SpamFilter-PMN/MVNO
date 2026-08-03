@@ -16,7 +16,12 @@
 # Deterministic AI-block: inline mvno-ai-filter mock (docker-compose.yml) returns
 # {"allow":false} when body contains E2E-BLOCK, else {"allow":true}. Config-only.
 #
-# Gate: every cell must PASS or the script exits non-zero at first failure.
+# Topology note: the IMS (5G-side) senders/receivers run as DEDICATED containers on
+# the bridge network (mvno_mvno_net) with their own IP, so Kamailio can route relays
+# back to them (mirrors the proven Goal 6 receiver topology; does NOT depend on the
+# UERANSIM 5G user-plane). 2G->5G rows are injected directly into state/hlr/smsc.db.
+#
+# Gate: every cell must PASS or the script exits non-zero at the summary.
 # ==============================================================================
 set -euo pipefail
 
@@ -25,20 +30,11 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
 CYAN='\033[0;36m'; GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
-
 PASS=0; FAIL=0
 TS="$(date +%H%M%S)"
-
 BRIDGE_METRICS="http://localhost:9100/metrics"
 VM="http://localhost:8428/api/v1/query"
-
-UE1=mvno-ueransim-ue-1
-UE2=mvno-ueransim-ue-2
-# Kamailio must be able to route relays back to a receiver.  The UE's 5G tun IP
-# (10.45.0.x) is NOT reachable from Kamailio on mvno_net, so receivers register
-# with their bridge-network eth0 IP (reachable by Kamailio) for determinism.
-UE1_IP=10.89.0.31   # eth0 on mvno_net (reachable by Kamailio)
-UE2_IP=10.89.0.32
+NET="mvno_mvno_net"
 KAM=10.89.0.23
 KAM_PORT=5060
 
@@ -46,6 +42,14 @@ ok()  { echo -e "${GREEN}  ok  $1${NC}"; PASS=$((PASS+1)); }
 bad() { echo -e "${RED}  X   $1${NC}"; FAIL=$((FAIL+1)); }
 
 bridge_counter() { curl -s -m 5 "${BRIDGE_METRICS}" | awk -v m="$1" '$1==m {print $2; exit}'; }
+api_counter() {
+  curl -s -m 5 http://localhost:8080/actuator/prometheus | python3 -c 'import sys
+want = "'$1'"
+for line in sys.stdin:
+    parts = line.split()
+    if len(parts) == 2 and parts[0] == want:
+        print(int(float(parts[1]))); break'
+}
 vm_value() {
   curl -s -m 5 "${VM}?query=$1" | python3 -c 'import sys,json
 try:
@@ -55,19 +59,38 @@ except Exception: print("")'
 }
 section() { echo -e "${CYAN}==== $1 ====${NC}"; }
 
+# --- dedicated mvno_net IMS terminal container helpers ---------------------
+start_recv() { # name msisdn ip listen
+  podman rm -f "$1" >/dev/null 2>&1 || true
+  podman run -d --name "$1" --network "$NET" --ip "$3" \
+    -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
+    python3 /scripts/ims_terminal.py --mode recv --msisdn "$2" \
+    --host ${KAM} --port ${KAM_PORT} --bind-ip "$3" --listen "$4" >/dev/null 2>&1
+}
+start_send() { # name msisdn peer body ip
+  podman rm -f "$1" >/dev/null 2>&1 || true
+  podman run -d --name "$1" --network "$NET" --ip "$5" \
+    -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
+    python3 /scripts/ims_terminal.py --mode send --msisdn "$2" --peer "$3" \
+    --host ${KAM} --port ${KAM_PORT} --bind-ip "$5" --body "$4" >/dev/null 2>&1
+}
+stop_ims() { podman rm -f "$1" >/dev/null 2>&1 || true; }
+
 echo -e "${CYAN}==== GOAL 7 : End-to-End SMS Interworking (4-cell + AI-block) ====${NC}"
 
 # -----------------------------------------------------------------------------
-# Preconditions: bridge up, script copied into UEs
+# Preconditions: bridge /metrics reachable
 # -----------------------------------------------------------------------------
 section "Preflight"
-podman cp "${SCRIPT_DIR}/ims_terminal.py" "${UE1}:/ims_terminal.py" 2>/dev/null || true
-podman cp "${SCRIPT_DIR}/ims_terminal.py" "${UE2}:/ims_terminal.py" 2>/dev/null || true
 if [ -z "$(bridge_counter mvno_bridge_sms_attempts_total || true)" ]; then
   echo -e "${RED}  X cannot reach bridge /metrics - is mvno-ip-sm-gw up on :9100?${NC}"; exit 1
 fi
 ok "bridge /metrics reachable"
 
+if [ -z "$(api_counter mvno_sms_blocked_total)" ]; then
+  echo -e "${RED}  X cannot reach mvno-api /actuator/prometheus - is mvno-api up on :8080?${NC}"; exit 1
+fi
+ok "mvno-api metrics reachable"
 
 # =============================================================================
 # Cell 1 - 2G -> 2G (2G SMSC direct; bridge must NOT be involved)
@@ -87,105 +110,87 @@ else
 fi
 
 # =============================================================================
-# Cell 2 - 2G -> 5G (IP-SM-GW poll -> SIP MESSAGE -> 5G UE receiver)
+# Cell 2 - 2G -> 5G (bridge poll of smsc.db -> SIP via Kamailio -> 5G terminal)
 # =============================================================================
-section "Cell 2: 2G->5G  (15554443322 -> 15551234567, via IP-SM-GW)"
-b25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; b25="${b25:-0}"
-RECV_LOG=/tmp/e2e_ue1_recv_${TS}.log
-podman exec "${UE1}" python3 /ims_terminal.py --mode recv --msisdn 15551234567 \
-  --host ${KAM} --port ${KAM_PORT} --bind-ip ${UE1_IP} --listen 30 \
-  > "${RECV_LOG}" 2>&1 &
-RECV_PID=$!
+section "Cell 2: 2G->5G  (15554443322 -> 15551234567, smsc.db poll -> SIP relay)"
+b_25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; b_25="${b_25:-0}"
+BODY2="E2E 2G5G ${TS}"
+start_recv ims_rx54 15551234567 10.89.0.54 45
 sleep 4
-"${SCRIPT_DIR}/send_vty_sms.sh" 15554443322 15551234567 "E2E 2G5G ${TS}" >/dev/null 2>&1 || true
-a25=""
-for _ in $(seq 1 12); do
-  a25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; a25="${a25:-0}"
-  [ "$a25" -gt "$b25" ] && break; sleep 3
-done
-if [ "$a25" -gt "$b25" ]; then
-  ok "bridge 2g->5g counter ${b25}->${a25}"
+python3 "${SCRIPT_DIR}/inject_smsc_row.py" 15554443322 15551234567 "${BODY2}" >/dev/null
+sleep 10
+a_25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; a_25="${a_25:-0}"
+RX2="$(podman logs ims_rx54 2>&1 | grep -cF "${BODY2}" || true)"
+if [ "$((a_25 - b_25))" -ge 1 ] && [ "${RX2}" -ge 1 ]; then
+  ok "delivered 2G->5G via bridge+Kamailio (2g5g +$((a_25 - b_25))); terminal got '${BODY2}'"
 else
-  bad "bridge 2g->5g counter did not move (still ${b25})"
+  bad "2g5g $b_25->$a_25; terminal log: $(podman logs ims_rx54 2>&1 | tail -4 | tr '\n' ' ')"
 fi
-if grep -q "E2E 2G5G ${TS}" "${RECV_LOG}" 2>/dev/null; then ok "5G UE receiver got the body"; else bad "5G UE receiver did not log the body"; fi
-if podman logs mvno-ip-sm-gw 2>&1 | grep -q "DELIVERED"; then ok "bridge marked row DELIVERED"; else bad "no DELIVERED in bridge log"; fi
-kill "${RECV_PID}" 2>/dev/null || true
+stop_ims ims_rx54
 
 # =============================================================================
-# Cell 3 - 5G -> 2G (UE1 -> bridge SIP :5090 -> SMPP submit_sm -> 2G SMSC)
+# Cell 3 - 5G -> 2G (IMS send -> bridge relay :5090 -> SMPP -> SMSC -> MS1)
 # =============================================================================
-section "Cell 3: 5G->2G  (15551234567 -> 15554443322, via IP-SM-GW)"
-b52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; b52="${b52:-0}"
-podman exec "${UE1}" python3 /ims_terminal.py --mode send --msisdn 15551234567 \
-  --peer 15554443322 --host ${KAM} --port ${KAM_PORT} --bind-ip ${UE1_IP} \
-  --body "E2E 5G2G ${TS}" >/dev/null 2>&1 || true
-a52=""
-for _ in $(seq 1 10); do
-  a52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; a52="${a52:-0}"
-  [ "$a52" -gt "$b52" ] && break; sleep 3
-done
-if [ "$a52" -gt "$b52" ]; then
-  ok "bridge 5g->2g counter ${b52}->${a52}"
+section "Cell 3: 5G->2G  (15551234567 -> 15554443322, bridge relay -> SMPP)"
+b_52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; b_52="${b_52:-0}"
+BODY3="E2E 5G2G ${TS}"
+start_send ims_tx55 15551234567 15554443322 "${BODY3}" 10.89.0.55
+sleep 12
+a_52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; a_52="${a_52:-0}"
+MS1_HITS="$(podman exec mvno-2g-ms grep -cF "${BODY3}" /root/.osmocom/bb/sms.txt 2>/dev/null || true)"
+if [ "$((a_52 - b_52))" -ge 1 ] && [ "${MS1_HITS}" -ge 1 ]; then
+  ok "delivered 5G->2G via bridge+SMPP (5g2g +$((a_52 - b_52))); MS1 sms.txt has '${BODY3}'"
 else
-  bad "bridge 5g->2g counter did not move (still ${b52})"
+  bad "5g2g $b_52->$a_52; MS1 sms.txt hits=${MS1_HITS}: $(podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt 2>/dev/null | tail -2 | tr '\n' ' ')"
 fi
-if podman logs mvno-ip-sm-gw 2>&1 | grep -q "SUBMIT_SM"; then ok "bridge SMPP SUBMIT_SM to 2G SMSC"; else bad "no SUBMIT_SM in bridge log"; fi
 
 # =============================================================================
-# Cell 4 - 5G -> 5G (UE1 -> Kamailio IMS twin -> UE2 receiver)
+# Cell 4 - 5G -> 5G (Kamailio twin relay; bridge must stay untouched)
 # =============================================================================
-section "Cell 4: 5G->5G  (15551234567 -> 15557654321, Kamailio IMS twin)"
-RECV2=/tmp/e2e_ue2_recv_${TS}.log
-podman exec -d "${UE2}" python3 /ims_terminal.py --mode recv --msisdn 15557654321 \
-  --host ${KAM} --port ${KAM_PORT} --bind-ip ${UE2_IP} --listen 30 \
-  > "${RECV2}" 2>&1 || true
+section "Cell 4: 5G->5G  (15551234567 -> 15557654321, Kamailio twin relay)"
+b_25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; b_25="${b_25:-0}"
+b_52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; b_52="${b_52:-0}"
+BODY4="E2E 5G5G ${TS}"
+start_recv ims_rx56 15557654321 10.89.0.56 90
 sleep 4
-podman exec "${UE1}" python3 /ims_terminal.py --mode send --msisdn 15551234567 \
-  --peer 15557654321 --host ${KAM} --port ${KAM_PORT} --bind-ip ${UE1_IP} \
-  --body "E2E 5G5G ${TS}" >/dev/null 2>&1 || true
-found=""
-for _ in $(seq 1 10); do
-  grep -q "E2E 5G5G ${TS}" "${RECV2}" 2>/dev/null && { found=1; break; }; sleep 3
-done
-if [ -n "$found" ]; then ok "5G->5G delivered: UE2 receiver got the body"; else bad "5G->5G not received by UE2"; fi
-pkill -f "ims_terminal.py --mode recv --msisdn 15557654321" 2>/dev/null || true
-
-# =============================================================================
-# Cell 5 - AI-BLOCK (mock allow:false on E2E-BLOCK marker -> dropped, not bridged)
-# =============================================================================
-section "Cell 5: AI-Block (E2E-BLOCK marker -> allow:false -> dropped)"
-blk_b="$(vm_value 'mvno_sms_blocked_total')"; blk_b="${blk_b:-0}"
-b25b="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; b25b="${b25b:-0}"
-python3 "${SCRIPT_DIR}/send_smpp_sms.py" --sender 15554443322 --recipient 15551234567 \
-  --message "E2E-BLOCK persistent lottery spam ${TS}" >/dev/null
-blk_a="$blk_b"; a25b="$b25b"
-for _ in $(seq 1 12); do
-  blk_a="$(vm_value 'mvno_sms_blocked_total')"; blk_a="${blk_a:-$blk_b}"
-  a25b="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; a25b="${a25b:-$b25b}"
-  [ "$blk_a" -gt "$blk_b" ] && break; sleep 3
-done
-if [ "$blk_a" -gt "$blk_b" ]; then
-  ok "SMS blocked counter ${blk_b}->${blk_a} (policy rejected)"
-  if [ "$a25b" -eq "$b25b" ]; then
-    ok "blocked SMS was NOT bridged (2g->5g stayed ${a25b})"
-  else
-    bad "blocked SMS leaked to bridge (2g->5g ${b25b}->${a25b})"
-  fi
+start_send ims_tx55 15551234567 15557654321 "${BODY4}" 10.89.0.55
+sleep 8
+a_25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; a_25="${a_25:-0}"
+a_52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; a_52="${a_52:-0}"
+RX4="$(podman logs ims_rx56 2>&1 | grep -cF "${BODY4}" || true)"
+if [ "${RX4}" -ge 1 ] && [ "$a_25" = "$b_25" ] && [ "$a_52" = "$b_52" ]; then
+  ok "relayed 5G->5G via Kamailio; terminal got '${BODY4}'; bridge untouched (2g5g=$a_25,5g2g=$a_52)"
 else
-  bad "blocked counter did not move (still ${blk_b})"
+  bad "rx56 hits=${RX4}; 2g5g $b_25->$a_25, 5g2g $b_52->$a_52; log: $(podman logs ims_rx56 2>&1 | tail -4 | tr '\n' ' ')"
 fi
 
 # =============================================================================
-# Summary / hard gate
+# Cell 5 - AI-BLOCK (E2E-BLOCK marker -> mock allow:false -> 403 + counter)
 # =============================================================================
-echo ""
-echo -e "${CYAN}==== RESULTS : ${PASS} PASSED / ${FAIL} FAILED ====${NC}"
-if [ "${FAIL}" -eq 0 ]; then
-  echo -e "${GREEN}  GOAL 7 E2E - ALL CELLS PASSED${NC}"
+section "Cell 5: AI-BLOCK  (E2E-BLOCK marker -> 403, counter++, no delivery)"
+B_BLK="$(api_counter mvno_sms_blocked_total)"; B_BLK="${B_BLK:-0}"
+BODY5="E2E-BLOCK 5G5G ${TS}"
+start_send ims_tx55 15551234567 15557654321 "${BODY5}" 10.89.0.55
+sleep 8
+A_BLK="$(api_counter mvno_sms_blocked_total)"; A_BLK="${A_BLK:-0}"
+SEND403="$(podman logs ims_tx55 2>&1 | grep -c '403' || true)"
+RX_NO="$(podman logs ims_rx56 2>&1 | grep -cF "${BODY5}" || true)"
+K_BLOCK="$(podman logs mvno-kamailio --since 2m 2>&1 | grep -c 'SMS BLOCKED BY MVNO INTERCEPTION CORE' || true)"
+if [ "$A_BLK" -gt "$B_BLK" ] && [ "${SEND403}" -ge 1 ] && [ "${RX_NO}" -eq 0 ] && [ "${K_BLOCK}" -ge 1 ]; then
+  ok "blocked by AI core (blocked $B_BLK->$A_BLK, sender saw 403, receiver untouched, kamailio logged block)"
+else
+  bad "blocked $B_BLK->$A_BLK; sender 403 hits=${SEND403}; rx56 marker hits=${RX_NO}; kamailio block lines=${K_BLOCK}"
+fi
+stop_ims ims_rx56
+
+# =============================================================================
+# Summary
+# =============================================================================
+echo
+if [ "$FAIL" -eq 0 ]; then
+  echo -e "${GREEN}==== E2E RUNBOOK: ALL CELLS PASS (${PASS} ok) ====${NC}"
   exit 0
 else
-  echo -e "${RED}  GOAL 7 E2E - ${FAIL} CELL(S) FAILED${NC}"
+  echo -e "${RED}==== E2E RUNBOOK: ${FAIL} FAILURE(S), ${PASS} ok ====${NC}"
   exit 1
 fi
-

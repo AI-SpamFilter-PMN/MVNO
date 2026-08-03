@@ -272,7 +272,7 @@ def parse_nonce(resp_text, header):
 
 def reply_ok(req_text, sock, host, port):
     lines = req_text.split("\r\n")
-    vias = [ln.strip() for ln in lines if ln.lower().startswith("via:")]
+    vias = [ln.strip().split(":", 1)[1].strip() for ln in lines if ln.lower().startswith("via:")]
     headers = {}
     for ln in lines[1:]:
         if ":" in ln:

@@ -552,8 +552,21 @@ services:
         from http.server import HTTPServer, BaseHTTPRequestHandler
         class H(BaseHTTPRequestHandler):
             def do_POST(self):
-                length = int(self.headers.get('Content-Length', 0))
-                body = self.rfile.read(length) if length > 0 else b''
+                if self.headers.get('Transfer-Encoding', '').lower() == 'chunked':
+                    body = b''
+                    while True:
+                        line = self.rfile.readline().strip()
+                        if not line:
+                            break
+                        size = int(line, 16)
+                        if size == 0:
+                            self.rfile.readline()
+                            break
+                        body += self.rfile.read(size)
+                        self.rfile.readline()
+                else:
+                    length = int(self.headers.get('Content-Length', 0))
+                    body = self.rfile.read(length) if length > 0 else b''
                 text = body.decode('utf-8', errors='ignore')
                 if 'E2E-BLOCK' in text:
                     resp = b'{"allow":false,"reason":"Spam (E2E deterministic block)"}'
