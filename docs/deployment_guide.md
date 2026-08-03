@@ -54,6 +54,21 @@ Operating in a daemonless, rootless environment:
 | **Podman** | `sudo apt install podman` | Daemonless rootless engine |
 | **Docker Compose Plugin**| `sudo apt install docker-compose` | Compose orchestration via `podman compose` |
 
+**Custom images (no local cache, internet available):** the 8 project-built images
+(`mvno-*`) are published **publicly** to Docker Hub under
+`docker.io/5attab007/mvno-*:<tag>` (kamailio 5.7.2, 2g-ms/2g-core/osmo-smsc/telecom-api
+1.0.0, ueransim 3.2.6, open5gs + open5gs-webui 2.8.0). A fresh machine can pull and
+retag them in one step, then launch the stack offline:
+
+```bash
+./scripts/pull-images.sh     # pulls 5attab007/mvno-* and re-tags to the bare names compose expects
+./scripts/up.sh
+```
+
+Vendor images (`mongo:7.0`, `grafana/grafana-oss:11.6.0`, `timberio/vector`,
+`victoriametrics/*`, `drachtio/rtpengine`, `percona/mongodb_exporter`, `python:3.11-alpine`)
+pull from their own public Docker Hub namespaces as usual.
+
 ### Kernel Prerequisites (5G NGAP Signaling)
 
 5G N2 interface signaling between UERANSIM gNB (`mvno-ueransim-gnb`) and Open5GS AMF (`mvno-amf`) over TCP/SCTP port 38412 requires the **SCTP kernel module** enabled on the host operating system:
