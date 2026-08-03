@@ -334,14 +334,20 @@ class BridgeSip:
         return resp if resp and ("200 OK" in resp) else None
 
     def register(self, msisdn):
+        # Fresh Call-ID + branch per attempt: Kamailio's registrar rejects a
+        # re-REGISTER on an existing Call-ID whose CSeq does not exceed the
+        # stored one ("invalid cseq") — reusing a fixed Call-ID across
+        # refreshes would kill the 2G leg at first expiry.
+        nonce_ts = int(time.time())
         contact = f"<sip:{msisdn}@{self.ip}:{SIP_PORT}>"
-        via = f"SIP/2.0/UDP {self.ip}:{SIP_PORT};branch=z9hG4bK-bridge-{msisdn}-{self.etag}"
+        via = f"SIP/2.0/UDP {self.ip}:{SIP_PORT};branch=z9hG4bK-bridge-{msisdn}-{nonce_ts}"
+        call_id = f"bridge-reg-{msisdn}-{nonce_ts}@mvno"
         req = (
             f"REGISTER sip:{REALM}:{KAMAILIO_PORT} SIP/2.0\r\n"
             f"Via: {via}\r\n"
             f"From: <sip:{msisdn}@{REALM}>;tag=brid-t1\r\n"
             f"To: <sip:{msisdn}@{REALM}>\r\n"
-            f"Call-ID: bridge-reg-{msisdn}-{self.etag}@mvno\r\n"
+            f"Call-ID: {call_id}\r\n"
             f"CSeq: 1 REGISTER\r\n"
             f"Contact: {contact}\r\n"
             f"Expires: 1800\r\n"
@@ -368,7 +374,7 @@ class BridgeSip:
             f"Via: {via.replace('-1-', '-2-')}\r\n"
             f"From: <sip:{msisdn}@{REALM}>;tag=brid-t1\r\n"
             f"To: <sip:{msisdn}@{REALM}>\r\n"
-            f"Call-ID: bridge-reg-{msisdn}-{self.etag}@mvno\r\n"
+            f"Call-ID: {call_id}\r\n"
             f"CSeq: 2 REGISTER\r\n"
             f"Contact: {contact}\r\n"
             f"Authorization: {auth}\r\n"
