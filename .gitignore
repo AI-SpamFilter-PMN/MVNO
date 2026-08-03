@@ -28,7 +28,6 @@ vendor/
 *.swp
 
 # Docs — private personal guides & notes (strictly local-only)
-docs/implementation_guide.md
 docs/*.rar
 docs/*.pdf
 docs/*.drawio
@@ -36,6 +35,9 @@ docs/*.png
 !docs/architecture_flow.png
 !docs/ims_voice_call_flow.png
 !docs/sms_interception_flow.png
+
+# NOTE: docs/implementation_guide.md is UNIGNORED (like API_CONTRACT.md) so it can
+#       be shared with teammates on GitHub — keep the Goal 7 runbook section in sync.
 
 # NOTE: docs/API_CONTRACT.md is UNIGNORED so it can be shared with teammates on GitHub!
 
