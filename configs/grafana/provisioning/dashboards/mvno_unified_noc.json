@@ -1406,11 +1406,11 @@
               },
               {
                 "color": "#FF0844",
-                "value": 1
+                "value": 0.0001
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops"
         },
         "overrides": []
       },
@@ -1441,13 +1441,13 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "rtpengine_zero_packet_streams_total default 0",
+          "expr": "rate(rtpengine_zero_packet_streams_total[5m]) default 0",
           "refId": "A"
         }
       ],
       "title": "Zero-Packet RTP Streams (media stuck)",
       "type": "stat",
-      "description": "Non-zero while sessions exist without bidirectional media \u2014 signals a media-plane fault, not an idle system."
+      "description": "New RTP streams that received zero packets in the last 5m (rate). >0 = media fault right now; a cumulative counter would sit permanently red."
     },
     {
       "datasource": {

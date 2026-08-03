@@ -12,9 +12,7 @@ groups:
         condition: C
         data:
           - refId: C
-            datasource:
-              type: prometheus
-              uid: victoriametrics
+            datasourceUid: victoriametrics
             model:
               expr: count(up{job=~"telecom-api|rtpengine|vmagent|open5gs|mongodb|victoria-metrics"} == 0) > 0
               instant: true
@@ -35,9 +33,7 @@ groups:
         condition: A
         data:
           - refId: A
-            datasource:
-              type: prometheus
-              uid: victoriametrics
+            datasourceUid: victoriametrics
             model:
               expr: rtpengine_ports_free < 10
               instant: true
@@ -58,9 +54,7 @@ groups:
         condition: A
         data:
           - refId: A
-            datasource:
-              type: prometheus
-              uid: victoriametrics
+            datasourceUid: victoriametrics
             model:
               expr: sum(rate(mvno_call_blocked_eir_total[5m])) > 0
               instant: true
@@ -81,9 +75,7 @@ groups:
         condition: A
         data:
           - refId: A
-            datasource:
-              type: prometheus
-              uid: victoriametrics
+            datasourceUid: victoriametrics
             model:
               expr: sum(rate(mvno_ai_failopen_total[5m])) > 0
               instant: true
