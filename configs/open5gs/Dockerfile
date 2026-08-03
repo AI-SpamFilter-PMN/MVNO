@@ -1,11 +1,11 @@
-# NOTE: layered on the known-good 2026-07-26 build (mvno-open5gs:latest).
+# NOTE: layered on the known-good 2026-07-26 build (mvno-open5gs:2.8.0-base).
 # A from-source rebuild of the same v2.8.0 tag currently yields binaries with
 # regressed HTTP/2 client behavior (every NF's SBI connection to the NRF dies
 # at the first ~30s heartbeat; old binaries are unaffected). Empirical matrix
 # verified 2026-08-01: old client -> old NRF works, new client -> any NRF fails.
 # Until that rebuild is root-caused, do NOT switch this base back to a fresh
 # source build. Only the deployment bits (iproute2 + iptables + entrypoint) are layered.
-FROM mvno-open5gs:latest
+FROM mvno-open5gs:2.8.0-base
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     iproute2 \

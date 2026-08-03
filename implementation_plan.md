@@ -1,4 +1,4 @@
-# Implementation Plan — Master Plan v7 (Goals 0–5 ✅ COMPLETE; Goal 6 NEXT)
+# Implementation Plan — Master Plan v7 (Goals 0–6 ✅ COMPLETE; Goal 7 IN PROGRESS)
 
 Consolidated roadmap for the MVNO repo (`/home/zkhattab/AI-SpamFilter-PMN/MVNO`).
 Teammate repos (`AI-Filteration-System`, `SipClient`, `sms-client`) are **read-only external** — integrate only, never edit.
@@ -82,10 +82,38 @@ Goal 1 (portability) ── ✅ done; Goal 2 (scripts) ── ✅ done; Goal 3 (
   UE2→UE1 delivered** (sms.txt) → SMPP MT delivered → `show sms-queue` pending 0 → telecom-api
   `/actuator/health` UP (no SMPP→telecom-api regression).
 
-## Goal 6 — IP-SM-GW bridge
+## Goal 6 — IP-SM-GW bridge ✅ COMPLETE
 - `scripts/ip_sm_gw.py` (TS 23.204): 2G→5G (poll SC queue for non-2G recipients → Kamailio
   MESSAGE), 5G→2G (SIP SMS → `submit_sm`); MSISDN↔(UE, access) map from `subscriber` table.
 - Gate: all 4 cross cells (2G→2G, 2G→5G, 5G→2G, 5G→5G) pass once.
+- **Empirical Proof**:
+  - Leg 1 (2G→5G): `15554443322` → `15551234567` (body 'GATE6 2Gto5G'). Bridge log: `POLL` → `SEND` → `DELIVERED`. Row `sent` marked in `smsc.db`.
+  - Leg 2 (5G→2G): `15551234567` → `15554443322` (body 'GATE6 5Gto2G'). Bridge log: `[RELAY]` → `[SMPP] BIND_TRANSCEIVER OK` → `[SMPP] SUBMIT_SM OK`.
+  - Bugfix A: `mark_attempt()` now called on failure; retries bounded to 5.
+  - Bugfix B: tight `0.2s` recv loop removed; now uses `POLL_INTERVAL` (5s) to avoid Kamailio pike 429.
+
+### Goal 6 design (empirically verified before coding)
+- **Bridge runs as a container** `mvno-ip-sm-gw` on `mvno_net` (host has NO route to 10.89.0.0/24
+  and containers have no route back to host published ports — verified `host:2775 FAIL` from
+  kamailio), mounting `./state/hlr` for live read of `smsc.db`/`hlr.db` (osmo-hlr/osmo-smsc already
+  share this volume → single source of truth) and `./scripts` for the bridge.
+- **2G→5G leg (empirically proven)**: 2G MS→5G MSISDN MO SMS lands in SMSC queue as
+  `SMS` row with `sent` NULL (verified: `MS1→15551234567` produced row id=17, `deliver_attempts=0`,
+  osmo-msc log `Subscriber MSISDN-15551234567 is not attached, skipping SMS`). Bridge polls
+  `smsc.db` `SMS` table for rows where `sent IS NULL AND dest_addr` is a 5G MSISDN → builds a
+  digest-authenticated SIP MESSAGE (sender = 2G src, recipient = 5G dest) to Kamailio → Kamailio
+  relays to registered 5G UE → bridge marks row delivered (`sent = now`).
+- **5G→2G leg**: 5G UE sends SIP MESSAGE to a 2G MSISDN. Kamailio `lookup("location")` fails
+  (2G MSISDN not a SIP location) → today returns 404. Bridge **REGISTERs** the 2G MSISDNs with
+  Kamailio (Contact = its own SIP listener) so `lookup("location")` succeeds → Kamailio relays the
+  MESSAGE to the bridge → bridge does SMPP `submit_sm` to osmo-smsc (SMSC MT-delivers to the 2G MS).
+- **Subscriber access map** from `subscriber` table: 2G MSISDNs `15554443322` (MS1),
+  `15557778888` (MS2); 5G MSISDNs `15551234567` (UE1), `15557654321` (UE2), `15559998888` (UE3).
+  All 5 also present in Kamailio `subscriber` table (digest auth, password `testpass`).
+- **SMPP ESME creds** reused from `send_smpp_sms.py` (BIND_TRANSCEIVER `smsclient`/`password`,
+  osmo-smsc esme stanza `smsclient`/`password`), `submit_sm` PDU 0x00000004.
+- Gate: run bridge, drive 2G→2G (MS1→MS2), 2G→5G (MS1→UE1), 5G→2G (UE1→MS1), 5G→5G (UE1→UE2);
+  assert each destination receives the body, `sent` set for 2G→5G rows, `sms-queue` pending 0.
 
 ## Goal 7 — e2e_runbook.sh
 - SIP-method × SMS-path × 4-cell matrix; deterministic AI-block (config-only mock rule —

@@ -198,7 +198,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 | `make init-db` fails | `sqlite3` not installed | Install `sqlite3` package |
 | UL data plane dead after gNB recreate | Stale NGAP contexts; gNB silently swallows PDU Session Resource Setup | Recreate the **whole UERANSIM trio** (`podman compose up -d --force-recreate ueransim-gnb ueransim-ue-1 ueransim-ue-2 ueransim-ue-3`), never a single container — `docs/ISSUES.md` §7.4 |
 | UE can't reach `10.45.0.1` | UE default route missing | `podman exec mvno-ueransim-ue-N sh -c 'ip route add 10.45.0.1 dev uesimtun0'` |
-| NFs de-register from NRF every ~30s | Rebuilt Open5GS from source | Use the layered Dockerfile on `mvno-open5gs:latest` — never rebuild from source (`docs/ISSUES.md` §5.6) |
+| NFs de-register from NRF every ~30s | Rebuilt Open5GS from source | Use the layered Dockerfile on `mvno-open5gs:2.8.0-base` — never rebuild from source (`docs/ISSUES.md` §5.6) |
 | 5G-path SIP times out on first packet | Neighbor-resolution warm-up after UPF/bridge restarts | Re-run the simulator — subsequent exchanges are immediate |
 | UE can't reach bridge services via 5G | SNAT rule missing (UPF recreated) | Entrypoint installs it idempotently; verify `podman exec mvno-upf iptables -t nat -L POSTROUTING -n` |
 

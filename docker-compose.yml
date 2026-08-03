@@ -488,6 +488,36 @@ services:
         ipv4_address: 10.89.0.52
     restart: unless-stopped
 
+  # ─── IP-SM-GW Bridge (TS 23.204: 2G SMSC <-> 5G/IMS SMS interworking) ───
+  ip-sm-gw:
+    image: python:3.11-alpine
+    container_name: mvno-ip-sm-gw
+    command: ["python3", "-u", "/scripts/ip_sm_gw.py"]
+    ports:
+      - "9100:9100"
+    volumes:
+      - ./scripts:/scripts:z
+      - ./state/hlr:/var/lib/osmocom:z
+    environment:
+      - SMSC_DB=/var/lib/osmocom/smsc.db
+      - HLR_DB=/var/lib/osmocom/hlr.db
+      - KAMAILIO_HOST=10.89.0.23
+      - KAMAILIO_PORT=5060
+      - SMPP_HOST=10.89.0.49
+      - SMPP_PORT=2775
+      - SIP_BIND=0.0.0.0
+      - SIP_PORT=5090
+      - METRICS_PORT=9100
+      - POLL_INTERVAL=3
+    depends_on:
+      - kamailio
+      - osmo-hlr
+      - osmo-smsc
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.53
+    restart: unless-stopped
+
   # ─── Spring Boot Interception Gateway & Vosk ASR JNI Runtime ───
   telecom-api:
     image: mvno-telecom-api:1.0.0
@@ -523,11 +553,16 @@ services:
         class H(BaseHTTPRequestHandler):
             def do_POST(self):
                 length = int(self.headers.get('Content-Length', 0))
-                if length > 0: self.rfile.read(length)
+                body = self.rfile.read(length) if length > 0 else b''
+                text = body.decode('utf-8', errors='ignore')
+                if 'E2E-BLOCK' in text:
+                    resp = b'{"allow":false,"reason":"Spam (E2E deterministic block)"}'
+                else:
+                    resp = b'{"allow":true,"reason":"Clean content"}'
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                self.wfile.write(b'{"allow":true,"reason":"Clean content"}')
+                self.wfile.write(resp)
             def do_GET(self):
                 self.send_response(200)
                 self.end_headers()

@@ -17,15 +17,18 @@ The core network operates as an unprivileged, rootless stack that handles real-t
 
 ```
 SIP Phone ──▶ Kamailio ──▶ rtpengine ──(Audio Spool)──┐
-                │                                    ▼
+                │            (RTP Engine)             ▼
 SMPP Client ──▶ OsmoSMSC ───────────────▶ Spring Boot Gateway (Java 21) ──▶ AI Spam Filter
-                │                         (Native Vosk ASR JNI)
-5G UE ──▶ Open5GS (AMF) ─────────────────┘
+                │ 2G SMSC        ┌─────── (Native Vosk ASR JNI)
+5G UE ──▶ Open5GS (AMF) ───────▶│
+2G MS ──▶ 2G Core (BSC/BTS) ──▶ OsmoSMSC ──▶ IP-SM-GW ──▶ Kamailio ──▶ 5G UE   (2G↔5G SMS)
 ```
 
 Two interception flows — SMS (via OsmoSMSC SMPP) and Voice (via Kamailio SIP). The 5G SA core adds UERANSIM gNB+UE simulation with live PDU Session establishment (`S-NSSAI {sst: 1, sd: 0x000001}`) and IPv4 data-plane allocation (`10.45.0.0/16`). All decisions go through the Spring Boot policy gateway.
 
-3 test UEs: **UE-1** (15551234567, balance=100), **UE-2** (15557654321, balance=0), **UE-3** (15559998888, balance=100). EIR SIM-swap fraud detection triggers dynamically on multi-SIM IMEI bindings.
+A **TS 23.204 IP-SM-GW bridge** (`mvno-ip-sm-gw`) provides 2G↔5G SMS interworking: it polls the 2G SMSC store-and-forward DB (`smsc.db`) and relays stored SMS toward 5G/IMS subscribers as SIP `MESSAGE` into Kamailio, and in the reverse direction receives 5G SMS on SIP port `5090` and backhauls them to the SMSC via SMPP `submit_sm`.
+
+Test subscribers: **5G UEs** — **UE-1** (15551234567, balance=100), **UE-2** (15557654321, balance=0), **UE-3** (15559998888, balance=100). **2G MSs** (OsmocomBB, virtual radio) — **2G-MS** (15554443322), **2G-MS2** (15557778888), SMSC short-code `15550000000`. EIR SIM-swap fraud detection triggers dynamically on multi-SIM IMEI bindings.
 
 ---
 
@@ -128,6 +131,7 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | **rtpengine Media** | `mvno-rtpengine` | `30000-30100`| UDP | RTP media audio stream relay range |
 | **OsmoSMSC + OsmoHLR** | `mvno-osmosmsc` | `2775` | TCP / SMPP | Short Message Peer-to-Peer (SMPP 3.4) |
 | **OsmoHLR** | `mvno-osmo-hlr` | `4222 (internal)` | TCP / GSUP | Standalone subscriber location database |
+| **IP-SM-GW Bridge** | `mvno-ip-sm-gw` | `5090 (SIP)` + `2775 (SMPP)` | UDP / SMPP | TS 23.204 2G SMSC ↔ 5G/IMS SMS interworking bridge |
 | **VictoriaMetrics** | `mvno-victoriametrics`| `8428` | HTTP | Telemetry TSDB & PromQL query API |
 | **vmagent Scraper** | `mvno-vmagent` | `8429` | HTTP | Telemetry scraper target health API |
 | **Grafana NOC** | `mvno-grafana` | `3000` | HTTP | Real-time telecom NOC dashboard UI |
@@ -150,12 +154,14 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | 8 | **5G SA Core** | Open5GS 10-NF 5GC + UERANSIM gNB + 3 UE simulation with live PDU Session establishment (`10.45.0.0/16`). |
 | 9 | **SMS-over-NAS** | 5G NAS SMS routing architecture contract (Mock / Roadmap item). |
 | 10 | **MongoDB Seed** | Atomic init script (`scripts/seed-mongo.sh`) provisions 3 UEs into `open5gs.subscribers` avoiding WebUI admin hash bug. |
+| 11 | **IP-SM-GW 2G↔5G SMS Bridge** | TS 23.204 interworking bridge (`mvno-ip-sm-gw`): polls 2G SMSC store-and-forward DB and relays to 5G/IMS via SIP MESSAGE; backhauls 5G SMS to SMSC via SMPP submit_sm. Both legs verified end-to-end. |
 
 ---
 
 ## 7. Documentation
 
 * [ONBOARDING.md](ONBOARDING.md): Team onboarding guide, setup instructions, make targets, and Section 14 integration specs.
+* [docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md): Full multi-terminal manual testing guide — all MVP flows (2G/5G SMS, 2G↔5G IP-SM-GW bridging, SIP/IMS calls, RTP engine media, Vosk STT, recording, interception REST API, Grafana/VictoriaMetrics telemetry).
 * [docs/API_CONTRACT.md](docs/API_CONTRACT.md): Public AI Spam Filter REST API contract & JSON schemas for teammates.
 * [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
 * [docs/ROADMAP.md](docs/ROADMAP.md): Architectural roadmap and operational backlog (SIP 407 + API keys implemented; VictoriaLogs, healthchecks, SBI eval open).

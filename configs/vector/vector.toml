@@ -22,8 +22,8 @@ source = '''
 # VRL Regex Parsing: Extract E.164 phone numbers (MSISDN) from raw signaling logs
 if contains(to_string!(.message), "INVITE") {
   .event_type = "SIP_INVITE"
-  caps = parse_regex(.message, r'(?i)from: sip:(?P<caller>\d+)@')??
-  if caps != null {
+  caps, err = parse_regex(to_string!(.message), r'(?i)from: sip:(?P<caller>\d+)@')
+  if err == null {
     .caller_msisdn = caps.caller
   }
 } else if contains(to_string!(.message), "submit_sm") {
@@ -38,3 +38,19 @@ type = "file"
 inputs = ["parse_telecom_events"]
 path = "/var/log/vector/telecom_events.json"
 encoding.codec = "json"
+
+# ==============================================================================
+# METRICS PIPELINE — scrape IP-SM-GW bridge counters and remote-write to
+# VictoriaMetrics TSDB (Goal 8: "New SMS counters" / metrics ingestion).
+# Vector-ingested metrics augment vmagent scraping for the same bridge endpoint.
+# ==============================================================================
+[sources.bridge_metrics]
+type = "prometheus_scrape"
+endpoints = ["http://ip-sm-gw:9100/metrics"]
+scrape_interval_secs = 5
+
+[sinks.vm_remote_write]
+type = "prometheus_remote_write"
+inputs = ["bridge_metrics"]
+endpoint = "http://victoria-metrics:8428/api/v1/write"
+

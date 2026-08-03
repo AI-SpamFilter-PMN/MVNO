@@ -30,6 +30,15 @@ scrape_configs:
           subsystem: "control-plane"
           component: "spring-gateway"
 
+  # IP-SM-GW 2G<->5G SMS Interworking Bridge Metrics
+  - job_name: "ip-sm-gw"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["ip-sm-gw:9100"]
+        labels:
+          subsystem: "control-plane"
+          component: "ip-sm-gw"
+
   # Scraper Self-Monitoring Endpoint
   - job_name: "vmagent"
     static_configs:

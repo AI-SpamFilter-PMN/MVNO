@@ -186,7 +186,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 5.6: Fresh v2.8.0 Source Rebuild Regresses SBI HTTP/2 Clients (30 s Heartbeat Death)
 * **Symptom**: After rebuilding the Open5GS container from the `v2.8.0` tag source, every NF's SBI connection to the NRF died at the first heartbeat (~30-35 s after registration): `[sbi] WARNING: Error in the HTTP2 framing layer (16)` (lib/sbi/client.c:767, `CURLE_HTTP2`), followed by NRF `[nrf] WARNING: No heartbeat` → de-registration. All NFs de-registered on a fixed cadence regardless of NRF restart order.
 * **Root Cause**: The freshly built daemon binaries (from-source v2.8.0 tag, verified tag peel `157f611a...` 2026-06-20 Release-19) exhibited a regressed HTTP/2 client behavior compared to the known-good 07-26 image (`mvno-open5gs:latest`, image `a2f041bbd267`). A 2×2 matrix (old/new image × NRF/client) proved: any *new-image client* fails; any *known-good client* works against either NRF. Runtime libraries were byte-identical (libcurl3-gnutls 7.88.1-10+deb12u15, libgnutls30 3.7.9-2+deb12u7, libnghttp2-14 1.52.0-1+deb12u3, libssl3 3.0.20-1~deb12u2); only the Open5GS daemon binaries differed (md5).
-* **Fix**: [configs/open5gs/Dockerfile](configs/open5gs/Dockerfile) is now **layered on the known-good image** (`FROM mvno-open5gs:latest`) adding only `iproute2` + the fixed `entrypoint.sh` — it does **not** rebuild Open5GS from source. The Dockerfile carries an explicit banner: do not switch the base back to a fresh source build until the HTTP/2 client regression is root-caused upstream. Rebuilt image `mvno-open5gs:2.8.0` daemon binaries now md5-match the known-good image.
+* **Fix**: [configs/open5gs/Dockerfile](configs/open5gs/Dockerfile) is now **layered on the known-good image** (`FROM mvno-open5gs:2.8.0-base`, a pinned re-tag of the known-good 2.8.0 image) adding only `iproute2` + the fixed `entrypoint.sh` — it does **not** rebuild Open5GS from source. The Dockerfile carries an explicit banner: do not switch the base back to a fresh source build until the HTTP/2 client regression is root-caused upstream. Rebuilt image `mvno-open5gs:2.8.0` daemon binaries now md5-match the known-good image.
 * **Verification**: Full stack recreate → NRF shows 8 NF registrations, **0 de-registrations** past the 90 s heartbeat checkpoint; only a few startup-race framings (all before the settle timestamp), none after.
 
 ### Issue 5.7: SMF UE Pool Allocates the ogstun Gateway Address (10.45.0.1) to UEs
@@ -363,6 +363,25 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   (`iptables` added to the Open5GS Dockerfile runtime layer; `net.ipv4.ip_forward=1` is already the container default.) Trade-off: bridge services see the UE's traffic with source `10.89.0.14` (the UPF), not the UE's `10.45.0.x`.
 * **Verification**: SIP over 5G end-to-end (Phase 1 gate): sim from inside ue-1 with the kamailio `/32` routed via `uesimtun0` → REGISTER 200 OK, INVITE 407 → digest → 100 trying; Kamailio logs show the dialog from `10.89.0.14`; ogstun counters grow (~10 KB RX / ~15 KB TX per dialog pair).
 
+### Issue 8.21: IP-SM-GW Bridge Unbounded Retry Spin on 2G→5G Delivery Failure
+* **Symptom**: If a 5G destination was unreachable (e.g., UE not registered → 404) or blocked (e.g., pike 429), the bridge logged `[RETRY]` and immediately re-attempted the delivery at full CPU speed.
+* **Root Cause**: `scripts/ip_sm_gw.py` logic failed to invoke `mark_attempt()` in the exception/failure branch of the 2G→5G poll loop. The row's `deliver_attempts` counter never incremented, so the SQL query `deliver_attempts < MAX_ATTEMPTS` remained true forever.
+* **Fix**: Added an explicit `mark_attempt(self.sc, row["id"])` call in the failure branch. Retries are now bounded to `MAX_ATTEMPTS=5` (default). Once exhausted, the row is no longer polled.
+* **Verification**: Injected SMS for an unregistered 5G UE; bridge log showed 5 `RETRY` events then stopped polling that `row_id`. `smsc.db` showed `deliver_attempts=5`.
+
+### Issue 8.22: IP-SM-GW Bridge Tight `recv()` Loop Tripping Kamailio Pike (429 Flood)
+* **Symptom**: During retry bursts, the bridge would suddenly receive `429 Too Many Requests` from Kamailio for all subsequent SIP MESSAGE attempts.
+* **Root Cause**: The SIP listener `recv()` timeout was dynamically set to `0.2s` if pending rows existed. Combined with the `mark_attempt` bug (Issue 8.21), this created a tight spin-loop that exceeded Kamailio's `pike` module threshold (anti-flood).
+* **Fix**: Changed `self.sip.recv(timeout=...)` to ALWAYS use `POLL_INTERVAL` (default 5s). This provides a natural backoff between delivery attempts, staying well under the pike threshold.
+* **Verification**: End-to-end 2G→5G delivery (leg 1) now shows `[POLL]`, `[SEND]`, then `[DELIVERED]` with a stable cadence. Kamailio logs no longer show 429s for the bridge IP.
+
+### Issue 8.23: 5G→2G SIP MESSAGE Relay Loops / 408 Timeout (Test Artifact)
+* **Symptom**: 5G→2G SMS failed with 408 Request Timeout or infinite Kamailio relay loops when using a receiver co-located with the bridge.
+* **Root Cause**: Running the UE receiver (`ims_terminal.py --mode recv`) in the same container as the bridge (`mvno-ip-sm-gw` @ `10.89.0.53`) caused source-IP ambiguity. Kamailio could not distinguish the bridge's relay leg from the receiver's response leg, leading to routing confusion.
+* **Fix**: **Test methodology fix only.** Dedicated receiver containers (e.g., `ue1-recv-test` @ `10.89.0.60`) must be used for verification. This ensures clean IP separation for Kamailio's `lookup("location")` and routing logic.
+* **Verification**: Verified 5G→2G leg (leg 2) using a dedicated container; bridge log showed `[RELAY] 5G->2G` → `[SMPP] SUBMIT_SM OK`.
+
+
 ---
 
 ## 9. Master Verification & Verification Checklist
@@ -387,6 +406,10 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 | **DL Data Plane (Phase 0 gate)** | 4 UDP probes from UPF netns `10.45.0.1:34569` → ue-1 tun IP:9 | ue-1 tun RX incremented (+4); no N3 drops | ✅ **PASS** |
 | **SIP over 5G (Phase 1 gate)** | `sip_traffic_sim.py --host 10.89.0.23 --port 5060` from inside ue-1 (kamailio `/32` via `uesimtun0`) | REGISTER 200 OK + INVITE 407 → digest → 100 trying; ogstun counters grow; `mvno_call_requests_total` increments | ✅ **PASS** |
 | **Open5GS WebUI Login UI** | `GET :9999/` | `HTTP 200 OK` (`<title>Open5gs - Login</title>`) | ✅ **PASS** |
+| **IP-SM-GW Leg 1 (2G→5G)** | `send_db_sms.sh` 2G→5G | Bridge log: `POLL` → `SEND` → `DELIVERED`; row `sent` NOT NULL | ✅ **PASS** |
+| **IP-SM-GW Leg 2 (5G→2G)** | `ims_terminal.py` 5G→2G | Bridge log: `[RELAY]` → `[SMPP] SUBMIT_SM OK` | ✅ **PASS** |
+| **IP-SM-GW Bounded Retry** | Fail 2G→5G delivery (UE unregistered) | `deliver_attempts` climbs to 5 and stops; no pike 429 flood | ✅ **PASS** |
+
 
 ---
 
