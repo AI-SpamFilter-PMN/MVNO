@@ -51,10 +51,14 @@ Manual equivalents:
 
 | Distro | Command |
 |--------|---------|
-| Ubuntu/Debian | `apt install podman docker-compose-v2 sqlite3 lksctp-tools` |
-| Fedora/RHEL | `dnf install podman podman-compose sqlite3 lksctp-tools` |
-| Arch/CachyOS | `pacman -S podman docker-compose sqlite3 lksctp-tools` |
+| Ubuntu/Debian | `apt install podman docker-compose-v2 sqlite3 lksctp-tools espeak-ng ffmpeg` |
+| Fedora/RHEL | `dnf install podman podman-compose sqlite3 lksctp-tools espeak-ng ffmpeg` |
+| Arch/CachyOS | `pacman -S podman docker-compose sqlite3 lksctp-tools espeak-ng ffmpeg` |
 | **All** | `sudo modprobe sctp` (verify: `lsmod \| grep sctp`) |
+
+> `espeak-ng` + `ffmpeg` are used by `demo_runbook.sh` check 9b to synthesize the
+> demo scam-call speech ("You have won a prize, call us now") into a 16 kHz WAV for
+> the Vosk → AI blocked-verdict path. `deploy.sh` installs them automatically.
 
 > **Note**: SCTP kernel module is mandatory for 5G NGAP (gNB ↔ AMF). Without it, gNB never connects.
 > **Image source**: the 8 custom images (`mvno-*`) are **public on Docker Hub**

@@ -76,7 +76,7 @@ if [ "$INSTALL" -eq 1 ]; then
   else
     ok "container runtime: $RT"
   fi
-  for tool in sqlite3 curl; do
+  for tool in sqlite3 curl espeak-ng ffmpeg; do
     if command -v "$tool" >/dev/null 2>&1; then ok "$tool present"
     else
       echo "» installing $tool"

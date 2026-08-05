@@ -70,6 +70,10 @@ X-API-Key: mvno-demo-key-2026
 AI classifier. Payload shape is **event-typed** — SMS, VOICE_CALL, and TRANSCRIPT carry different
 fields (verified against `AiFilterService.java`).
 
+**Transport**: `POST` with header `Content-Type: application/json`. The inline demo mock is
+header-tolerant (for `curl -d` convenience), but a production classifier MUST require the
+header and reject other types with `415 Unsupported Media Type`.
+
 **SMS event** (`event_type: "SMS"`):
 ```json
 {
@@ -181,6 +185,13 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   credentials (`username: MSISDN`, realm `localhost`, password `testpass`). Applies to REGISTER and
   INVITE alike.
 - **RTP Media Relay:** RTPEngine ports `30000-30100/udp` (G.711u PCMU codec supported).
+- **Codec:** configure the client for **PCMU (G.711u, payload type 0) only** — the relay does not
+  transcode; PCMA/opus negotiations fail media.
+- **Blocked calls:** zero-balance / EIR-fraud / AI-blocked calls are rejected with
+  `SIP/2.0 403 Forbidden` — treat 403 as a terminal call failure (no retry loop).
+- **Firewall:** open UDP `30000-30100` (RTP relay range) and UDP `5066` (SIP) between client host
+  and MVNO host; the client's own RTP socket must be reachable (see `fix_nated_contact()` in
+  `configs/kamailio/kamailio.cfg`).
 
 ### sms-client (`src/main/resources/application.properties`) — ✅ verified
 - `smpp.host=127.0.0.1`, `smpp.port=2775`, `smpp.systemId=smsclient`, `smpp.password=password`
@@ -188,10 +199,12 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 - `ai.classify.url=http://localhost:5000/classify` — ⚠ **mismatch confirmed in
   source**: matches **no** MVNO endpoint (MVNO mock is `ai-filter:8000/api/v1/classify`;
   `AI-Filteration-System` is `:8000/api/filter-sms`).
-  → **Recommendation to the consuming client:** point `ai.classify.url` at the agreed classifier, OR
-  rely on MVNO's post-submit SMSC interception instead of client-side classification (the two
-  are redundant architectures — MVNO enforces allow/block AFTER SMPP submission via the gateway).
-- `server.port=8080` ⚠ overlaps `telecom-api`'s `8080` if co-hosted — run on a different host/port.
+  → **Exact replacement value** (co-hosted on `mvno_net`): `http://mvno-ai-filter:8000/api/v1/classify`
+  (from a non-containerized host: `http://localhost:8008/api/v1/classify`). This is **optional
+  redundancy** — MVNO enforces allow/block AFTER SMPP submission via the gateway, so client-side
+  classification is not required for the demo.
+- `server.port=8080` ⚠ overlaps `telecom-api`'s `8080` if co-hosted — run on a different host/port
+  (e.g. `server.port=8081`).
 - `sms.blockSpam=false` default: spam is NOT blocked client-side; MVNO policy gateway still enforces.
 - **SMPP credentials:** SMSC System-ID `MVNO_SMSC`; primary ESME account `mvno-api-route` /
   password `changeme`; secondary client ESME account `smsclient` / password `password`.
@@ -211,6 +224,17 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   - Must classify within the 5s read window (target ≤ 500ms per the SLA contract).
   - Package as container image `mvno-ai-filter:1.0.0`; attach to `mvno_net` in `docker-compose.yml`.
   - Verify with `make test-sms` and `make test-call`.
+- **Deterministic fallback layer (REQUIRED for the demo and the gates):**
+  - The e2e Goal-7 AI-block cell asserts the `E2E-BLOCK` marker → `allow:false` and the demo's
+    post-call scam-block story asserts phishing-keyword blocking on `TRANSCRIPT` events
+    (word-boundary, lowercase: `won`, `prize`, `claim`, `free`, `urgent`, `account`, `blocked`,
+    `confirm` — tuned to Vosk small-model ASR output, e.g. "You have won a prize, call us now" →
+    Vosk hears `you have won an prize called us out`).
+  - The replacement MUST keep an equivalent deterministic rule layer (marker + keyword list) OR
+    prove the model blocks those exact inputs — otherwise `e2e_runbook.sh` and `demo_runbook.sh`
+    check 9 break and the demo's blocked-call story is unverifiable.
+- **TRANSCRIPT events are post-call analytics only**: verdicts never retro-block an in-flight call;
+    they increment `mvno_vosk_blocked_total` and appear in the mvno-api log.
 
 ---
 
@@ -242,23 +266,31 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 | Artifact | Why |
 |---|---|
 | `docs/INTEGRATION_CONTRACT.md` (this file) | §3 payload schemas (3 event types), §4 SLA/fail-open |
-| `docker-compose.yml` service `ai-filter` (lines ~543) | reference mock implementation to replace |
+| `docker-compose.yml` service `ai-filter` (lines ~543) | reference mock implementation to replace (incl. deterministic keyword/E2E-BLOCK fallback layer) |
 | `telecom-api/.../filter/AiFilterService.java` | exact outbound call semantics (`AI_FILTER_URL`, timeouts, circuit breaker) |
 | `telecom-api/src/test/java/.../AiFilterSlaTimeoutTest.java` | SLA behavior the model must satisfy |
 | `scripts/testing/e2e_runbook.sh` Goal 7 cell | the AI-block assertion the model must keep green |
 
+**Prove your integration with**: `make test-sms` + `make test-call`; `./scripts/testing/e2e_runbook.sh` (Goal 7 AI-block cell must stay green — requires your container to keep the deterministic `E2E-BLOCK`/keyword rules); `./scripts/testing/demo_runbook.sh` check 9b (scam speech → `allow:false` + `mvno_vosk_blocked_total` increment).
+
 ### SipClient (voice user agent)
 | Artifact | Why |
 |---|---|
-| `docs/INTEGRATION_CONTRACT.md` §1, §5 (SipClient), §6 | ports, digest auth, RTP range, `MVNO_PUBLISH_5060` |
+| `docs/INTEGRATION_CONTRACT.md` §1, §5 (SipClient), §6 | ports, digest auth, PCMU-only codec, 403 semantics, RTP range, `MVNO_PUBLISH_5060` |
 | `docs/ENVIRONMENT_MATRIX.md` §3 | why host `5060` is blocked (Asterisk) |
 | `configs/kamailio/kamailio.cfg` `route[INTERCEPT]` | call-intercept callout behavior |
-| `docs/MANUAL_TESTING_GUIDE.md` voice flows | end-to-end call + RTP + recording verification steps |
+| `docs/MANUAL_TESTING_GUIDE.md` voice flows | end-to-end call + RTP + recording verification steps (Flow E, T6/T7/T8) |
+| `scripts/testing/sip_traffic_sim.py` | reference UA — your client must reproduce its REGISTER/407→digest→INVITE→RTP behavior |
+
+**Prove your integration with**: `./scripts/testing/demo_runbook.sh` check 5 (replace the sim caller with your client: REGISTER 200 OK, call answered, `rtpengine_bytes_total` moves) and check 6 (your client must surface the 403 Forbidden from a zero-balance call). Also Flow E T6/T7 for the full media dialog.
 
 ### sms-client (SMPP ESME)
 | Artifact | Why |
 |---|---|
-| `docs/INTEGRATION_CONTRACT.md` §1, §5 (sms-client) | SMPP `2775`, `MVNO_SMSC`, ESME accounts, intercept REST |
+| `docs/INTEGRATION_CONTRACT.md` §1, §5 (sms-client) | SMPP `2775`, `MVNO_SMSC`, ESME accounts, `ai.classify.url` replacement value, intercept REST |
 | `configs/osmocom/osmo-smsc.cfg` | the `esme smsclient` / `esme mvno-api-route` routes |
 | `docs/MANUAL_TESTING_GUIDE.md` SMS flows | 2G/5G + IP-SM-GW delivery verification |
 | `scripts/testing/e2e_runbook.sh` | 5-cell SMS matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) |
+| `scripts/testing/send_smpp_sms.py` | reference ESME — your client must reproduce BIND_TRANSCEIVER + SUBMIT_SM against `127.0.0.1:2775` |
+
+**Prove your integration with**: `./scripts/testing/demo_runbook.sh` check 10 (binary BIND_TRANSCEIVER) + check 10b (SUBMIT_SM ESME_ROK) — replace the harness with your client; `./scripts/testing/e2e_runbook.sh` (all 5 cells, incl. the AI-block 403 path).

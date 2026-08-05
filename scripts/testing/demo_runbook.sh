@@ -85,6 +85,20 @@ echo -e "${YELLOW}[4/13] 💳 Querying Subscriber Balance (E.164 MSISDN: 1555123
 curl -s -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -m json.tool
 echo -e "${GREEN}✓ Subscriber Balance retrieved: 100 credits${NC}\n"
 
+# ------------------------------------------------------------------------------
+# [4b/13] GATEWAY ZERO-TRUST AUTH (missing X-API-Key -> HTTP 401 Unauthorized)
+# ------------------------------------------------------------------------------
+# Technical Verification: Calls the same subscriber endpoint WITHOUT the API key.
+# Protocol / Component: HTTP REST / ApiKeyInterceptor.java (X-API-Key zero-trust).
+# Validation Criteria: Response HTTP status MUST be 401 and body MUST be empty.
+# ==============================================================================
+CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/v1/intercept/subscriber/15551234567)
+if [ "$CODE" != "401" ]; then
+    echo "[-] Error: expected HTTP 401 without X-API-Key, got ${CODE}" >&2
+    exit 1
+fi
+echo -e "${GREEN}✓ Zero-trust enforced: no X-API-Key -> HTTP ${CODE}${NC}\n"
+
 # ==============================================================================
 # [5/13] AUTHORIZED IMS VOIP CALL INTERCEPTION FLOW (2G / IMS DIRECT PATH)
 # ==============================================================================
@@ -122,6 +136,32 @@ done
 [ "$AFTER" -gt "${BEFORE:-0}" ] || { echo "[-] Error: rtpengine_bytes_total did not move (media not relayed)" >&2; exit 1; }
 echo -e "${GREEN}✓ 2G/IMS path: full RTP media dialog relayed through RTPEngine (+$((AFTER-BEFORE)) bytes)${NC}\n"
 podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
+
+# ------------------------------------------------------------------------------
+# [5c/13] CALL RECORDING PIPELINE (RTPEngine pcap -> WAV -> Vosk transcript)
+# ------------------------------------------------------------------------------
+# Technical Verification: Extracts the recorded call pcap with pcap_to_wav.py and
+# asserts the Vosk spool watcher archives a transcript .txt for it.
+# Protocol / Component: RTPEngine pcap recording (recording-method=pcap) /
+# pcap_to_wav.py (G.711u decode, 8 kHz) / NativeVoskService.java spool watcher.
+# Validation Criteria: WAV extracted with audio; transcript archived <= 25s.
+# ==============================================================================
+echo -e "${YELLOW}[5c/13] 🎙️ Verifying Call Recording Pipeline (pcap -> WAV -> Vosk ASR)...${NC}"
+NEWEST_PCAP=$(ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1 || true)
+[ -n "$NEWEST_PCAP" ] || { echo "[-] Error: no recorded pcap found" >&2; exit 1; }
+WAV_OUT=$(python3 "${SCRIPT_DIR}/pcap_to_wav.py" "$NEWEST_PCAP" 2>&1) || true
+echo "$WAV_OUT" | grep -q "WAV extracted" || { echo "[-] Error: pcap->WAV extraction failed: ${WAV_OUT}" >&2; exit 1; }
+PCAP_WAV="${NEWEST_PCAP%.pcap}.wav"
+cp "$PCAP_WAV" state/spool/
+WAV_STEM=$(basename "$PCAP_WAV" .wav)
+TXT_PATH=""
+for i in $(seq 1 10); do
+    sleep 2.5
+    TXT_PATH=$(ls state/spool/archived/"${WAV_STEM}".txt 2>/dev/null | head -1 || true)
+    [ -n "$TXT_PATH" ] && break
+done
+[ -n "$TXT_PATH" ] || { echo "[-] Error: Vosk did not archive a transcript within 25s" >&2; exit 1; }
+echo -e "${GREEN}✓ Recording pipeline proven: transcript archived at ${TXT_PATH}${NC}\n"
 
 # ==============================================================================
 # [5b/13] 5G SA USER-PLANE SIP CALL TRAVERSAL (GTP-U TUNNEL)
@@ -321,6 +361,37 @@ else:
 "
 echo -e "${GREEN}✓ Native Vosk Java 21 ASR Speech-to-Text Pipeline Proven${NC}\n"
 
+# ------------------------------------------------------------------------------
+# [9b/13] POST-CALL SCAM VERDICT (speech WAV -> Vosk -> TRANSCRIPT -> BLOCKED)
+# ------------------------------------------------------------------------------
+# Technical Verification: Synthesizes the demo scam phrase with espeak-ng,
+# upsamples to 16 kHz mono, drops it in the spool, and asserts the post-call
+# AI verdict blocks it (mvno_vosk_blocked_total increments in VictoriaMetrics).
+# Protocol / Component: espeak-ng TTS / NativeVoskService.java ASR spool watcher /
+# AiFilterService.classifyTranscript -> ai-filter mock keyword rule.
+# Validation Criteria: mvno_vosk_blocked_total increases by >= 1 within 60s.
+# ==============================================================================
+echo -e "${YELLOW}[9b/13] 🚨 Simulating Scam Call -> AI Blocked Verdict (speech -> Vosk -> TRANSCRIPT -> blocked)...${NC}"
+command -v espeak-ng >/dev/null 2>&1 || { echo "[-] Error: espeak-ng missing — install via ./scripts/deploy.sh" >&2; exit 1; }
+command -v ffmpeg >/dev/null 2>&1 || { echo "[-] Error: ffmpeg missing — install via ./scripts/deploy.sh" >&2; exit 1; }
+vm_counter() {
+    curl -s 'http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total' \
+        | grep -o '"value":\[[0-9]*,"[0-9]*"\]' | grep -o ',"[0-9]*"' | tr -d ',"'
+}
+BLOCKED_BEFORE=$(vm_counter)
+BLOCKED_BEFORE=${BLOCKED_BEFORE:-0}
+espeak-ng -v en-us "You have won a prize, call us now" -w /tmp/opencode/demo_scam.wav >/dev/null 2>&1
+ffmpeg -y -loglevel error -i /tmp/opencode/demo_scam.wav -ar 16000 -ac 1 /tmp/opencode/demo_scam_16k.wav
+cp /tmp/opencode/demo_scam_16k.wav "state/spool/demo-scam-$(date +%s).wav"
+BLOCKED_AFTER=$BLOCKED_BEFORE
+for i in $(seq 1 12); do
+    sleep 5
+    BLOCKED_AFTER=$(vm_counter)
+    [ -n "$BLOCKED_AFTER" ] && [ "$BLOCKED_AFTER" -gt "$BLOCKED_BEFORE" ] && break
+done
+[ "$BLOCKED_AFTER" -gt "$BLOCKED_BEFORE" ] || { echo "[-] Error: mvno_vosk_blocked_total did not increment (blocked verdict missing)" >&2; exit 1; }
+echo -e "${GREEN}✓ Scam call blocked: mvno_vosk_blocked_total ${BLOCKED_BEFORE} -> ${BLOCKED_AFTER}${NC}\n"
+
 # ==============================================================================
 # [10/13] BINARY SMPP 3.4 BIND_TRANSCEIVER PDU (OSMOCOM SMSC PORT 2775)
 # ==============================================================================
@@ -342,8 +413,34 @@ resp = s.recv(1024)
 s.close()
 cmd_id, status = struct.unpack('>II', resp[4:12])
 print(f'  SMPP PDU Response: CMD=0x{cmd_id:08X}, Status=0x{status:08X} (ESME_ROK / SUCCESS)')
+if status != 0:
+    print('[-] Error: SMPP bind did not return ESME_ROK', file=sys.stderr)
+    sys.exit(1)
 "
 echo -e "${GREEN}✓ SMPP 3.4 ESME Transceiver Bound Successfully${NC}\n"
+
+# ------------------------------------------------------------------------------
+# [10b/13] SMPP 3.4 SUBMIT_SM DELIVERY (full ESME -> SMSC submit round-trip)
+# ------------------------------------------------------------------------------
+# Technical Verification: Submits an SMS via the same SMPP 3.4 channel and
+# asserts the SMSC accepts it (ESME_ROK). Uses send_smpp_sms.py harness.
+# Validation Criteria: BIND_TRANSCEIVER OK + SUBMIT_SM status 0x00000000.
+# ==============================================================================
+echo -e "${YELLOW}[10b/13] 📨 Submitting SMS via SMPP 3.4 SUBMIT_SM (Port 2775)...${NC}"
+SUBMIT_OUT=$(python3 "${SCRIPT_DIR}/send_smpp_sms.py" 2>&1) || true
+echo "$SUBMIT_OUT" | grep -q "BIND_TRANSCEIVER Successful" || { echo "[-] Error: SMPP rebind failed" >&2; exit 1; }
+echo "$SUBMIT_OUT" | grep -q "SUBMIT_SM Delivered" || { echo "[-] Error: SUBMIT_SM was not delivered" >&2; exit 1; }
+echo "$SUBMIT_OUT" | grep -q "Status=0x00000000" || { echo "[-] Error: SUBMIT_SM not accepted (ESME_ROK expected)" >&2; exit 1; }
+echo -e "${GREEN}✓ SMPP SUBMIT_SM accepted by OsmoSMSC (ESME_ROK)${NC}"
+python3 - <<'EOF'
+import sqlite3
+c = sqlite3.connect("state/hlr/smsc.db")
+n = c.execute("DELETE FROM SMS WHERE src_addr='15551234567' AND dest_addr='15557654321' AND sent IS NULL").rowcount
+c.commit()
+if n:
+    print(f"  (drained {n} pending demo SMS row(s) from smsc.db so the bridge does not retry them during a subsequent e2e run)")
+EOF
+echo ""
 
 # ==============================================================================
 # [11/13] VICTORIAMETRICS TSDB PROMQL TELEMETRY INGESTION

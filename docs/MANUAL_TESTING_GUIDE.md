@@ -704,9 +704,14 @@ A filtered verdict also increments `mvno_vosk_blocked_total`.
 **Goal**: run the 13-check graduation demo as a single self-verifying gate — the same
 script used to certify the project demo (13/13 passed, two consecutive runs
 2026-08-03). It covers far more than the e2e gate: health probes, 5G UE registration,
-Vector log aggregation, balance query, authorized VoIP call, **zero-balance call
-block (407 → 403)**, **EIR SIM-swap fraud block**, 5G SMS interception, Vosk ASR,
-SMPP PDU, VictoriaMetrics PromQL, Grafana NOC, and overall readiness.
+Vector log aggregation, balance query, zero-trust auth (401 without `X-API-Key`,
+check 4b), authorized VoIP call with **full RTP media relayed through RTPEngine**
+(check 5, `rtpengine_bytes_total` delta) + the **recording pipeline** (check 5c:
+pcap → WAV → Vosk transcript), 5G user-plane SIP, zero-balance call block
+(407 → 403), EIR SIM-swap fraud block, 5G SMS interception, Vosk ASR, **post-call
+scam verdict** (check 9b: speech → Vosk → TRANSCRIPT → `mvno_vosk_blocked_total`
+increment), SMPP PDU bind + **SUBMIT_SM** (checks 10/10b), VictoriaMetrics PromQL,
+Grafana NOC, and overall readiness.
 
 ```bash
 ./scripts/testing/demo_runbook.sh
