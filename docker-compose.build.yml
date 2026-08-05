@@ -33,3 +33,16 @@ services:
       context: ./configs/ueransim
       dockerfile: Dockerfile
     image: mvno-ueransim:3.2.6
+
+  2g-core:
+    build:
+      context: ./configs/2g
+      dockerfile: Dockerfile.core
+    image: mvno-2g-core:1.0.0
+
+  2g-ms:
+    build:
+      context: ./configs/2g
+      dockerfile: Dockerfile.ms
+    image: mvno-2g-ms:1.0.0
+

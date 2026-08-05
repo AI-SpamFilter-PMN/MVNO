@@ -565,7 +565,7 @@ find . -type d | sort
 │   ├── grafana/                    # Grafana dashboards
 │   └── hlr/                        # OsmoHLR SQLite database
 └── docs/
-    ├── API_CONTRACT.md             # Public AI Spam Filter REST API contract (Shared)
+    ├── INTEGRATION_CONTRACT.md     # Single contracts doc: interfaces + API schemas (Shared)
     ├── architecture_flow.svg       # Architecture flow diagram (Shared)
     ├── deployment_guide.md         # Deployment runbook & badges (Shared)
     ├── implementation_guide.md     # Single Master Implementation Guide (Private local-only)

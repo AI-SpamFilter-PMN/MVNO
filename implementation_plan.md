@@ -106,8 +106,9 @@ Goal 1 (portability) ── ✅ done; Goal 2 (scripts) ── ✅ done; Goal 3 (
   unused — stdlib only); `make test` all suites pass.
 
 ## Goal 3 — Integration-Only ✅ COMPLETE (`5774214`)
-- `docs/INTEGRATION_CONTRACT.md`: interfaces MVNO exposes (SIP 5066, SMPP 2775, REST
-  `/api/v1/intercept/*` with `X-API-Key: mvno-demo-key-2026`, AI mock `:8000/api/v1/classify`);
+- `docs/INTEGRATION_CONTRACT.md`: single contracts doc — interfaces MVNO exposes (SIP 5066, SMPP 2775, REST
+  `/api/v1/intercept/*` with `X-API-Key: mvno-demo-key-2026`, `/api/v1/classify` with SMS/VOICE_CALL/TRANSCRIPT
+  event types, AI mock `:8000/api/v1/classify`);
   per-repo notes (SipClient 5060→5066 rec, sms-client `ai.classify.url=:5000` mismatch rec,
   `server.port=8080` overlap, AI-FS optional). §3 = optional env-gated `MVNO_PUBLISH_5060`
   (default-off; blocked here — Asterisk owns 5060) + §4 stability guarantee.

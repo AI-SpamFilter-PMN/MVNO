@@ -126,40 +126,24 @@ make test                # runs test-vty + test-api + test-sms + test-call
 
 **Internal DNS:** `http://ai-filter:8000/api/v1/classify` (host port 8008)
 
-**SMS Input:**
-```json
-{
-  "event_type": "SMS",
-  "sender_msisdn": "15551234567",
-  "recipient_msisdn": "15557654321",
-  "content_text": "Hello world",
-  "timestamp_epoch_ms": 1699999999999
-}
-```
+The full request/response schemas live in **`docs/INTEGRATION_CONTRACT.md` §3** — one contract with
+three event types: `SMS`, `VOICE_CALL`, and `TRANSCRIPT` (post-call ASR output). The response is
+always `{ "allow": boolean, "reason": "string" }`.
 
-**Voice Input:**
-```json
-{
-  "event_type": "VOICE_CALL",
-  "caller_msisdn": "15551234567",
-  "callee_msisdn": "15557654321",
-  "call_id": "call-123",
-  "timestamp_epoch_ms": 1699999999999
-}
-```
-
-**Output:**
-```json
-{ "allow": true, "reason": "Clean content" }
-```
-
-**SLA:** 5s read timeout → fail-open (`allow: true`). Circuit breaker: 3 consecutive failures → 30s fast fail-open (~0.1ms).
+**SLA:** 5s read timeout → fail-open (`allow: true`). Circuit breaker: 3 consecutive failures → 30s
+fast fail-open (~0.1ms). Full SLA/fail-open/env-variable spec: `docs/INTEGRATION_CONTRACT.md` §4.
 
 **Current mock:** `ai-filter` returns `allow:false` (reason `"Spam (E2E deterministic block)"`) when
-the payload contains the `E2E-BLOCK` marker, else `allow:true` (`"Clean content"`). Drop-in
-replace the container with the real `AI-Filteration-System` model for live spam detection.
+the payload contains the `E2E-BLOCK` marker, else `allow:true` (`"Clean content"`) — the marker
+works for all three event types. Drop-in replace the container with the real
+`AI-Filteration-System` model for live spam detection (drop-in criteria:
+`docs/INTEGRATION_CONTRACT.md` §5).
 
-**Full schema:** `docs/API_CONTRACT.md`
+**Voice post-call leg (supervisor flow):** recorded calls are transcribed in-process by Vosk ASR;
+the transcript is then POSTed to the AI filter as a `TRANSCRIPT` event
+(`AiFilterService.classifyTranscript`) and the verdict is logged + exported as
+`mvno_vosk_classified_total` / `mvno_vosk_blocked_total`. Fail-open: a transcript verdict failure
+never stalls the spool loop.
 
 ---
 
@@ -255,7 +239,7 @@ replace the container with the real `AI-Filteration-System` model for live spam 
 | File | Why |
 |------|-----|
 | `docs/deployment_guide.md` | Full ops runbook, configs, Issue 8.x log |
-| `docs/API_CONTRACT.md` | Formal JSON schema for AI filter |
+| `docs/INTEGRATION_CONTRACT.md` | Single contract: interfaces + API payload schemas (SMS/VOICE_CALL/TRANSCRIPT) + SLA + per-repo integration + partner handoff |
 | `docs/ISSUES.md` | 8.x issue log with root causes/fixes |
 | `docs/architecture_flow.svg` | System diagram |
 | `docs/implementation_guide.md` | Deep dive architecture and configuration guide |
@@ -291,43 +275,19 @@ replace the container with the real `AI-Filteration-System` model for live spam 
 
 Authoritative per-repository parameters & verified source findings live in **`docs/INTEGRATION_CONTRACT.md`** —
 that is the single source of truth for repository-side values and required changes (e.g. SipClient's
-`SERVER_PORT` 5060→5066, sms-client's `ai.classify.url` mismatch). The subsections below summarize the
-AI-Filteration-System contract; SipClient/sms-client maintainers should read the contract file.
+`SERVER_PORT` 5060→5066, sms-client's `ai.classify.url` mismatch), and for the **`/api/v1/classify`
+payload schemas (SMS / VOICE_CALL / TRANSCRIPT)**, X-API-Key auth, SLA/fail-open rules, and the
+partner handoff file list (contract §8). The subsections below summarize it; maintainers of all
+three repositories should read the contract file.
 
 If you are on the **AI Model Team** developing in the [AI-Filteration-System](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) repository:
 
 ### Interface Contract
 Your container model service **MUST** expose an HTTP REST classification endpoint at:
-`POST /api/v1/classify` (Listening on `0.0.0.0:8000` inside container network `mvno_net`).
-
-### Contract Payload Schema
-* **SMS Classification Request (sent by `telecom-api`)**:
-  ```json
-  {
-    "event_type": "SMS",
-    "sender_msisdn": "15551234567",
-    "recipient_msisdn": "15557654321",
-    "content_text": "Urgent: Claim your free prize now at http://spam.link",
-    "timestamp_epoch_ms": 1721590000000
-  }
-  ```
-* **Voice Call Classification Request (sent by `telecom-api`)**:
-  ```json
-  {
-    "event_type": "VOICE_CALL",
-    "caller_msisdn": "15551234567",
-    "callee_msisdn": "15557654321",
-    "call_id": "call-123",
-    "timestamp_epoch_ms": 1721590000000
-  }
-  ```
-* **Required JSON Response (expected by `telecom-api`)**:
-  ```json
-  {
-    "allow": false,
-    "reason": "Phishing URL detected"
-  }
-  ```
+`POST /api/v1/classify` (Listening on `0.0.0.0:8000` inside container network `mvno_net`), accepting
+**all three event types** — `SMS`, `VOICE_CALL`, and `TRANSCRIPT` (post-call ASR output) — and
+returning `{ "allow": boolean, "reason": "string" }`. Full JSON schemas:
+`docs/INTEGRATION_CONTRACT.md` §3.
 
 ### Integration Parameters
 * **SMS Client (`sms-client`)**:

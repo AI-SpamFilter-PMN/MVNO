@@ -248,7 +248,9 @@ for build_target in \
     "mvno-open5gs:$OPEN5GS_DIR/Dockerfile:$OPEN5GS_DIR" \
     "mvno-ueransim:$PROJECT_DIR/configs/ueransim/Dockerfile:$PROJECT_DIR" \
     "mvno-open5gs-webui:$OPEN5GS_DIR/webui/Dockerfile:$OPEN5GS_DIR/webui" \
-    "mvno-kamailio:$PROJECT_DIR/configs/kamailio/Dockerfile:$PROJECT_DIR"; do
+    "mvno-kamailio:$PROJECT_DIR/configs/kamailio/Dockerfile:$PROJECT_DIR" \
+    "mvno-2g-core:$PROJECT_DIR/configs/2g/Dockerfile.core:$PROJECT_DIR/configs/2g" \
+    "mvno-2g-ms:$PROJECT_DIR/configs/2g/Dockerfile.ms:$PROJECT_DIR/configs/2g"; do
     IFS=':' read -r tag dockerfile ctx <<< "$build_target"
     label="build:${tag}"
     try_log_quiet "$label" "$DOCKER_CMD build -t '${tag}:latest' -f '$dockerfile' '$ctx'"
@@ -256,7 +258,7 @@ done
 
 # ─── Step 7: Save all images as tarballs ────────────────
 # Tag compose-built images with stable names
-for svc in osmo-smsc telecom-api; do
+for svc in osmo-smsc telecom-api 2g-core 2g-ms; do
     tag="mvno-${svc}"
     existing=$($DOCKER_CMD images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E "^${tag}:|^mvno_${svc}:" | head -1)
     if [ -n "$existing" ]; then
@@ -280,6 +282,8 @@ declare -A SAVE_IMAGES=(
     ["timberio-vector-0.44.0-alpine"]="timberio/vector:0.44.0-alpine"
     ["mvno-osmo-smsc-1.0.0"]="mvno-osmo-smsc:1.0.0"
     ["mvno-telecom-api-1.0.0"]="mvno-telecom-api:1.0.0"
+    ["mvno-2g-core-1.0.0"]="mvno-2g-core:1.0.0"
+    ["mvno-2g-ms-1.0.0"]="mvno-2g-ms:1.0.0"
     ["maven-3.9-eclipse-temurin-21"]="maven:3.9-eclipse-temurin-21"
     ["mvno-open5gs-2.8.0"]="mvno-open5gs:2.8.0"
     ["mvno-open5gs-webui-2.8.0"]="mvno-open5gs-webui:2.8.0"
