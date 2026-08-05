@@ -287,7 +287,45 @@ Your container model service **MUST** expose an HTTP REST classification endpoin
 `POST /api/v1/classify` (Listening on `0.0.0.0:8000` inside container network `mvno_net`), accepting
 **all three event types** — `SMS`, `VOICE_CALL`, and `TRANSCRIPT` (post-call ASR output) — and
 returning `{ "allow": boolean, "reason": "string" }`. Full JSON schemas:
-`docs/INTEGRATION_CONTRACT.md` §3.
+`docs/INTEGRATION_CONTRACT.md` §3 (authoritative copy).
+
+### Contract Payload Schema
+* **SMS Classification Request (sent by `telecom-api`)**:
+  ```json
+  {
+    "event_type": "SMS",
+    "sender_msisdn": "15551234567",
+    "recipient_msisdn": "15559876543",
+    "content_text": "Urgent: Claim your free prize now at http://spam.link",
+    "timestamp_epoch_ms": 1721590000000
+  }
+  ```
+* **Voice Call Classification Request (sent by `telecom-api`)**:
+  ```json
+  {
+    "event_type": "VOICE_CALL",
+    "caller_msisdn": "15551234567",
+    "callee_msisdn": "15557654321",
+    "call_id": "call-123",
+    "timestamp_epoch_ms": 1721590000000
+  }
+  ```
+* **Transcript Classification Request (sent by `NativeVoskService` post-call)**:
+  ```json
+  {
+    "event_type": "TRANSCRIPT",
+    "call_id": "call-1785097956%40127.0.0.1-464274ce81646346",
+    "transcript": "Hello, this is your bank. Please confirm your pin number.",
+    "timestamp_epoch_ms": 1721590000000
+  }
+  ```
+* **Required JSON Response (expected by `telecom-api`, all three event types)**:
+  ```json
+  {
+    "allow": false,
+    "reason": "Phishing URL detected"
+  }
+  ```
 
 ### Integration Parameters
 * **SMS Client (`sms-client`)**:

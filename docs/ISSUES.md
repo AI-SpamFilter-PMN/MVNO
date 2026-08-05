@@ -205,6 +205,27 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 
 ---
 
+### Issue 5.8: 5G User-Plane SIP Path Goes Silent After Long Uptime — Stale gNB GTP-U Downlink (ogstun RX=0)
+* **Symptom**: `demo_runbook.sh` check 5b fails on a multi-day-old stack: the UE's SIP REGISTER to `10.89.0.23:5060` via `uesimtun0` times out even though the UE tunnel exists (`10.45.0.x/32`) and AMF still reports `ran_ue = 3`. Uplink is dead end-to-end: UPF `ogstun` RX stays `0` and the POSTROUTING `MASQUERADE 10.45.0.0/16 !ogstun` rule shows `0 packets` — no UE byte ever reaches the user plane.
+* **Root Cause**: The 5G core + UERANSIM containers had been running ~3 days (`StartedAt 08-03 22:32`); an external signal (compose/restart cycle at 08-05 11:34:43) interrupted the SMF/AMF event loops — both `amf.log` and `smf.log` end with `[core] ERROR: epoll failed (4:Interrupted system call)` at the same millisecond — while the processes survived. SMF/UPF PDU-session state and the **gNB's downlink F-TEID/GTP-U mappings went stale**: after restarting the UEs (fresh registration + new PDU sessions), uplink recovers (ogstun RX moves, MASQUERADE matches) and the UPF transmits SIP replies (ogstun TX increments) but they never reach the UE — the gNB still routes the downlink tunnel to the dead session.
+* **Fix**: Restart the gNB first (rebuilds NGAP + all GTP tunnels), then the UEs:
+  ```bash
+  podman restart mvno-ueransim-gnb && sleep 8
+  podman restart mvno-ueransim-ue-1 mvno-ueransim-ue-2 mvno-ueransim-ue-3
+  # wait ~45 s, confirm re-registration: query=ran_ue -> 3
+  ```
+* **Verification**:
+  ```bash
+  # raw SIP probe from inside the UE — must return a 401/200, not timeout:
+  podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py \
+    --host 10.89.0.23 --port 5060 --callee 15559998888 --caller 15551234567
+  # -> 'Registration failed: timed out' BEFORE; 'REGISTER 200 OK' after the fix.
+  ./scripts/testing/demo_runbook.sh   # check 5b: 'ogstun TX +2769 bytes'; full gate 13/13 (exit 0)
+  ```
+* **2026-08-05 regression re-certification**: full `demo_runbook.sh` gate passed **13/13 (exit 0)** after the gNB+UE restart, including the 5G user-plane SIP traversal (5b), 407→digest→403 zero-balance block (6), EIR SIM-swap (7), 5G SMS interception (8), Vosk ASR + spool archive (9), SMPP bind (10), PromQL (11/13) and Grafana NOC (12).
+
+---
+
 ## 6. Control-Plane & Telemetry Pipeline Operational RCA
 
 ### Issue 6.1: SQLite WAL Directory Mount Permission (`SQLITE_READONLY_DIRECTORY`)
@@ -430,6 +451,9 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 | **IP-SM-GW Leg 2 (5G→2G)** | `ims_terminal.py` 5G→2G | Bridge log: `[RELAY]` → `[SMPP] SUBMIT_SM OK` | ✅ **PASS** |
 | **IP-SM-GW Bounded Retry** | Fail 2G→5G delivery (UE unregistered) | `deliver_attempts` climbs to 5 and stops; no pike 429 flood | ✅ **PASS** |
 | **IMS Voice Call (media plane, Issue 8.27)** | `sip_traffic_sim.py --uas … --rtp 5` + `--rtp 6` caller | `407 → 100 → 180 → 200 OK`, ACK/BYE answered, bidirectional RTP through rtpengine, `rtpengine_packets_total > 0`, recorded pcap, `pcap_to_wav.py` → Vosk `.txt` in spool/archived | ✅ **PASS** (Aug 3 2026) |
+| **Post-call Transcript → AI Verdict (supervisor flow leg)** | espeak-ng real speech → 16 kHz WAV → spool → Vosk ASR → `TRANSCRIPT` classify | Vosk `{"text": "this is my first call from your man come out that suspicious transactions"}` → log `AI transcript verdict [...]: allow=true, reason='Clean content'`; `mvno_vosk_classified_total` = 1; mock TRANSCRIPT `E2E-BLOCK` → `allow:false "Spam (E2E deterministic block)"`, clean → `allow:true` | ✅ **PASS** (Aug 5 2026) |
+| **Demo Gate Re-Certification (Issue 5.8)** | `./scripts/testing/demo_runbook.sh` after gNB + UE restart | **13/13 passed, exit 0** — incl. 5G user-plane SIP (ogstun TX +2769 B), 407→digest→403, EIR block, 5G SMS, Vosk ASR, SMPP bind, PromQL, Grafana NOC | ✅ **PASS** (Aug 5 2026) |
+| **E2E SMS Matrix (AI-block)** | `./scripts/testing/e2e_runbook.sh` | **ALL CELLS PASS (7 ok)** — 2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block (E2E-BLOCK → 403, `mvno_sms_blocked_total` 0→1) | ✅ **PASS** (Aug 5 2026) |
 
 
 ---
