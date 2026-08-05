@@ -51,6 +51,6 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 ```bash
 ./scripts/preflight.sh        # verify host (must be ✓ ALL CLEAR or ! WARN)
 make init-db                  # SQLite subscriber DBs
-make up                       # 27 containers, offline-first
+make up                       # 31 containers, offline-first
 bash scripts/testing/demo_runbook.sh   # 13-step end-to-end gate
 ```

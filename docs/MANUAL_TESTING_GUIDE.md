@@ -419,8 +419,8 @@ podman rm -f ims-uas58 ims-caller59
 **Goal**: observe live RTPEngine counters feeding VictoriaMetrics.
 
 ```bash
-# Direct metric (if RTPEngine exposes a metrics endpoint; else via Grafana)
-curl -s http://localhost:9464/metrics | grep -i rtpengine | head
+# Direct metric (RTPEngine exposes its own metrics on 9900; also scraped into VictoriaMetrics)
+curl -s http://localhost:9900/metrics | grep -i rtpengine | head
 ```
 
 **Expected (Grafana)**: the **RTP ENGINE DEEP DIVE** row shows `rtpengine_sessions_total`
@@ -442,11 +442,13 @@ cumulative and would sit permanently red).
 **Goal**: run the **native Vosk ASR engine** end-to-end on an audio sample stored in
 the spool, then read its transcription.
 
-Make sure the Vosk ASR container/service is up and a model exists:
+Vosk ASR runs **in-process inside `mvno-api`** (no separate Vosk container) — make
+sure the API is up and the model exists:
 
 ```bash
-podman compose ps | grep -i vosk
+podman compose ps | grep mvno-api
 ls vendor/vosk/vosk-model-small-en-us-0.15/   # mounted model (ro)
+podman logs mvno-api --since 2m | grep -i "vosk" | head   # ASR engine live lines
 ```
 
 Place a 16 kHz mono WAV in the spool and let the ASR watcher transcribe it:
@@ -526,8 +528,8 @@ curl -s 'http://localhost:8428/api/v1/label/__name__/values' | grep -E 'mvno_|rt
 # 2) A key business metric still incrementing?
 curl -s 'http://localhost:8428/api/v1/query?query=mvno_sms_requests_total' | head -c 400
 
-# 3) Grafana up + dashboards present?
-curl -s -u admin:admin http://localhost:3000/api/search?query=mvno | python3 -m json.tool | head -40
+# 3) Grafana up + dashboards present? (quote the URL — `?` is a zsh glob)
+curl -s -u admin:admin 'http://localhost:3000/api/search?query=mvno' | python3 -m json.tool | head -40
 ```
 
 **Expected**:
@@ -678,7 +680,7 @@ After ASR, `NativeVoskService` routes the transcript to the AI filter as a
 
 ```bash
 podman logs mvno-api 2>&1 | grep "AI transcript verdict" | tail -3
-curl -s 'http://localhost:8429/api/v1/query' --data-urlencode \
+curl -s 'http://localhost:8428/api/v1/query' --data-urlencode \
   'query=mvno_vosk_classified_total' | head -c 400
 ```
 

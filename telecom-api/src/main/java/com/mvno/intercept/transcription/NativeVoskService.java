@@ -135,6 +135,32 @@ public class NativeVoskService {
     }
 
     /**
+     * Routes a transcribed recording to the AI filter and records the verdict counters.
+     * Post-call analytics only — a failure is logged and never stalls the spool loop.
+     *
+     * @param fileName Spool WAV filename (recording identifier = stem, no SIP Call-ID).
+     * @param text     Vosk ASR transcript text; blank transcripts are skipped.
+     */
+    void classifyAndRecord(final String fileName, final String text) {
+        if (text.isBlank()) {
+            logger.warn("Skipping AI classification for [{}]: empty transcript", fileName);
+            return;
+        }
+        try {
+            final String recordingId = fileName.replaceAll("(?i)\\.wav$", "");
+            final InterceptResponse verdict = aiFilterService.classifyTranscript(recordingId, text);
+            classified.increment();
+            if (!verdict.allow()) {
+                blocked.increment();
+            }
+            logger.info("AI transcript verdict [{}]: allow={}, reason='{}'",
+                    recordingId, verdict.allow(), verdict.reason());
+        } catch (final Exception e) {
+            logger.error("AI transcript classification error [{}]: {}", fileName, e.getMessage());
+        }
+    }
+
+    /**
      * Periodically polls media spool directory on Virtual Threads every 3000ms to process new audio captures.
      */
     @Scheduled(fixedDelay = 3000)
@@ -178,22 +204,7 @@ public class NativeVoskService {
                         // Route transcript to the AI filter for post-call scam/spam verdict.
                         // rtpengine spool names carry no SIP Call-ID (call-<epoch>%<host>-<hash>.wav),
                         // so the filename stem is used as the recording identifier.
-                        if (!text.isBlank()) {
-                            try {
-                                final String recordingId = file.getName().replaceAll("(?i)\\.wav$", "");
-                                final InterceptResponse verdict = aiFilterService.classifyTranscript(recordingId, text);
-                                classified.increment();
-                                if (!verdict.allow()) {
-                                    blocked.increment();
-                                }
-                                logger.info("AI transcript verdict [{}]: allow={}, reason='{}'",
-                                        recordingId, verdict.allow(), verdict.reason());
-                            } catch (final Exception e) {
-                                logger.error("AI transcript classification error [{}]: {}", file.getName(), e.getMessage());
-                            }
-                        } else {
-                            logger.warn("Skipping AI classification for [{}]: empty transcript", file.getName());
-                        }
+                        classifyAndRecord(file.getName(), text);
                         
                         // Move processed audio file to 'archived' directory
                         Files.move(path, archiveDir.resolve(path.getFileName()), StandardCopyOption.REPLACE_EXISTING);

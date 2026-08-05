@@ -550,6 +550,7 @@ services:
       - -c
       - |
         from http.server import HTTPServer, BaseHTTPRequestHandler
+        import json
         class H(BaseHTTPRequestHandler):
             def do_POST(self):
                 if self.headers.get('Transfer-Encoding', '').lower() == 'chunked':
@@ -571,7 +572,29 @@ services:
                 if 'E2E-BLOCK' in text:
                     resp = b'{"allow":false,"reason":"Spam (E2E deterministic block)"}'
                 else:
-                    resp = b'{"allow":true,"reason":"Clean content"}'
+                    # Deterministic demo rules. The E2E-BLOCK marker above is authoritative
+                    # for ALL event types (certified by the e2e gate AI-block cell). In
+                    # addition, post-call TRANSCRIPT events are blocked on scam keywords
+                    # so a real scam call recording (Vosk ASR -> mock) is blocked end-to-end
+                    # and mvno_vosk_blocked_total increments. SMS/VOICE_CALL are unaffected.
+                    # Words are matched on word boundaries and verified to survive Vosk
+                    # small-model ASR (e.g. "You have won a prize, call us now" -> Vosk:
+                    # "you have won an prize called us out"). Demo scam script:
+                    #   "You have won a prize, call us now"
+                    allow = True
+                    reason = "Clean content"
+                    try:
+                        import re
+                        payload = json.loads(text)
+                        if payload.get("event_type") == "TRANSCRIPT":
+                            t = (payload.get("transcript") or "").lower()
+                            words = ["won", "prize", "claim", "free", "urgent", "account", "blocked", "confirm"]
+                            if any(re.search(r"\b" + w + r"\b", t) for w in words):
+                                allow = False
+                                reason = "Spam (phishing phrase detected)"
+                    except Exception:
+                        pass
+                    resp = json.dumps({"allow": allow, "reason": reason}).encode()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
