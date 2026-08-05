@@ -35,6 +35,7 @@ rebuild: clean init-db
 # Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
 	@mkdir -p state/mongodb state/spool/archived state/hlr state/kamailio state/vm-data state/grafana state/logs/kamailio state/logs/osmocom
+	@rm -f state/kamailio/kamailio.db-shm state/kamailio/kamailio.db-wal 2>/dev/null || true
 	@sqlite3 state/kamailio/kamailio.db \
 		"CREATE TABLE IF NOT EXISTS version (id INTEGER PRIMARY KEY, table_name TEXT UNIQUE, table_version INTEGER);" \
 		"INSERT OR IGNORE INTO version VALUES (1, 'version', 1), (2, 'location', 9), (3, 'subscriber', 7);" \

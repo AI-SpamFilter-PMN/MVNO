@@ -36,12 +36,14 @@ detect_runtime
 export PODMAN_USER_UID=$(id -u)
 
 CUSTOM_IMAGES=(
-  mvno-kamailio
-  mvno-open5gs
-  mvno-open5gs-webui
-  mvno-ueransim
-  mvno-osmo-smsc
-  mvno-telecom-api
+  mvno-kamailio:5.7.2
+  mvno-open5gs:2.8.0
+  mvno-open5gs-webui:2.8.0
+  mvno-ueransim:3.2.6
+  mvno-osmo-smsc:1.0.0
+  mvno-telecom-api:1.0.0
+  mvno-2g-core:1.0.0
+  mvno-2g-ms:1.0.0
   # mvno-vosk-worker — removed: ASR runs in-process via NativeVoskService.java
 )
 

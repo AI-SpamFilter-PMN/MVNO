@@ -40,6 +40,15 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
 
 ## 3. Prerequisites (Per OS)
 
+The **recommended** on-ramp is the single-command deployer (auto-installs missing
+packages, loads SCTP, pulls images from Docker Hub, init-db, up, self-heals):
+
+```bash
+./scripts/deploy.sh            # full bring-up; try --check first (read-only)
+```
+
+Manual equivalents:
+
 | Distro | Command |
 |--------|---------|
 | Ubuntu/Debian | `apt install podman docker-compose-v2 sqlite3 lksctp-tools` |
@@ -48,18 +57,30 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
 | **All** | `sudo modprobe sctp` (verify: `lsmod \| grep sctp`) |
 
 > **Note**: SCTP kernel module is mandatory for 5G NGAP (gNB ↔ AMF). Without it, gNB never connects.
-> **Air-Gapped / Offline Setup**: Run `./scripts/bootstrap.sh` once with internet access to vendor all container images, Vosk speech models, and pip wheels into `vendor/`. Run `./scripts/load-offline.sh` to load offline image tarballs into Podman.
+> **Image source**: the 8 custom images (`mvno-*`) are **public on Docker Hub**
+> (`docker.io/5attab007/mvno-*`) — `./scripts/pull-images.sh` pulls + retags them.
+> Vendor images pull from their own public namespaces. `deploy.sh` does this for you;
+> use `./scripts/bootstrap.sh` + `./scripts/load-offline.sh` only for air-gapped setups.
 
 ---
 
 ## 4. Quickstart (Copy-Paste Ready)
 
+**One command (recommended):**
+
 ```bash
 git clone https://github.com/AI-SpamFilter-PMN/MVNO.git
 cd MVNO
-make init-db   # creates SQLite WAL DBs + seeds test subscribers
-make up        # offline-first launch (27 containers)
-make test      # runs test-vty + test-api + test-sms + test-call
+./scripts/deploy.sh      # installs deps, pulls images from Docker Hub, init-db, up, self-heals
+```
+
+**Step-by-step (what deploy.sh wraps):**
+
+```bash
+./scripts/pull-images.sh # pull the 8 custom images from docker.io/5attab007/mvno-*
+make init-db             # creates SQLite WAL DBs + seeds test subscribers
+make up                  # offline-first launch (31 containers)
+make test                # runs test-vty + test-api + test-sms + test-call
 ```
 
 ---
@@ -68,7 +89,7 @@ make test      # runs test-vty + test-api + test-sms + test-call
 
 | Target | Purpose |
 |--------|---------|
-| `make up` | Start container stack (offline-first, uses pre-loaded images) |
+| `make up` | Start container stack (offline-first, uses pre-loaded images; 31 containers) |
 | `make down` | Stop container stack |
 | `make ps` | List active container services |
 | `make logs` | Stream live container logs across microservices |

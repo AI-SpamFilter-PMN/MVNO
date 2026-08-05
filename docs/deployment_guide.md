@@ -65,6 +65,9 @@ retag them in one step, then launch the stack offline:
 ./scripts/up.sh
 ```
 
+One-command path (≡ pull-images + init-db + up, with preflight and self-heal):
+`./scripts/deploy.sh` — see §2B.
+
 Vendor images (`mongo:7.0`, `grafana/grafana-oss:11.6.0`, `timberio/vector`,
 `victoriametrics/*`, `drachtio/rtpengine`, `percona/mongodb_exporter`, `python:3.11-alpine`)
 pull from their own public Docker Hub namespaces as usual.

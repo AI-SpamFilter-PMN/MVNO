@@ -1,5 +1,28 @@
 # Implementation Plan — Master Plan v7 (Goals 0–8; ALL DELIVERED ✅)
 
+## Post-8 Addendum — One-Command Team Bring-Up (2026-08-03) ✅
+
+**Deliverable**: `scripts/deploy.sh` — single entry point for a fresh teammate
+machine: runtime+OS package install (apt/dnf/pacman), `modprobe sctp`, image
+hydration via `pull-images.sh` (Docker Hub) or `load-offline.sh` (offline), `make init-db`,
+`up.sh`, API health wait with bounded self-heal (`compose up` retry + restart of
+exited containers). Verified green end-to-end (`RESULT: READY`, API `UP`, 31 services).
+
+**Two pre-existing bugs found & fixed during verification** (exactly what a teammate
+would have hit before this):
+1. `up.sh` `CUSTOM_IMAGES` used bare names → `podman image exists` resolved `:latest`
+   → false missing → forced `--build` (which failed on the missing prebuilt jar and a
+   `state/grafana/csv` build-context stat error). Changed to the tagged pins matching
+   `docker-compose.yml` and added the previously-skipped `mvno-2g-core` / `mvno-2g-ms`.
+2. `make init-db` failed with `readonly database` after kamailio had run (container
+   writes its WAL `-shm`/`-wal` as host-UID 101000); init-db now deletes the stale
+   WAL artifacts before opening the DB.
+
+**Companion**: the 8 custom `mvno-*` images are published public on Docker Hub
+(`5attab007/mvno-*`) with per-repo descriptions; `pull-images.sh` + deployment-guide /
+ONBOARDING one-liners point teammates there. README-level docs updated
+(ONBOARDING §3/§4/§5, deployment_guide §Method B).
+
 > **LIVE STATUS (final):** Goals 0–6 ✅, Goal 7 ✅, Goal 8 ✅ — all delivered & pushed to
 > `origin/main`. `e2e_runbook.sh` exits 0 with **all 5 cells green** (4-cell SMS
 > interworking matrix + AI-block), verified across two consecutive runs
