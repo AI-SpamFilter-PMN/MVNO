@@ -63,6 +63,17 @@ class AiFilterSlaTimeoutTest {
     }
 
     @Test
+    @DisplayName("Transcript Classification Timeout -> SLA Fail-Open Fallback")
+    void testTranscriptSlaTimeoutFallback() {
+        final InterceptResponse response = aiFilterService.classifyTranscript(
+                "call-1785097956%40127.0.0.1-464274ce81646346", "Claim your free prize now");
+
+        assertNotNull(response);
+        assertTrue(response.allow());
+        assertEquals("AI filter unreachable — SLA allow", response.reason());
+    }
+
+    @Test
     @DisplayName("Circuit Breaker Tripping After 3 Failures -> Fast Fail-Open")
     void testCircuitBreakerTripping() {
         final SMSInterceptRequest smsRequest = new SMSInterceptRequest("15551234567", "15557654321", "Test Content");

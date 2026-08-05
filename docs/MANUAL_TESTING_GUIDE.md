@@ -670,6 +670,24 @@ speech**, expect the words: the same pipeline transcribed
 > `ffmpeg -i state/spool/call-*.wav -ar 16000 state/spool/call-16k.wav`
 > (or `sox ... rate 16000`).
 
+### Terminal T6d — post-call AI transcript verdict
+
+After ASR, `NativeVoskService` routes the transcript to the AI filter as a
+`TRANSCRIPT` event (`/api/v1/classify`) and records the verdict. Verify in the
+`mvno-api` logs and metrics:
+
+```bash
+podman logs mvno-api 2>&1 | grep "AI transcript verdict" | tail -3
+curl -s 'http://localhost:8429/api/v1/query' --data-urlencode \
+  'query=mvno_vosk_classified_total' | head -c 400
+```
+
+**Expected**: a log line per recording like
+`AI transcript verdict [call-1785097956%40127.0.0.1-<hash>]: allow=true, reason='Clean content'`
+(and `allow=false` / `"Spam (E2E deterministic block)"` when the recording is an
+`E2E-BLOCK`-bearing spam call), plus a non-zero `mvno_vosk_classified_total`.
+A filtered verdict also increments `mvno_vosk_blocked_total`.
+
 ---
 
 ## Flow N — Automated Demo Gate (demo_runbook.sh)

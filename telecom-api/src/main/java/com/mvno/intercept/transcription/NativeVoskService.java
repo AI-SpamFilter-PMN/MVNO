@@ -1,5 +1,7 @@
 package com.mvno.intercept.transcription;
 
+import com.mvno.intercept.filter.AiFilterService;
+import com.mvno.intercept.subscriber.InterceptResponse;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -44,20 +46,27 @@ public class NativeVoskService {
     private static final Logger logger = LoggerFactory.getLogger(NativeVoskService.class);
     private final String spoolDir;
     private final String modelPath;
+    private final AiFilterService aiFilterService;
     private final Counter transcriptions;
     private final Counter decodeErrors;
+    private final Counter classified;
+    private final Counter blocked;
     private final AtomicInteger modelReady = new AtomicInteger(0);
     private Model voskModel;
 
     public NativeVoskService(
             @Value("${vosk.spool-dir:/var/spool/rtpengine}") final String spoolDir,
             @Value("${vosk.model-path:/opt/vosk-model-small-en-us-0.15}") final String modelPath,
+            final AiFilterService aiFilterService,
             final MeterRegistry meterRegistry) {
         this.spoolDir = spoolDir;
         this.modelPath = modelPath;
+        this.aiFilterService = aiFilterService;
         // Micrometer telemetry counters and gauge for Vosk ASR health monitoring
         this.transcriptions = meterRegistry.counter("mvno.vosk.transcriptions");
         this.decodeErrors = meterRegistry.counter("mvno.vosk.decode.errors");
+        this.classified = meterRegistry.counter("mvno.vosk.classified");
+        this.blocked = meterRegistry.counter("mvno.vosk.blocked");
         meterRegistry.gauge("mvno.vosk.model.ready", modelReady);
         initModel();
     }
@@ -157,13 +166,33 @@ public class NativeVoskService {
                         // Transcribe WAV audio to text
                         final String text = transcribeWav(file);
                         logger.info("Native Java 21 Vosk ASR Transcribed [{}]: {}", file.getName(), text);
-                        
+
                         // Save text transcription file (.txt) alongside archived WAV audio
                         try {
                             final String txtFileName = file.getName().replaceAll("(?i)\\.wav$", ".txt");
                             Files.writeString(archiveDir.resolve(txtFileName), text, StandardCharsets.UTF_8);
                         } catch (final Exception e) {
                             logger.error("Failed writing transcription txt file: {}", e.getMessage());
+                        }
+
+                        // Route transcript to the AI filter for post-call scam/spam verdict.
+                        // rtpengine spool names carry no SIP Call-ID (call-<epoch>%<host>-<hash>.wav),
+                        // so the filename stem is used as the recording identifier.
+                        if (!text.isBlank()) {
+                            try {
+                                final String recordingId = file.getName().replaceAll("(?i)\\.wav$", "");
+                                final InterceptResponse verdict = aiFilterService.classifyTranscript(recordingId, text);
+                                classified.increment();
+                                if (!verdict.allow()) {
+                                    blocked.increment();
+                                }
+                                logger.info("AI transcript verdict [{}]: allow={}, reason='{}'",
+                                        recordingId, verdict.allow(), verdict.reason());
+                            } catch (final Exception e) {
+                                logger.error("AI transcript classification error [{}]: {}", file.getName(), e.getMessage());
+                            }
+                        } else {
+                            logger.warn("Skipping AI classification for [{}]: empty transcript", file.getName());
                         }
                         
                         // Move processed audio file to 'archived' directory

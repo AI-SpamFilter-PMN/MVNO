@@ -159,6 +159,58 @@ public class AiFilterService {
     }
 
     /**
+     * Constructs a post-call Transcript classification payload and proxies it to the AI filter.
+     * Enforces SLA fail-open rules if the AI server is unreachable or the circuit is open.
+     * Non-blocking by design: a post-call verdict failure only logs and never stalls the media spool loop.
+     *
+     * @param callId    Recording identifier (rtpengine WAV filename stem, e.g. {@code call-1785097956%40127.0.0.1-<hash>}).
+     * @param transcript Vosk ASR transcribed speech text.
+     * @return InterceptResponse decision (allow: true/false).
+     */
+    public InterceptResponse classifyTranscript(final String callId, final String transcript) {
+        // Step 1: Fast-path check — if circuit breaker is OPEN, fail-open immediately (~0.1ms)
+        if (isCircuitOpen()) {
+            return failOpen("circuit_open", "AI filter circuit open — SLA allow");
+        }
+
+        try {
+            // Step 2: Build JSON classification request payload for post-call transcript
+            final Map<String, Object> body = Map.of(
+                "event_type", "TRANSCRIPT",
+                "call_id", callId,
+                "transcript", transcript,
+                "timestamp_epoch_ms", System.currentTimeMillis()
+            );
+
+            // Step 3: Execute POST request to external AI model microservice
+            final TranscriptionResult result = restClient.post()
+                    .uri(baseUrl)
+                    .body(body)
+                    .retrieve()
+                    .body(TranscriptionResult.class);
+
+            // Step 4: On successful response, reset consecutive failure counter to 0
+            if (result != null) {
+                consecutiveFailures.set(0);
+                return new InterceptResponse(result.allow(), result.reason());
+            }
+
+            // Fallback for null response body
+            return failOpen("empty_response", "AI filter returned empty response — SLA allow");
+
+        } catch (final RestClientException e) {
+            // Network / Timeout Exception: record failure & trigger SLA fail-open
+            recordFailure(e);
+            return failOpen("unreachable", "AI filter unreachable — SLA allow");
+
+        } catch (final Exception e) {
+            // Unexpected internal error: log & trigger SLA fail-open
+            logger.error("Unexpected error in Transcript AI classification: {}", e.getMessage(), e);
+            return failOpen("internal", "Gateway internal error — SLA allow");
+        }
+    }
+
+    /**
      * Carrier SLA Fallback: Increments Prometheus counter 'mvno.ai.failopen' and returns allow: true.
      */
     private InterceptResponse failOpen(final String reason, final String message) {

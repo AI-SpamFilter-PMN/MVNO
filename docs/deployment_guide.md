@@ -739,8 +739,14 @@ The ASR pipeline runs **entirely inside the Spring Boot JVM** via `NativeVoskSer
 2. **Native Java 21 Vosk ASR** (`NativeVoskService.java` inside `mvno-api`):
    - Uses a `@Scheduled(fixedDelay = 3000)` virtual-thread task that polls `/var/spool/rtpengine` every 3 seconds.
    - When a `.wav` file is ready, it is decoded in-memory using native JNI bindings (`com.alphacephei:vosk:0.3.45`) — zero Python, zero cloud.
-   - The transcript + biometrics are `POST`-ed to `POST /api/v1/transcriptions` (same JVM, loopback).
-   - The gateway then routes the result to the AI Spam Model REST API for allow/block decisions.
+   - The transcript text is then routed **in-process** to the AI Spam Model via `POST /api/v1/classify` with
+     `event_type: "TRANSCRIPT"` (see `AiFilterService.classifyTranscript`); the returned `{allow, reason}` verdict is
+     logged and exported as `mvno_vosk_classified_total` / `mvno_vosk_blocked_total`. Failures fail-open (post-call
+     analytics never stall the spool loop) and share the `mvno.ai.failopen` SLA counters.
+   - rtpengine spool files carry no SIP Call-ID in the filename (`call-<epoch>%<host>-<hash>.wav`); the filename
+     stem is used as the recording identifier (`call_id`) in the classify payload.
+   - `POST /api/v1/transcriptions` remains an inbound REST receiver for external post-call analytics payloads
+     (transcript + acoustic biometrics + DTMF) pushed by third-party clients; it does not feed the AI classifier.
    - **No separate `vosk-worker` container is needed** — this is handled entirely by `mvno-api`.
 
 ### Step 5: Observability Aggregation (vmagent ↔ VictoriaMetrics)
