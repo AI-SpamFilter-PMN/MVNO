@@ -88,14 +88,40 @@ echo -e "${GREEN}✓ Subscriber Balance retrieved: 100 credits${NC}\n"
 # ==============================================================================
 # [5/13] AUTHORIZED IMS VOIP CALL INTERCEPTION FLOW (2G / IMS DIRECT PATH)
 # ==============================================================================
-# Technical Verification: Executes sip_traffic_sim.py against host SIP port 5066.
+# Technical Verification: Runs sip_traffic_sim.py UAS + caller terminals (each
+# in its own mvno_net container) for a full REGISTER + 407 digest + INVITE +
+# bidirectional RTP media dialog anchored by RTPEngine.
 # Protocol / Component: RFC 3261 SIP / Kamailio Proxy & RTPEngine Media Relay.
-# Validation Criteria: Executes REGISTER + SIP 407 Digest Auth + INVITE dialog.
-# Verifies Kamailio anchors RTP media in RTPEngine and returns 100 Trying.
+# Validation Criteria: REGISTER 200 OK, call answered, caller relays RTP to the
+# RTPEngine anchor, and the rtpengine_bytes_total counter rises after the BYE
+# (session accounting flushes at session close).
 # ==============================================================================
-echo -e "${YELLOW}[5/13] 📞 Simulating Authorized IMS VoIP Call Interception Flow (SIP INVITE ➔ Kamailio)...${NC}"
-python3 "${SCRIPT_DIR}/sip_traffic_sim.py"
-echo -e "${GREEN}✓ 2G/IMS path: Real SIP INVITE processed by Kamailio (REST Intercept & RTPEngine Anchored)${NC}\n"
+echo -e "${YELLOW}[5/13] 📞 Simulating Authorized IMS VoIP Call Interception Flow (full RTP media dialog via RTPEngine)...${NC}"
+podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
+podman run -d --name ims-uas58 --network mvno_mvno_net --ip 10.89.0.58 \
+  -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
+  python3 -u /scripts/sip_traffic_sim.py --uas 15559998888 --rtp 5 \
+  --host 10.89.0.23 --port 5060 --bind-ip 10.89.0.58 --listen-port 5070 >/dev/null
+sleep 8
+BEFORE=$(curl -s http://localhost:9900/metrics | awk '/^rtpengine_bytes_total /{print $2}')
+OUT=$(podman run --rm --name ims-caller59 --network mvno_mvno_net --ip 10.89.0.59 \
+  -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
+  python3 -u /scripts/sip_traffic_sim.py --rtp 6 --caller 15551234567 \
+  --callee 15559998888 --host 10.89.0.23 --port 5060 \
+  --bind-ip 10.89.0.59 --listen-port 5090 2>&1) || true
+echo "$OUT" | grep -q "call answered" || { echo "[-] Error: media call was not answered" >&2; exit 1; }
+echo "$OUT" | grep -q "RTP media sent" || { echo "[-] Error: caller did not send RTP media" >&2; exit 1; }
+# rtpengine exports counters to :9900 on its own tick (session accounting flushes
+# asynchronously, observed 0-60 s after BYE) — poll until the byte counter moves.
+AFTER=$BEFORE
+for i in $(seq 1 12); do
+    sleep 5
+    AFTER=$(curl -s http://localhost:9900/metrics | awk '/^rtpengine_bytes_total /{print $2}')
+    [ -n "$AFTER" ] && [ "$AFTER" -gt "${BEFORE:-0}" ] && break
+done
+[ "$AFTER" -gt "${BEFORE:-0}" ] || { echo "[-] Error: rtpengine_bytes_total did not move (media not relayed)" >&2; exit 1; }
+echo -e "${GREEN}✓ 2G/IMS path: full RTP media dialog relayed through RTPEngine (+$((AFTER-BEFORE)) bytes)${NC}\n"
+podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
 
 # ==============================================================================
 # [5b/13] 5G SA USER-PLANE SIP CALL TRAVERSAL (GTP-U TUNNEL)

@@ -382,12 +382,19 @@ watch -n1 "curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_t
 ```
 
 **Expected**: both counters jump **while the call is up** and freeze after BYE.
-Reference figures from the certified 2026-08-03 run (`--rtp 6` caller / `--rtp 5` UAS):
+Reference figures from the certified 2026-08-05 run (`--rtp 6` caller / `--rtp 5` UAS):
 
 ```
-rtpengine_packets_total  0  -> 594   (both legs through the media proxy)
-rtpengine_bytes_total    0  -> 102168
+rtpengine_packets_total  0  -> 546   (298 caller + 248 UAS packets, both legs through the media proxy)
+rtpengine_bytes_total    0  -> 93912
+rtpengine_closed_sessions_total{reason="terminated"}  +1  (Kamailio rtpengine_delete on BYE)
 ```
+
+> **Counter reset caveat**: `rtpengine_*` counters reset whenever the rtpengine
+> container is (re)created (they are process-local, not persisted). Always measure
+> the **delta** across a call, never the absolute value. Accounting is flushed on
+> the exporter's own tick after session close (observed 0-60 s after BYE) — poll
+> the counter until it moves rather than reading once.
 
 Cross-checks (all expected to pass):
 
