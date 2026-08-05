@@ -171,7 +171,7 @@ replace the container with the real `AI-Filteration-System` model for live spam 
 | 2. EIR | IMEI→MSISDN binding >3 swaps/10min | `allow: false, "EIR: SIM swap detected"` |
 | 3. AI Filter | External model classification | `allow: false, "AI: spam detected"` |
 
-**End-to-end flow narrative (demo-day, matches supervisor):**
+**End-to-end flow narrative:**
 - **SMS:** The message is classified by the **AI filter first**; an allowed message then proceeds
   through the MVNO gateway and is **delivered to the MT** recipient (consumer → AI filter →
   MVNO/REST → MT).
@@ -283,16 +283,16 @@ replace the container with the real `AI-Filteration-System` model for live spam 
 
 ### Partner Repos & Roles (at a glance)
 
-| Teammate Repo | Role | Interface they consume | MVNO side | Status |
+| Repository | Role | Interface it consumes | MVNO side | Status |
 |---|---|---|---|---|
 | [`SipClient`](https://github.com/AI-SpamFilter-PMN/SipClient) | Voice UA | SIP `localhost:5066` (host → Kamailio `:5060`), 407 digest | Kamailio registrar/proxy | ✅ stable |
 | [`sms-client`](https://github.com/AI-SpamFilter-PMN/sms-client) | SMS ESME | SMPP 3.4 `osmo-smsc:2775`, ESME `smsclient` | OsmoSMSC (SMSC) | ✅ stable |
 | [`AI-Filteration-System`](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) | Classifier | `POST /api/v1/classify` | `telecom-api` (SLA 5s + circuit breaker) | mock-authoritative |
 
-Authoritative per-repo parameters & verified source findings live in **`docs/INTEGRATION_CONTRACT.md`** —
-that is the single source of truth for teammate-side values and required changes (e.g. SipClient's
+Authoritative per-repository parameters & verified source findings live in **`docs/INTEGRATION_CONTRACT.md`** —
+that is the single source of truth for repository-side values and required changes (e.g. SipClient's
 `SERVER_PORT` 5060→5066, sms-client's `ai.classify.url` mismatch). The subsections below summarize the
-AI-Filteration-System contract; SipClient/sms-client teammates should read the contract file.
+AI-Filteration-System contract; SipClient/sms-client maintainers should read the contract file.
 
 If you are on the **AI Model Team** developing in the [AI-Filteration-System](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) repository:
 
@@ -329,14 +329,14 @@ Your container model service **MUST** expose an HTTP REST classification endpoin
   }
   ```
 
-### Teammate Integration Parameters
-* **SMS Client Teammate (Ali — `sms-client`)**:
+### Integration Parameters
+* **SMS Client (`sms-client`)**:
   - SMPP 3.4 Host & Port: `osmo-smsc:2775` (inside `mvno_net`)
   - SMSC System-ID: `MVNO_SMSC`
   - Primary ESME Account: `mvno-api-route` / password `changeme`
   - Secondary Client ESME Account: `smsclient` / password `password`
   - REST Interception Endpoint: `POST http://telecom-api:8080/api/v1/intercept/sms` — **requires header `X-API-Key: mvno-demo-key-2026`** (missing/mismatched key → `401 Unauthorized`; demo key via env `X_API_KEY`)
-* **Voice Client Teammate (A7med3mar4 — `SipClient`)**:
+* **Voice Client (`SipClient`)**:
   - SIP Registrar & Proxy Target: `localhost:5066` on host (`5066:5060/udp`)
   - RTP Media Port Range: `30000-30100/udp` (G.711u PCMU)
   - SIP INVITE Authentication: `INVITE` is challenged with `407 Proxy Authentication Required` (digest, realm `localhost`) — retry with `Authorization: Digest` using your REGISTER credentials

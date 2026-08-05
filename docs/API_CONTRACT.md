@@ -91,20 +91,20 @@ Payload shape is **event-typed** — SMS and VOICE_CALL carry different fields (
 
 ---
 
-## 3. Teammate Cross-Repo Integration Specifications
+## 3. Cross-Repository Integration Specifications
 
-### 1. AI Team (`ai-filter` drop-in criteria)
+### 1. AI Classification Engine (`ai-filter` drop-in criteria)
 - Must replace mock `ai-filter` container in `docker-compose.yml` with classification engine listening on port `8000`.
 - Endpoint: `POST /api/v1/classify` taking request schema above and returning `{ "allow": boolean, "reason": "string" }`.
 
-### 2. SMS Client Teammate (Ali — `sms-client`)
+### 2. SMS Client (`sms-client`)
 - **SMPP Listener**: Connects to `OsmoSMSC` on TCP port `2775`.
 - **SMSC System-ID**: `MVNO_SMSC`
 - **Primary ESME Account**: `mvno-api-route` / password `changeme`
 - **Secondary Client ESME Account**: `smsclient` / password `password`
 - **REST Interception**: Calls `POST /api/v1/intercept/sms` on `telecom-api:8080`. Expects response `{ "allow": boolean, "reason": "string" }`.
 
-### 3. Voice Client Teammate (A7med3mar4 — `SipClient`)
+### 3. Voice Client (`SipClient`)
 - **SIP Registrar & Proxy**: Target host port `5066/udp` (`localhost:5066` on host, maps to `kamailio:5060` inside container network).
 - **SIP INVITE Authentication (407 Digest)**: Kamailio challenges unauthenticated `INVITE` with `407 Proxy Authentication Required` (zero-trust Section 1.1). Clients MUST handle the `Proxy-Authenticate: Digest` challenge and retry with an `Authorization: Digest` header using their subscriber-table credentials (`username: MSISDN`, realm `localhost`). Applies to REGISTER and INVITE alike.
 - **RTP Media Relay**: RTPEngine ports `30000-30100/udp` (G.711u PCMU codec supported).

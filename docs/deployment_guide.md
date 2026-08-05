@@ -79,7 +79,7 @@ pull from their own public Docker Hub namespaces as usual.
   (`podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`); keeps the
   base file free of `build:` stanzas.
 - `docker-compose.5060.yml` — host-dependent, **default-off** override that *also* publishes
-  Kamailio on host `5060` for SipClient teammates that hardcode 5060; blocked on the canonical host
+  Kamailio on host `5060` for SipClient instances that hardcode 5060; blocked on the canonical host
   (Asterisk owns 5060) — see `docs/ENVIRONMENT_MATRIX.md` §3.
 
 These are intentionally separate: merging them would force source builds on every machine and

@@ -2,7 +2,7 @@
 
 This document is the **authoritative portability contract** for running the MVNO core stack.
 It is the single source of truth for what OS / architecture / runtime / kernel features are
-required, and what will *not* work. Teammates and graders: read this before `make up`.
+required, and what will *not* work. External clients and reviewers: read this before `make up`.
 
 Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 
@@ -30,7 +30,7 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 
 - The MVNO Kamailio is host-mapped to **`5066:5060/udp`**. A host-level service (here: **Asterisk**, pid bound to `0.0.0.0:5060/udp`) owns `5060`.
 - Therefore the optional `MVNO_PUBLISH_5060` extra publish is **default-off and blocked on this host** — a rootless container cannot grab `5060` while Asterisk holds the wildcard bind.
-- **Teammate SIP clients must target `127.0.0.1:5066`** (the canonical MVNO Kamailio host port). See `docs/INTEGRATION_CONTRACT.md`.
+- **External SIP clients must target `127.0.0.1:5066`** (the canonical MVNO Kamailio host port). See `docs/INTEGRATION_CONTRACT.md`.
 
 ## 4. Vector log-shipper socket (runtime-agnostic)
 

@@ -469,7 +469,7 @@ This section defines the multi-agent integration boundaries across team reposito
 - **Secondary Client ESME Credentials**: `smsclient` / `password`
 - **REST Interception Gateway**: Calls `POST /api/v1/intercept/sms` on `telecom-api:8080` with header `X-API-Key: mvno-demo-key-2026` (zero-trust Section 1.2; missing/mismatched key → `401`).
 
-### 3. `SipClient` User Agent Interface (A7med3mar4 — `SipClient` Repo)
+### 3. `SipClient` User Agent Interface (`SipClient` Repo)
 - **Protocol**: SIP RFC 3261 over UDP.
 - **Target Host & Port**: `localhost:5066` on host (maps to `kamailio:5060/udp`).
 - **SIP REGISTER Authentication**: Digest authentication (`auth_check()`) using credentials seeded in `kamailio.db`.
