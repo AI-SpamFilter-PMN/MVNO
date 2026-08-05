@@ -72,6 +72,19 @@ Vendor images (`mongo:7.0`, `grafana/grafana-oss:11.6.0`, `timberio/vector`,
 `victoriametrics/*`, `drachtio/rtpengine`, `percona/mongodb_exporter`, `python:3.11-alpine`)
 pull from their own public Docker Hub namespaces as usual.
 
+**Compose file layout (why 3 files — do NOT merge them):** the stack uses standard Compose
+*override layering*, so each file has one distinct purpose:
+- `docker-compose.yml` — the canonical, offline-first base (32 services, statically pinned IPs).
+- `docker-compose.build.yml` — opt-in **source-build** override for online rebuilds
+  (`podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`); keeps the
+  base file free of `build:` stanzas.
+- `docker-compose.5060.yml` — host-dependent, **default-off** override that *also* publishes
+  Kamailio on host `5060` for SipClient teammates that hardcode 5060; blocked on the canonical host
+  (Asterisk owns 5060) — see `docs/ENVIRONMENT_MATRIX.md` §3.
+
+These are intentionally separate: merging them would force source builds on every machine and
+publish a privileged port by default. Leave all three in place.
+
 ### Kernel Prerequisites (5G NGAP Signaling)
 
 5G N2 interface signaling between UERANSIM gNB (`mvno-ueransim-gnb`) and Open5GS AMF (`mvno-amf`) over TCP/SCTP port 38412 requires the **SCTP kernel module** enabled on the host operating system:

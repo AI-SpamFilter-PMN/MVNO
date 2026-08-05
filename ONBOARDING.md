@@ -62,6 +62,21 @@ Manual equivalents:
 > Vendor images pull from their own public namespaces. `deploy.sh` does this for you;
 > use `./scripts/bootstrap.sh` + `./scripts/load-offline.sh` only for air-gapped setups.
 
+> **When are images re-published?** Only code that is **baked into an image** changes its Docker Hub
+> artifact. The `ip-sm-gw` bridge (`scripts/ip_sm_gw.py`) and the `ai-filter` mock run from a
+> **mounted volume / inline compose code** on stock `python:3.11-alpine` — their fixes never require
+> an image push. Rebuild + re-push the published images **only** when `telecom-api/` source, a
+> `configs/*/Dockerfile*`, or the 2G image Dockerfiles change.
+
+After such a change, from repo root:
+
+```bash
+make rebuild                              # offline local rebuild (init-db + up --build)
+podman push docker.io/5attab007/mvno-telecom-api:1.0.0   # push each changed image, e.g.:
+# repeat for the other changed images (mvno-kamailio, mvno-open5gs, …, as applicable)
+```
+
+
 ---
 
 ## 4. Quickstart (Copy-Paste Ready)
@@ -140,7 +155,9 @@ make test                # runs test-vty + test-api + test-sms + test-call
 
 **SLA:** 5s read timeout → fail-open (`allow: true`). Circuit breaker: 3 consecutive failures → 30s fast fail-open (~0.1ms).
 
-**Current mock:** `ai-filter` container returns `allow: true` always. Replace with your model.
+**Current mock:** `ai-filter` returns `allow:false` (reason `"Spam (E2E deterministic block)"`) when
+the payload contains the `E2E-BLOCK` marker, else `allow:true` (`"Clean content"`). Drop-in
+replace the container with the real `AI-Filteration-System` model for live spam detection.
 
 **Full schema:** `docs/API_CONTRACT.md`
 
@@ -153,6 +170,14 @@ make test                # runs test-vty + test-api + test-sms + test-call
 | 1. Prepaid OCS | SQLite balance ≤ 0 | `allow: false, "Prepaid balance exhausted"` |
 | 2. EIR | IMEI→MSISDN binding >3 swaps/10min | `allow: false, "EIR: SIM swap detected"` |
 | 3. AI Filter | External model classification | `allow: false, "AI: spam detected"` |
+
+**End-to-end flow narrative (demo-day, matches supervisor):**
+- **SMS:** The message is classified by the **AI filter first**; an allowed message then proceeds
+  through the MVNO gateway and is **delivered to the MT** recipient (consumer → AI filter →
+  MVNO/REST → MT).
+- **Voice:** The **real-time** gate is **metadata-only with fail-open** — if the AI filter is slow or
+  down, the call **passes** — and whether it was scam/spam is **determined post-call** from the
+  recording/transcript (see §6d / Vosk ASR).
 
 ---
 
@@ -198,7 +223,7 @@ make test                # runs test-vty + test-api + test-sms + test-call
 | Area | Limitation |
 |------|------------|
 | **Vosk ASR** | English-only small model (50MB). Post-call only. ~10-15% WER. No Arabic. |
-| **AI Filter Mock** | Returns `allow: true` always. Replace `ai-filter` container with your model. |
+| **AI Filter Mock** | Returns `allow:false` on the `E2E-BLOCK` marker (deterministic), else `allow:true`. Swap in the real `AI-Filteration-System` model for live spam detection. |
 | **SIP Testing** | `make test-call` uses HTTP POST; real SIP covered by `scripts/testing/sip_traffic_sim.py` (REGISTER + 407 digest challenge → INVITE handshake, used by runbook steps 5-6). No SIPp scenario included. |
 | **5G Radio Path** | 3 UERANSIM UEs registered on the AMF with a **verified UL+DL user-plane data path** (UE tun → N3 GTP-U → UPF ogstun). After any UERANSIM UE recreate, re-add the UE route (`ip route add 10.45.0.1 dev uesimtun0`) and recreate the trio atomically (see `docs/ISSUES.md` §7.4). **No SMS-over-NAS / VoNR over radio** — voice and SMS are external-path demos (SipClient / sms-client); SMS-over-NAS is on the roadmap. |
 | **SCTP Kernel** | `modprobe sctp` required on host. Fails silently if missing (gNB↔AMF never connects). |
@@ -255,6 +280,19 @@ make test                # runs test-vty + test-api + test-sms + test-call
 ---
 
 ## 14. Integration Guide: External Team (AI-SpamFilter-PMN ↔ MVNO Core)
+
+### Partner Repos & Roles (at a glance)
+
+| Teammate Repo | Role | Interface they consume | MVNO side | Status |
+|---|---|---|---|---|
+| [`SipClient`](https://github.com/AI-SpamFilter-PMN/SipClient) | Voice UA | SIP `localhost:5066` (host → Kamailio `:5060`), 407 digest | Kamailio registrar/proxy | ✅ stable |
+| [`sms-client`](https://github.com/AI-SpamFilter-PMN/sms-client) | SMS ESME | SMPP 3.4 `osmo-smsc:2775`, ESME `smsclient` | OsmoSMSC (SMSC) | ✅ stable |
+| [`AI-Filteration-System`](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) | Classifier | `POST /api/v1/classify` | `telecom-api` (SLA 5s + circuit breaker) | mock-authoritative |
+
+Authoritative per-repo parameters & verified source findings live in **`docs/INTEGRATION_CONTRACT.md`** —
+that is the single source of truth for teammate-side values and required changes (e.g. SipClient's
+`SERVER_PORT` 5060→5066, sms-client's `ai.classify.url` mismatch). The subsections below summarize the
+AI-Filteration-System contract; SipClient/sms-client teammates should read the contract file.
 
 If you are on the **AI Model Team** developing in the [AI-Filteration-System](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) repository:
 

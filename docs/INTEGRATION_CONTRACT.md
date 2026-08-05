@@ -8,6 +8,12 @@ teammate repos are treated as **read-only external consumers**.
 > Principle: MVNO exposes stable interfaces; teammates align their clients to them.
 > MVNO never edits teammate repos. Gaps are surfaced as *recommendations*, never as edits.
 
+**Flow ordering (matches the supervisor's framing):**
+- **SMS:** the message is classified by the AI filter **first**; an allowed message then proceeds
+  through the MVNO gateway and is delivered to the MT recipient (consumer → AI filter → MVNO → MT).
+- **Voice:** the **real-time** gate is **metadata-only with fail-open** — if the AI filter is slow or
+  down the call passes — and scam/spam is **determined post-call** from the recording/transcript.
+
 ---
 
 ## 1. Interfaces MVNO exposes
