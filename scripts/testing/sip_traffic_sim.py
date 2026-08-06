@@ -424,21 +424,34 @@ def send_sip_invite(caller, callee, password, host="127.0.0.1", port=5066):
     auth_header = (f'Digest username="{caller}", realm="localhost", nonce="{nonce}", '
                    f'uri="{uri}", response="{digest}"')
     s.sendto(build_invite(auth_header).encode(), (host, port))
-    try:
-        resp2, _ = s.recvfrom(4096)
+    deadline = time.time() + 8
+    final_line = "No Response"
+    while time.time() < deadline:
+        try:
+            s.settimeout(max(0.1, deadline - time.time()))
+            resp2, _ = s.recvfrom(4096)
+        except socket.timeout:
+            break
+        except Exception as e:
+            print(f"[-] SIP INVITE recv error: {e}")
+            s.close()
+            return False
         resp2_str = resp2.decode("utf-8", errors="ignore")
         first_line = resp2_str.split("\r\n")[0] if resp2_str else "No Response"
         print(f"[+] SIP INVITE Response for {caller}->{callee}: {first_line}")
-        s.close()
-        resp2_str_lower = resp2_str.lower()
-        if "200 ok" not in resp2_str_lower:
-            print(f"[-] INVITE not answered with 200 OK (got: {first_line})")
-            return False
-        return True
-    except Exception as e:
-        print(f"[-] SIP INVITE recv error: {e}")
-        s.close()
-        return False
+        code = first_line.split(" ")[1] if " " in first_line else "000"
+        final_line = first_line
+        if code.startswith(("2", "3", "4", "5", "6")):
+            resp2_str_lower = resp2_str.lower()
+            if "200 ok" not in resp2_str_lower:
+                print(f"[-] INVITE not answered with 200 OK (got: {first_line})")
+                s.close()
+                return False
+            s.close()
+            return True
+    print(f"[-] INVITE not answered with 200 OK (got: {final_line})")
+    s.close()
+    return False
 
 
 if __name__ == "__main__":

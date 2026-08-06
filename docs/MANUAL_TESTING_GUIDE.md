@@ -301,38 +301,42 @@ RTPEngine recorded every call — a new pcap file (~450 KB) appears in
 
 Raw extraction — **live-mic mode (tx = pulse)**: RTP media ports are **even**
 (RTCP = odd), and the pcap carries **two** media legs (caller↔callee through
-rtpengine). The port with **fewer** packets is your voice (spoken once); the
-busier one is the callee's looped speech file (runs the whole call):
+rtpengine). **Do not rely on packet counts to label legs** — in the certified
+2026-08-06 run the callee's canned file (2.34 s, 117 pkts) was the *shorter*
+leg while the caller's real speech ran the whole call (894 pkts). Label by
+**source IP**: tx = `10.89.0.61` (caller/your voice), rx = `10.89.0.60`
+(callee/canned phrase). Use `tshark -Y "udp.dstport%2==0" -e ip.src -e
+udp.dstport` and map the IPs first:
 
 ```bash
 # HOST (T-B)
 NEW=$(ls -t state/spool/pcaps/*.pcap | head -1)
-P_CALLER=$(tshark -r "$NEW" -Y "udp.dstport%2==0" -T fields -e udp.dstport \
-    | sort | uniq -c | sort -n | head -1 | awk '{print $2}')
-P_CALLEE=$(tshark -r "$NEW" -Y "udp.dstport%2==0" -T fields -e udp.dstport \
-    | sort | uniq -c | sort -n | sed -n '2p' | awk '{print $2}')
-# G.711 PCMU (pt 0) payloads per leg, raw u-law bytes -> 16 kHz mono WAVs in spool:
+tshark -r "$NEW" -Y "udp.dstport%2==0" -T fields -e ip.src -e udp.dstport \
+    | sort | uniq -c | sort -rn
+# pick ports by source IP (tx=caller, rx=callee), e.g. P_CALLER=30000 P_CALLEE=30086
+# G.711 PCMU (pt 0) payloads per leg — strip the 12-byte RTP header per packet
+# (tshark data.data includes it: 172 B/pkt = 12 hdr + 160 payload):
 for P in "$P_CALLER:live-caller" "$P_CALLEE:live-callee"; do
   DST=${P%%:*}; NAME=${P##*:}
-  tshark -r "$NEW" -d udp.port==$DST,rtp -Y "rtp.payload && rtp.p_type==0" \
-    -T fields -e rtp.payload | xxd -r -p > /tmp/$NAME.mulaw
+  tshark -r "$NEW" -Y "udp.dstport==$DST and data.data" -T fields -e data.data \
+    | tr -d '\n' | xxd -r -p > /tmp/live-$NAME.raw
+  python3 -c "
+import binascii,sys
+p=[binascii.unhexlify(l.strip()) for l in open('/tmp/live-$NAME.raw') if l.strip()]
+open('/tmp/$NAME.mulaw','wb').write(b''.join(b[12:] for b in p if len(b)>12))
+"
   ffmpeg -y -loglevel error -f mulaw -ar 8000 -ac 1 -i /tmp/$NAME.mulaw \
-    -ar 16000 -ac 1 state/spool/$NAME.wav
+    -ar 16000 -ac 1 -af loudnorm=I=-16:TP=-1.5:LRA=11 state/spool/$NAME.wav
 done
 ls -la /tmp/live-*.mulaw     # live-caller = YOUR voice; live-callee = speech phrase
 ```
 
-> If you spoke longer than the callee's looped speech, the packet-count labels
-> swap — play both with `aplay state/spool/live-*.wav` and rename by ear.
-> **Canned-mode only** (ausine fallback — no mic): the caller leg is a constant
-> sine tone, so the **shorter** leg is the speech file. For that mode keep the
-> classic single-leg extraction: `P=$(tshark -r "$NEW" -Y "udp.dstport%2==0" -T
-> fields -e udp.dstport | sort | uniq -c | sort -n | head -1 | awk '{print $2}')`,
-> then the payload→`state/spool/baresip-call.wav` pipeline shown in Flow M.
-
-> **tshark gotcha**: the payload-type field is **`rtp.p_type`** — `rtp.pt` is not a
-> valid filter field and silently yields nothing. The `-d` override must name the
-> **rtpengine-side destination port** (src-port overrides are a silent no-op).
+> **tshark gotcha**: `data.data` = the full UDP payload **including the 12-byte
+> RTP header** (172 B/pkt for PCMU) — you must strip 12 B/pkt before decoding
+> (the guide's older `rtp.payload` filter yields nothing without a working `-d`
+> override). `rtp.p_type==0` is the correct payload-type filter; `rtp.pt` is not
+> a valid field. Play both with `aplay state/spool/live-*.wav` and rename by
+> ear if in doubt.
 
 Then let the ASR watcher (~3 s poll) do its work and read the verdict:
 
@@ -357,12 +361,14 @@ URL breaks the request.)
 > even though the archived transcript files survive. Fresh demo runs always log
 > the verdict line — that is the line to show.
 
-**Expected** (live-mic mode, certified 2026-08-06 run): two archived transcripts —
-`live-callee.txt` ≈ `{"text": "you have won a prime target now"}` (small-model fuzz
-of the phrase — the keyword rule catches "won") and `live-caller.txt` ≈ your
-spoken words; two verdicts `AI transcript verdict [...]: allow=false,
-reason='Spam (phishing phrase detected)'` (speak the spam phrase for the caller
-verdict; the callee leg is the canned phrase). **Both** counters increment
+**Expected** (live-mic mode, certified 2026-08-06 re-run): two archived
+transcripts — `live-callee.txt` = `{"text": "you have won a prime target now"}`
+(canned phrase, small-model fuzz) and `live-caller.txt` = your **distinct**
+spoken words (re-run transcript: *"okay this is yet fucked up testing that dmv
+in oh spam filter was my own voice when back"* — real speech, **not** the
+canned phrase); two verdicts `AI transcript verdict [live-caller]: allow=true,
+reason='Clean content'` and `[baresip-call]: allow=false, reason='Spam
+(phishing phrase detected)'`. **Both** counters increment
 (`mvno_vosk_classified_total` and `mvno_vosk_blocked_total`). For a clean phrase,
 expect `allow=true, reason='Clean content'` and only
 `mvno_vosk_classified_total` moving.
@@ -1024,6 +1030,19 @@ panels with non-zero values; Grafana datasource `VictoriaMetrics`
 
 ## Flow K — AI Spam Block (deterministic E2E-BLOCK)
 
+> **Honesty note (2026-08-06)**: the "AI spam filter" in this stack is a
+> **deterministic mock classifier**, not a trained model. In
+> `docker-compose.yml` (service `mvno-ai-filter`, mock API on :8008) an inline
+> `python3 -c` endpoint returns `{"allow":false}` when the payload contains the
+> marker `E2E-BLOCK` (plus simple keyword rules like "won"/"prize" for
+> transcripts). `AiFilterService.java` (in `mvno-api`) proxies real traffic to
+> `http://ai-filter:8000/api/v1/classify` behind a circuit breaker that
+> **fails open** (allow on error). The real model repository
+> (`/home/zkhattab/AI-SpamFilter-PMN/AI-Filteration-System/`, standalone
+> FastAPI) is **not wired** into the compose stack — integration of that model
+> is a **roadmap item**. All certification evidence below proves the mock
+> classifier path end-to-end, nothing more.
+
 **Goal**: prove the SMS interception core **drops** a spam SMS end-to-end: the
 inline AI-filter mock (config-only rule in `docker-compose.yml`) returns
 `allow:false` whenever the classification payload contains the marker `E2E-BLOCK` —
@@ -1190,9 +1209,14 @@ echo "exit=$?"    # 0 = ALL 13 CHECKS PASS
   🎉 ALL 13 DEMO ITEMS PASSED — GRADUATION PROJECT DEMO READY!
 ```
 
-> The 5G-path check (`[5b]`) runs `sip_traffic_sim.py` inside `mvno-ueransim-ue-1`
-> over the real 5G user plane and asserts the UPF `ogstun` TX byte counter moves
-> (+2684 bytes) — proof SIP traversed GTP-U, not the test network.
+> The 5G-path check (`[5b]`) runs a full scripted SIP dialog inside
+> `mvno-ueransim-ue-1` over the real 5G user plane: a UAS registers
+> `15559998888` bound to the UE's 5G IP (`10.45.0.8:5070`) and answers INVITEs,
+> while a caller (`15551234567`) dials it with RTP media. It asserts (1) the UAS
+> REGISTER returns 200 OK, (2) the INVITE is **answered with a final
+> `SIP/2.0 200 OK`** (the simulator waits past the interim 100 trying), (3) RTP
+> media flows, and (4) the UPF `ogstun` TX byte counter moves (+7448 bytes in
+> the 2026-08-06 run) — proof the dialog traversed GTP-U, not the test network.
 
 ---
 
@@ -1225,10 +1249,15 @@ With the 5G recipient still unregistered, inject a 2G→5G row and watch T3:
 
 > **Precondition (Issue 8.37)**: the demo runbook leaves live SIP registrations for
 > `15559998888` behind in Kamailio's usrloc (ims-uas58 @10.89.0.58 + ue-1's
-> sip_traffic_sim callee @10.89.0.14). While any binding exists, Kamailio relays the
+> sip_traffic_sim callee @10.89.0.14, plus the 5b UAS @10.45.0.8 which persists
+> for its 3600 s expiry even after the UAS process is killed). While any binding
+> exists, Kamailio relays the
 > MESSAGE (200 OK) and the retry never triggers. Clear it first with a
 > digest-authenticated deregister (`Contact: *`, `Expires: 0`, `testpass`); confirm
-> with an authenticated MESSAGE returning `404 Not Found`.
+> with an authenticated MESSAGE returning `404 Not Found`. (Re-verified
+> 2026-08-06 17:30 UTC after the 5b rework: the first attempt was masked by the
+> demo 5b UAS binding — row delivered on poll 1; after deregister → 404, the
+> row hit `deliver_attempts=5` and went inert.)
 
 ```bash
 python3 scripts/testing/inject_smsc_row.py 15554443322 15559998888 "will retry then drop"
@@ -1400,13 +1429,13 @@ has ≥ 1 human-visible artifact; runbook evidence is in `docs/evidence/`:
 | E — SIP/IMS Voice Call (RTPEngine) | ✅ certified | demo_runbook item 5 (rtpengine_bytes_total delta) |
 | F — RTPEngine metrics | ✅ certified | `docs/evidence/flow-f-j-telemetry.txt` |
 | G — Vosk ASR (spool) | ✅ certified | demo_runbook items 5c/9 (transcript archived ≤25 s) |
-| H — Live-mic recording + transcription | ✅ certified | `docs/evidence/flow-h-live-mic.txt` (two-leg WAVs + verdicts) |
+| H — Live-mic recording + transcription | ✅ certified | `docs/evidence/live-mic-rerun-2026-08-06.txt` (distinct real voice ≠ canned phrase, two-leg WAVs, AI filter verdicts allow=true Clean / allow=false Spam, speaker-proof monitor capture) |
 | I — Interception Gateway REST API | ✅ certified | demo_runbook items 4/7/8 (balance 100, EIR, allow:false) |
 | J — Grafana NOC & VictoriaMetrics | ✅ certified | `count(up)` = 9/9; `docs/evidence/grafana-mvno-unified-noc.json` |
-| K — AI Spam Block (E2E-BLOCK) | ✅ certified | e2e_runbook Cell 5; demo_runbook item 7 |
+| K — AI Spam Block (E2E-BLOCK) | ✅ certified | e2e_runbook Cell 5; demo_runbook item 7 — **deterministic mock classifier** (AI model integration = roadmap item; see Flow K) |
 | L — Automated E2E Gate | ✅ certified | `docs/evidence/e2e-run-2026-08-06.log` (5 cells, 8 ok, exit 0) |
 | M — Call Recording → ASR | ✅ certified | demo_runbook item 5c (pcap → WAV → Vosk ≤25 s) |
-| N — Automated Demo Gate | ✅ certified | `docs/evidence/demo-run-2026-08-06.log` (13/13, exit 0) |
+| N — Automated Demo Gate | ✅ certified | `docs/evidence/demo-run-2026-08-06b.log` (13/13, exit 0) |
 | O — Failure-Path & Resilience | ✅ certified | O.1 sabotage → FAIL → recovery → PASS; `docs/evidence/o2-bounded-retry.txt` |
 
 Infrastructure fixes landed during the audit (see `docs/ISSUES.md`):
@@ -1419,9 +1448,22 @@ Infrastructure fixes landed during the audit (see `docs/ISSUES.md`):
   streams real parsed events (demo_runbook item 3 asserts on it).
 - **demo_runbook item 5c** now guards against empty RTPEngine recording frames
   (skip-and-retry, ≥1 KiB) — deterministic across consecutive runs.
+- **demo_runbook item 5b** no longer certifies on ogstun byte counters alone:
+  it now runs a full scripted UAS+caller dialog over the 5G user plane and
+  requires an answered `SIP/2.0 200 OK` plus RTP media (the old check passed on
+  `100 trying` only). Verified in `docs/evidence/demo-run-2026-08-06b.log`.
+- **Flow H evidence replaced**: the original `flow-h-live-mic.txt` claim was
+  invalid (both legs byte-identical to the canned file, md5
+  `6991f943…`); superseded by the 2026-08-06 live-mic re-run (distinct real
+  speech, transcripts differ, speaker-proof monitor capture).
 
 *End of manual testing guide. All flows verified against the running stack
 (2026-08-06; e2e_runbook.sh 5 cells/8 ok and demo_runbook.sh 13/13 certified
 green on consecutive runs; Section 0 from-zero demo fully verified with live-mic
 baresip voice, two-leg tshark→WAV→Vosk spam verdicts, raw SMPP/sqlite3/nc+digest
-SMS paths, and the E2E-BLOCK 403 path).*
+SMS paths, and the E2E-BLOCK 403 path). The live-mic flow H claim was re-run on
+2026-08-06 with a distinct real-voice phrase (`docs/evidence/live-mic-rerun-2026-08-06.txt`):
+the caller leg provably differs from the canned phrase (AI filter verdicts
+`allow=true, Clean content` vs `allow=false, Spam (phishing phrase detected)`),
+with a speaker-proof monitor capture; the AI filter itself is labeled honestly
+as a deterministic mock classifier (Flow K).*

@@ -1,5 +1,11 @@
 === Flow H — Live Microphone Recording + Transcription (evidence 2026-08-06 16:31 UTC) ===
 
+> **SUPERSEDED 2026-08-06 (see live-mic-rerun-2026-08-06.txt)**: audit showed the
+> caller leg below is byte-identical to the canned file (md5
+> 6991f9439b006472712bc4c6ccc9b869 for both legs) — i.e. this run's "live"
+> caller leg actually carried the canned speech, not the microphone. The
+> re-run replaces it with a provably distinct real-voice capture.
+
 Two-leg RTP extraction (live-mic call 2026-08-06, baresip-tx pulse.so / baresip-rx aufile):
   state/spool/archived/live-caller.wav (18,720 B mulaw src)
   state/spool/archived/live-callee.wav (120,160 B mulaw src)

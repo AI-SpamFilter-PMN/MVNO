@@ -342,3 +342,30 @@ from real assertions. Verification loops per phase (verify → fix → stop on p
   updated (7/7 → 5 cells/8 ok miscount fixed).
 - Verification assertion satisfied: every flow has a human-visible artifact; both
   runbooks exit 0 from real assertions.
+
+## RED-FLAG Follow-up (2026-08-06) — 100% REAL-LIFE PROOF
+
+- **RF1 (flow-h-live-mic invalid)**: verified md5 `live-caller.wav == baresip-call.wav`
+  = `6991f943…` (both the canned phrase) — the Phase-1 "live caller" leg was the
+  canned file. Superseded by a **live-mic re-run**: baresip-tx (pulse → physical
+  mic) dialed 15559998888, rx auto-answered (aufile canned), 18 s media; legs
+  labeled by source IP (tx 10.89.0.61 = caller voice, rx 10.89.0.60 = canned),
+  RTP header stripped per packet, loudnorm. Assertion PASS: live-caller.txt
+  (`"okay this is yet fucked up testing that dmv in oh spam filter was my own
+  voice when back"`) ≠ baresip-call.txt (`"you have won a prime target now"`);
+  AI filter verdicts allow=true Clean vs allow=false Spam (phishing). Speaker-proof:
+  played caller leg via physical sink, captured the sink monitor — Vosk ASR of the
+  monitor = the same real utterance. Evidence: docs/evidence/live-mic-rerun-2026-08-06.txt.
+- **RF2 (demo 5b silent green)**: old 5b passed on ogstun bytes alone while INVITE
+  only got `100 trying`; also `send_sip_invite` treated the first response as final.
+  Fixes: sip_traffic_sim.py waits for the final response; demo_runbook 5b now runs a
+  full UAS+caller dialog over the 5G user plane (UAS binds UE's 10.45.0.8:5070) and
+  asserts REGISTER 200 OK + INVITE answered 200 OK + RTP media + ogstun movement.
+  Fresh run: demo_runbook 13/13 exit 0 (docs/evidence/demo-run-2026-08-06b.log,
+  5b ogstun TX +7448 B). O.2 re-verified (first attempt masked by the 5b UAS's
+  usrloc entry — ISSUES 8.37 updated; after deregister → 404, bounded at 5).
+- **RF3 (mock classifier honesty, user Option 1)**: Flow K + certification table +
+  footer now label the AI spam filter as a **deterministic mock classifier** (compose
+  inline python3 :8008 E2E-BLOCK/keyword rules; AiFilterService fail-open proxy; real
+  AI-Filteration-System model = roadmap item, not wired).
+- Old flow-h-live-mic.txt marked SUPERSEDED (kept for provenance).

@@ -193,22 +193,34 @@ echo -e "${GREEN}✓ Recording pipeline proven: transcript archived at ${TXT_PAT
 # ==============================================================================
 # [5b/13] 5G SA USER-PLANE SIP CALL TRAVERSAL (GTP-U TUNNEL)
 # ==============================================================================
-# Technical Verification: Runs sip_traffic_sim.py inside ueransim-ue-1 over uesimtun0.
+# Technical Verification: Full scripted SIP dialog inside ueransim-ue-1 over
+# uesimtun0: a UAS registers 15559998888 binding the UE's 5G IP (10.45.0.8) and
+# answers INVITEs; a caller (15551234567) registers and calls it with RTP media.
 # Protocol / Component: 5G GTP-U N3 Tunnel / UERANSIM ↔ Open5GS UPF (ogstun) ↔ Kamailio.
-# Validation Criteria: Compares ogstun RX bytes before & after call. Asserts ogstun RX
-# byte counter moves (+2684 bytes) to empirically prove SIP traversed the 5G GTP-U user plane.
+# Validation Criteria: (1) SIP REGISTER returns 200 OK over the 5G path; (2) the
+# digest-authenticated INVITE is ANSWERED with a final "SIP/2.0 200 OK" (the
+# simulator waits for the final response, not the interim 100 trying); (3) RTP
+# media flows; (4) ogstun TX byte counter moves, proving 5G user-plane traversal.
 # ==============================================================================
 echo -e "${YELLOW}[5b/13] 📡 Simulating SIP over the 5G SA User Plane (UE tun → N3 GTP-U → UPF ogstun → Kamailio)...${NC}"
 podman exec mvno-ueransim-ue-1 sh -c 'ip route replace 10.89.0.23/32 dev uesimtun0 2>/dev/null' || true
 podman cp "${SCRIPT_DIR}/sip_traffic_sim.py" mvno-ueransim-ue-1:/tmp/sip_traffic_sim.py >/dev/null
+podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
+podman exec mvno-ueransim-ue-1 sh -c 'rm -f /tmp/uas.log; nohup python3 -u /tmp/sip_traffic_sim.py --uas 15559998888 --host 10.89.0.23 --port 5060 --bind-ip 10.45.0.8 --listen-port 5070 > /tmp/uas.log 2>&1 &'
+sleep 4
 BEFORE=$(podman exec mvno-upf cat /sys/class/net/ogstun/statistics/tx_bytes 2>/dev/null || echo 0)
-OUT=$(podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py --host 10.89.0.23 --port 5060 --callee 15559998888 --caller 15551234567 2>&1) || true
+OUT=$(podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py --rtp 3 --caller 15551234567 --callee 15559998888 --host 10.89.0.23 --port 5060 --bind-ip 10.45.0.8 --listen-port 5072 2>&1) || true
 AFTER=$(podman exec mvno-upf cat /sys/class/net/ogstun/statistics/tx_bytes 2>/dev/null || echo 0)
+UAS_LOG=$(podman exec mvno-ueransim-ue-1 cat /tmp/uas.log 2>/dev/null || true)
+podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
 echo "$OUT"
-echo "$OUT" | grep -q "SIP REGISTER 200 OK" || { echo "[-] Error: 5G-path REGISTER did not succeed" >&2; exit 1; }
-echo "$OUT" | grep -q "INVITE Response" || { echo "[-] Error: 5G-path INVITE did not succeed" >&2; exit 1; }
+echo "--- UAS side (5G-path callee) ---"
+echo "$UAS_LOG"
+echo "$UAS_LOG" | grep -q "SIP REGISTER 200 OK for subscriber 15559998888" || { echo "[-] Error: 5G-path REGISTER did not succeed" >&2; exit 1; }
+echo "$OUT" | grep -q "SIP/2.0 200 OK" || { echo "[-] Error: 5G-path INVITE not answered with 200 OK (got 100 trying / timeout)" >&2; exit 1; }
+echo "$OUT" | grep -q "RTP media sent" || { echo "[-] Error: 5G-path RTP media did not flow" >&2; exit 1; }
 [ "${AFTER:-0}" -gt "${BEFORE:-0}" ] || { echo "[-] Error: ogstun TX did not move (5G path dead)" >&2; exit 1; }
-echo -e "${GREEN}✓ 5G SA path: SIP REGISTER + INVITE traversed the 5G user plane (ogstun TX +$((AFTER-BEFORE)) bytes)${NC}\n"
+echo -e "${GREEN}✓ 5G SA path: REGISTER 200 OK + INVITE answered 200 OK + RTP media over the 5G user plane (ogstun TX +$((AFTER-BEFORE)) bytes)${NC}\n"
 
 # ==============================================================================
 # [6/13] ZERO-BALANCE CALL BLOCKING (SIP 407 CHALLENGE ➔ DIGEST ➔ SIP 403 FORBIDDEN)
