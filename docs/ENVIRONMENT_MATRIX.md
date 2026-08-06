@@ -14,7 +14,7 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 |---|---|---|
 | **OS** | Linux (any modern distro) | macOS / Windows / Docker Desktop are **not** supported for the full stack. |
 | **Architecture** | amd64 (x86_64) | arm64 (Apple Silicon) requires a full source rebuild of all custom images + the Vosk native JNI lib (untested). |
-| **Container runtime** | rootless **Podman** + the `podman compose` plugin (Docker Compose v2 compat) | Docker Engine on Linux also works for most services, but the rootless Podman socket path is the canonical one used by the Vector log shipper (see §4). |
+| **Container runtime** | rootless **Podman** + the `podman compose` plugin (Docker Compose v2 compat) | Docker Engine on Linux also works for most services, but the rootless Podman socket path is the canonical one used by the Vector log shipper (see Section 4). |
 | **Kernel: `/dev/net/tun`** | required | 5G SA UPF + UERANSIM pass `/dev/net/tun` + `NET_ADMIN` + `SYS_PTRACE` — unavailable on Docker Desktop (macOS/Windows). |
 | **Kernel: SCTP** | required (`sctp` module loadable) | AMF↔gNB NGAP (`:38412`) and the 2G `osmo-stp` M3UA/SIGTRAN both ride SCTP. On macOS/Windows SCTP does not exist. Linux: `sudo modprobe sctp`. |
 | **Kernel: multicast** | required for the 2G virtual-Um path | `osmocom-bb virtphy` ↔ `osmo-bts-virtual` use UDP multicast `239.193.23.1:4729`; some cloud/VM bridges disable multicast. |

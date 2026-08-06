@@ -76,13 +76,23 @@ if [ "$INSTALL" -eq 1 ]; then
   else
     ok "container runtime: $RT"
   fi
-  for tool in sqlite3 curl espeak-ng ffmpeg; do
+  for tool in sqlite3 curl espeak-ng ffmpeg baresip tshark nc; do
     if command -v "$tool" >/dev/null 2>&1; then ok "$tool present"
     else
-      echo "» installing $tool"
-      if command -v apt-get >/dev/null 2>&1; then sudo apt-get install -y "$tool"
-      elif command -v dnf >/dev/null 2>&1; then sudo dnf install -y "$tool"
-      elif command -v pacman >/dev/null 2>&1; then sudo pacman -Sy --noconfirm "$tool"; fi
+      # tool name != package name for some tools; map per distro
+      case "$tool:$(command -v apt-get >/dev/null 2>&1 && echo apt || { command -v dnf >/dev/null 2>&1 && echo dnf || echo pacman; })" in
+        baresip:*)        pkg=baresip ;;
+        tshark:apt*)      pkg=tshark ;;
+        tshark:*)         pkg=wireshark-cli ;;
+        nc:apt*)          pkg=netcat-openbsd ;;
+        nc:dnf*)          pkg=nmap-ncat ;;
+        nc:*)             pkg=openbsd-netcat ;;
+        *)                pkg=$tool ;;
+      esac
+      echo "» installing $tool ($pkg)"
+      if command -v apt-get >/dev/null 2>&1; then sudo apt-get install -y "$pkg"
+      elif command -v dnf >/dev/null 2>&1; then sudo dnf install -y "$pkg"
+      elif command -v pacman >/dev/null 2>&1; then sudo pacman -Sy --noconfirm "$pkg"; fi
     fi
   done
 else
@@ -138,7 +148,7 @@ while [ "$heal" -lt 4 ]; do
   "$COMPOSE_CMD" up -d --remove-orphans >/dev/null 2>&1 || true
   sleep 6
 done
-if ! api_up; then fail "API never became healthy; see ONBOARDING.md §11"; fi
+if ! api_up; then fail "API never became healthy; see ONBOARDING.md Section 11"; fi
 
 # ---- 8. Final health / summary --------------------------------------------------------
 step "Health snapshot"
@@ -150,7 +160,7 @@ echo "=== DEPLOY SUMMARY ==="
 for s in "${SUCCESSES[@]:-}"; do ok "$s"; done
 if [ "${#FAILURES[@]}" -gt 0 ]; then
   for f in "${FAILURES[@]}"; do echo "  ✗ $f"; done
-  echo "RESULT: PARTIAL — troubleshoot per ONBOARDING.md §11"
+  echo "RESULT: PARTIAL — troubleshoot per ONBOARDING.md Section 11"
   exit 1
 else
   echo "RESULT: READY — run ./scripts/demo_runbook.sh (13-check gate) to certify"

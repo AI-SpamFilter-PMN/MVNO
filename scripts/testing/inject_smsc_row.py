@@ -4,8 +4,9 @@ inject_smsc_row.py — deterministic SMSC store-and-forward row injector (Goal 7
 
 Inserts a clean pending SMS row directly into OsmoSMSC's SQLite database
 (state/hlr/smsc.db, the SAME file the IP-SM-GW bridge polls). This is the reliable
-way to drive a 2G->5G (or AI-block) flow in e2e: unlike send_vty_sms.sh (VTY quirks)
-and send_db_sms.sh (invented schema writing to the wrong DB), it writes to the
+way to drive a 2G->5G (or AI-block) flow in e2e: unlike the retired
+send_vty_sms.sh (VTY unpublished, container lacks nc/socat) and send_db_sms.sh
+(invented schema writing to the wrong DB), it writes to the
 bridge's actual SMS table with clean text and deliver_attempts=0.
 
 Usage:

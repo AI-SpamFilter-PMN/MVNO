@@ -169,7 +169,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 5.4: UDM `no_tls` SBI Framing — 3GPP Rel-16 Verification Note
 * **Scope**: Verify the Open5GS UDM Service-Based Interface (SBI) HTTP/2 cleartext (h2c) framing against 3GPP Rel-16 (TS 29.500 / TS 29.501) requirements for the isolated bridge network.
 * **Findings**: `configs/open5gs/udm.yaml` sets `no_tls: true` at the `default` scope and on both `udm.sbi.server` (`0.0.0.0:7777`) and `udm.sbi.client` (`nrf`, `udr`) stanzas. The identical `no_tls: true` + `advertise: <nf>` pattern is present across `amf.yaml`, `ausf.yaml`, `bsf.yaml`, `nrf.yaml`, `nssf.yaml`, `pcf.yaml`, `smf.yaml`, `udr.yaml` (UPF is exempt: it communicates via PFCP and has no SBI HTTP/2 server).
-* **Conclusion**: h2c cleartext framing is compliant for a trusted, single-tenant bridge network (`mvno_net`) per TS 29.500 §6.1 (TLS optional when transport security is provided by the network segment). No changes required. Live evidence: `nrf` shows all NFs registered over cleartext HTTP/2; `mvno-udm`/`mvno-udr` healthy.
+* **Conclusion**: h2c cleartext framing is compliant for a trusted, single-tenant bridge network (`mvno_net`) per TS 29.500 Section 6.1 (TLS optional when transport security is provided by the network segment). No changes required. Live evidence: `nrf` shows all NFs registered over cleartext HTTP/2; `mvno-udm`/`mvno-udr` healthy.
 
 ### Issue 5.5: `ogs_tun_set_ip()` is a No-Op on Linux — ogstun Gateway Never Configured
 * **Symptom**: UPF's N6 tunnel device `ogstun` existed inside `mvno-upf` but had **no IP address and no route** (`ip addr` empty, `10.45.0.0/16` route absent). All user-plane packets written to the tun by the UPF were silently dropped by the kernel (device RX/TX counters stayed at 0). Symptom seen as "UPF receives GTP-U but no N6 write" (`[RECV] GPU-U` traces present, `ogstun` RX = 0).
@@ -471,6 +471,55 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **New pipeline component**: `scripts/testing/pcap_to_wav.py` — extracts G.711 (PCMU) audio from an rtpengine `recording-format=eth` pcap into a 16-bit 8 kHz WAV in `state/spool/`, which the Native Vosk ASR watcher auto-transcribes and archives (closes the roadmap gap noted in `configs/rtpengine/rtpengine.conf`: mr9.4 records pcap only).
 * **Verification**: full dialog `407 → 100 → 180 → 200 OK → ACK → RTP ↔ → BYE → 200`; caller sent 297 packets, UAS answered with 248, UAS received 47 520 RTP payload bytes (297×160 exactly); `rtpengine_packets_total` 0 → 594, `rtpengine_bytes_total` 0 → 102 168; pcap recorded per call; pcap→wav (10.9 s) → Vosk archived `{"text": ""}` (tone, no speech — correct) proving the whole record→transcribe→archive chain on a *real* call.
 * **Note**: Vosk accuracy on real speech was already proven via mic recordings (`state/spool/archived/count_test.txt` → "the one two three four five six seven eight either"). `debug=1` suppresses `L_INFO` xlogs — the INTERCEPT QUERY/RESPONSE lines are invisible in production logs by design; keep `debug=2+` only for routing diagnostics.
+
+### Issue 8.28: baresip `-d` Daemonize Kills REGISTER — Registration Goes Silently Unanswered
+
+* **Symptom**: `baresip -d -f <cfgdir>` (daemonize) starts cleanly but the UA never receives any response to REGISTER — no 401, no 200 — while the same config backgrounded *without* `-d` registers normally (`401 → 200 OK` pair per REGISTER).
+* **Root Cause**: a baresip quirk: in daemonize mode the main loop detaches before the SIP event loop is fully wired, so inbound responses are never dispatched. Only visible as silence in `-T` (trace) logs.
+* **Fix**: never use `-d`. Run backgrounded as `baresip -f <cfg> -s -T` (containerized or with `setsid … &`); `-s` disables SIGINT handling, `-T` keeps the trace.
+* **Verification**: both `baresip-rx`/`baresip-tx` containers (ubuntu:24.04, `mvno_mvno_net`) registered 2× `200 OK` each; digest REGISTER dialog proven live 2026-08-06.
+
+### Issue 8.29: baresip ctrl_tcp Console — Netstring JSON Dialing (Port 4444)
+
+* **Symptom**: piping commands to baresip's stdin fails (`fd_listen err: fd=0 (Operation not permitted)` — the stdio console cannot take a closed/EOF stdin) and `-e "dial …"` on the CLI is unreliable; `{"command":"dial","uri":"sip:…"}` over the TCP console returns `can't find a URI to dial to`.
+* **Root Cause**: baresip's `ctrl_tcp.so` console (bound to `127.0.0.1:4444` inside the container) speaks **netstring framing** (`<len>:<json>,`) and the JSON key for the dial target is **`params`**, not `uri`; the `dial` command itself comes from `menu.so`, and `account.so`/`menu.so`/`ctrl_tcp.so` are **application modules** (`module_app`) — a plain `module` line silently skips them.
+* **Fix**: load `module_app account.so`, `module_app menu.so`, `module_app ctrl_tcp.so`; dial with `MSG='{"command":"dial","params":"sip:15559998888@10.89.0.23:5060"}'; podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; printf '${#MSG}:${MSG},' >&3; timeout 2 cat <&3"` (host shell expands `${#MSG}` into the netstring length); hangup with `{"command":"hangup"}`.
+* **Verification**: `CALL_OUTGOING`/`CALL_CLOSED` events + full 407→100→180→200→ACK→RTP→BYE dialog on the live baresip pair (2026-08-06).
+
+### Issue 8.30: baresip Requires glibc ≥ 2.38 — Debian Bookworm Too Old
+
+* **Symptom**: running the Arch-built baresip 4.6.0 binary in a Debian-based container fails at load: `version 'GLIBC_2.38' not found` (bookworm ships glibc 2.36).
+* **Root Cause**: the host's baresip is linked against the host glibc; containers must provide ≥ 2.38.
+* **Fix**: run in `docker.io/library/ubuntu:24.04` (glibc 2.39), with read-only mounts of `/usr/bin/baresip`, its 9 shared libs (`libbaresip.so.26`, `libre.so.41`, `libbrotli{common,dec,enc}.so.1`, `libcrypto.so.3`, `libssl.so.3`, `libz.so.1`, `libzstd.so.1`) and `/usr/lib/baresip` modules.
+* **Verification**: both baresip containers on `mvno_mvno_net` (10.89.0.60/.61) registered and completed RTP calls; speech WAV (`aufile`) streamed both directions (2026-08-06).
+
+### Issue 8.31: 2G MS-2 (15557778888) Is HLR-Only — No Handset, `sms.txt` Never Shows It
+
+* **Symptom**: an SMS addressed to `15557778888` is accepted by OsmoSMSC (`Going to send a MT SMS` in the log) but never appears in `mvno-2g-ms:/root/.osmocom/bb/sms.txt`.
+* **Root Cause**: the `mvno-2g-ms` container runs **one** `mobile` app (pid 1, `mobile -c /etc/osmocom/mobile.cfg`) serving only **MS1** (`IMSI 001010000000004` / `15554443322`). MS-2 exists in the HLR as subscriber 5 but has no handset in this test rig.
+* **Fix**: always use `15554443322` (MS1) as the 2G recipient for any receipt check; `15557778888` remains valid only as a sender/HLR entity.
+* **Verification**: raw SMPP 2G→2G and 5G→2G digest flows delivered to MS1 (`sms.txt` shows `[SMS from +15557778888]` / `[SMS from +15553332211]`), while a `15557778888`-recipient test stayed invisible (2026-08-06).
+
+### Issue 8.32: Raw SMPP PDU Byte-Alignment — One Wrong Digit Corrupts the Whole SUBMIT_SM
+
+* **Symptom**: hand-built `nc` SMPP BIND_TRANSCEIVER succeeds (status 0) but SUBMIT_SM gets **no response**; the SMSC log shows `smpp34_unpack()` error `[destination_addr:155544433322(OK)][tag:000E(OK)][length:4865(OK)][leng value.octet:18533(Value length exceed buffer length)]`.
+* **Root Cause**: a 12-digit recipient (one extra `3`) and/or extra zero bytes before `sm_length` shift the whole PDU tail — OsmoSMSC's strict TLV unpacker then misreads the message bytes as TLV and drops the PDU without replying. The SMSC parses strictly; there is no lenient mode.
+* **Fix**: build the PDU programmatically and verify byte-for-byte before use — the certified raw command is in the manual guide Section 0.6a (header `00 00 00 45 | 00 00 00 04 | 00 00 00 00 | 00 00 00 02`, then `00 01 01 <src 11 digits> 00 01 01 <dst 11 digits>`, eight `00` fields, `0e`, 14-byte body; total 69 bytes).
+* **Verification**: exact-69-byte PDU → `Rx SUBMIT-SM (15554443322/1/1)` + `SMPP SUBMIT-SM: Stored in DB` + MS1 receipt; the corrupted variant produced the unpack error above (2026-08-06).
+
+### Issue 8.33: `nc -u` Never Exits After the SIP Response
+
+* **Symptom**: `printf 'MESSAGE …' | nc -u localhost 5066` prints Kamailio's 407/200 response but **hangs** — the command never returns and the shell blocks.
+* **Root Cause**: the UDP socket stays open waiting for more input after the response; this nc build (openbsd-netcat) keeps reading until stdin EOF *and* does not self-close on a datagram reply.
+* **Fix**: always wrap in `timeout 5 nc -u localhost 5066 < request.txt` (and feed the request from a file, not a live terminal).
+* **Verification**: the digest flows (5G→2G, 5G→5G, E2E-BLOCK) complete with `SIP/2.0 200 OK` / `403` under `timeout` (2026-08-06).
+
+### Issue 8.34: zsh `:ro` Volume-Mount Modifier + Non-Word-Splitting Breaks Mount Loops
+
+* **Symptom**: `B="$B -v $f:$f:ro"` inside a `for f in …` loop silently corrupts mounts — podman errors `incorrect volume format` and the string shows `/usr/lib/libz.so.1:/usr/lib/libz.soo` (the `:ro` suffix mangled); a plain `$B` variable also fails even with correct contents.
+* **Root Cause**: two zsh behaviors: (1) unquoted/plain `$f:ro` triggers zsh's **`:r` rootname modifier** (strips the last suffix, leaving `…so` + `o`); (2) zsh does **not** word-split unquoted variables (bash would), so the whole mount list arrives as one argument.
+* **Fix**: use a zsh-safe array — `B=(-v /usr/bin/baresip:/usr/bin/baresip:ro); B+=(-v "${f}:${f}:ro"); …` then `podman run … "${B[@]}"`. Braces are mandatory around `${f}` before the `:ro` suffix.
+* **Verification**: `"${B[@]}"` form runs both baresip containers with 11 clean `src:dst:ro` mounts; containers registered and called (2026-08-06). Documented in the manual guide Section 0 step 3.
 
 
 ---

@@ -10,7 +10,7 @@ All commands below were **empirically verified** against the running stack
 (`podman compose up`). Each flow is shown as a set of commands you paste into
 **separate terminal windows** so you can watch each leg in real time.
 
-> **§0 is the flagship**: a complete **from-zero live demo** that uses **only raw
+> **Section 0 is the flagship**: a complete **from-zero live demo** that uses **only raw
 > shell** — no Python, no calls to `./scripts/testing/*`. It uses `baresip`
 > (a tiny native SIP UA) for voice, raw `nc`+`md5sum` for SIP digest SMS,
 > raw binary SMPP over `nc` for 2G SMS, raw `sqlite3` for queue injection, and
@@ -412,7 +412,7 @@ podman compose ps          # expect 31/31 containers Up
 
 > The OsmoSMSC **VTY (127.0.0.1:4254) is not published** and the container has no
 > `nc`/`socat` — the old `send_vty_sms.sh` driver is **broken by design**; use the
-> raw SMPP/nc commands in §0.6a or `send_smpp_sms.py`.
+> raw SMPP/nc commands in Section 0.6a or `send_smpp_sms.py`.
 
 ---
 
@@ -458,12 +458,12 @@ podman logs ims-tx             # expect "[+] MESSAGE delivered (digest)"
 podman rm -f ims-rx ims-tx
 ```
 
-> **Raw-shell alternative** for the same roles: §0.2–0.3 (baresip receiver) and
-> §0.6c/6d (nc+digest sender) — no Python involved.
+> **Raw-shell alternative** for the same roles: Section 0.2–0.3 (baresip receiver) and
+> Section 0.6c/6d (nc+digest sender) — no Python involved.
 
 Free static IPs reserved for this: **10.89.0.54 / 10.89.0.55 / 10.89.0.56**
 (SMS terminals), **10.89.0.58 / 10.89.0.59** (voice UAS / caller — see Flow E),
-**10.89.0.60 / 10.89.0.61** (baresip rx / tx — see §0).
+**10.89.0.60 / 10.89.0.61** (baresip rx / tx — see Section 0).
 All SIP digest passwords default to `testpass`; registered subscribers live in
 Kamailio's `subscriber` table.
 
@@ -487,22 +487,22 @@ OsmoSMSC to the attached 2G MS (Flow A).
 ```bash
 # A) Raw SQLite injection into the SMSC queue — the canonical 2G->5G row driver
 #    (writes the bridge's real polled SMS table: state/hlr/smsc.db, deliver_attempts=0)
-#    Full command in §0.6b. Scripted equivalent:
+#    Full command in S0.6b. Scripted equivalent:
 python3 scripts/testing/inject_smsc_row.py 15554443322 15551234567 "Hello via DB queue"
 
 # B) Raw binary SMPP 3.4 submit_sm (port 2775) — the same path the IP-SM-GW uses
-#    Full command in §0.6a. Scripted equivalent:
+#    Full command in S0.6a. Scripted equivalent:
 python3 scripts/testing/send_smpp_sms.py --sender 15554443322 --recipient 15557654321
 
 # C) Via the Gateway REST interception API (evaluates balance/EIR/spam policies)
-#    Raw curl in §0.6e. Scripted equivalent:
+#    Raw curl in S0.6e. Scripted equivalent:
 ./scripts/testing/send_rest_sms.sh 15554443322 15557654321 "Hello via REST API"
 ```
 
 > **Do NOT use `send_db_sms.sh`** (invented `sms`/`sender_id` schema writing to a
 > different DB than the bridge polls — the row is never seen) and do **not** use
 > the retired `send_vty_sms.sh` (the SMSC VTY is unpublished and the container
-> lacks `nc`/`socat` — see §1). Prefer the raw commands in §0.
+> lacks `nc`/`socat` — see Section 1). Prefer the raw commands in Section 0.
 >
 > To hit the **2G→5G bridge** use a 5G `recipient` (e.g. `15551234567`); to keep it
 > **2G→2G** use a 2G `recipient` (e.g. `15557778888`).
@@ -527,13 +527,13 @@ cd /tmp
 
 ### Terminal T0 — trigger an MO 2G→2G SMS
 
-Any of the send tools in §3 with a **2G recipient**. Native delivery needs the
-recipient 2G MS attached to the VLR. The raw way (full PDU command in §0.6a):
+Any of the send tools in Section 3 with a **2G recipient**. Native delivery needs the
+recipient 2G MS attached to the VLR. The raw way (full PDU command in Section 0.6a):
 
 ```bash
 # sender 15557778888 -> recipient 15554443322 (MS1, logs receipts):
 # paste the "( printf '<bind hex>' ; sleep 1; printf '<submit hex>' | xxd -r -p ) \
-#   | nc -q 3 localhost 2775" block from §0.6a, changing the message bytes if desired.
+#   | nc -q 3 localhost 2775" block from S0.6a, changing the message bytes if desired.
 ```
 
 Or the scripted way:
@@ -560,7 +560,7 @@ python3 scripts/testing/send_smpp_sms.py --sender 15557778888 --recipient 155544
 
 ### Terminal T5 — 5G receiver (dedicated container, own IP)
 
-baresip receiver (§0.2–0.3, raw) or:
+baresip receiver (Section 0.2–0.3, raw) or:
 
 ```bash
 podman run -d --name ims-rx --network mvno_mvno_net --ip 10.89.0.54 \
@@ -582,7 +582,7 @@ podman logs -f ims-rx     # watch for "15554443322: <body>"
 ### Terminal T0 — inject the 2G→5G SMS
 
 ```bash
-# Raw (canonical — full command in §0.6b): sqlite3 INSERT with src 15554443322,
+# Raw (canonical — full command in Section 0.6b): sqlite3 INSERT with src 15554443322,
 # dest 15559998888 (or 15551234567), text 'E2E 2Gto5G'
 # Scripted equivalent:
 python3 scripts/testing/inject_smsc_row.py 15554443322 15551234567 "E2E 2Gto5G"
@@ -613,7 +613,7 @@ receives it, acks Kamailio, and injects it into OsmoSMSC via SMPP for 2G deliver
 
 ### Terminal T5 — 5G sender
 
-Raw (`nc` + MD5 digest — full nonce/digest sequence in §0.6c; recipient
+Raw (`nc` + MD5 digest — full nonce/digest sequence in Section 0.6c; recipient
 `15554443322`), or scripted:
 
 ```bash
@@ -651,7 +651,7 @@ bridge involvement.
 
 **Verify in**: T1 (Kamailio relay), T5 (both terminals).
 
-Raw (`nc` + digest to a registered IMS number — §0.6d, receiver = baresip rx on
+Raw (`nc` + digest to a registered IMS number — Section 0.6d, receiver = baresip rx on
 `15559998888`), or scripted:
 
 ### Terminal T5a — receiver (dedicated container)
@@ -694,7 +694,7 @@ RTPEngine (see Flow M for the transcript pipeline).
 
 **Verify in**: T6 (UAS), T7 (caller), T8 (RTP counters), T1 (Kamailio).
 
-> **No-scripts alternative**: §0.2–0.4 (baresip rx auto-answers and streams a
+> **No-scripts alternative**: Section 0.2–0.4 (baresip rx auto-answers and streams a
 > speech file; tx dials over its ctrl_tcp console) — verified 2026-08-06.
 > The scripted simulator below remains the certified *programmatic* dialog.
 >
@@ -702,7 +702,7 @@ RTPEngine (see Flow M for the transcript pipeline).
 > (10.89.0.58 / 10.89.0.59). The script binds its listen socket to that IP before
 > registering, so Kamailio's `fix_nated_contact()` stores a reachable contact — an
 > unbound register stores the socket's ephemeral port, which dies with the process
-> and calls silently 408 (see ISSUES.md §8.27).
+> and calls silently 408 (see ISSUES.md Section 8.27).
 
 ### Terminal T6 — UAS (answer the call, run first)
 
@@ -835,7 +835,7 @@ sleep 5 && cat state/spool/archived/sample.txt
 
 The script auto-falls back through `ffmpeg -f pulse` → `ffmpeg -f alsa` → `arecord`,
 so it works on PulseAudio, ALSA and PipeWire hosts. (Raw pipeline for a *recorded*
-call is §0.5; raw mic = `ffmpeg -f pulse -i default -ar 16000 -ac 1 state/spool/mic.wav`.)
+call is Section 0.5; raw mic = `ffmpeg -f pulse -i default -ar 16000 -ac 1 state/spool/mic.wav`.)
 
 ### Flow I — Interception Gateway REST API
 
@@ -877,7 +877,7 @@ delivered.
 
 **Verify in**: T0/T1, the sender terminal log, and the API blocked counter.
 
-Raw (canonical — §0.7: `nc` + digest, body `E2E-BLOCK ...` → `403` + counter
+Raw (canonical — Section 0.7: `nc` + digest, body `E2E-BLOCK ...` → `403` + counter
 increment + `SMS BLOCKED BY MVNO INTERCEPTION CORE` in Kamailio), or scripted:
 
 ### Terminal T5a — receiver (dedicated container, 5G→5G leg)
@@ -952,7 +952,7 @@ directly, see `configs/rtpengine/rtpengine.conf`). The Vosk ASR watcher polls
 
 ### Terminal T6b — extract the latest recorded call
 
-Raw (canonical — §0.5: `tshark -d udp.port==<even-dst>,rtp` +
+Raw (canonical — Section 0.5: `tshark -d udp.port==<even-dst>,rtp` +
 `rtp.p_type==0` + `xxd -r -p` + `ffmpeg -f mulaw`), or scripted:
 
 ```bash
@@ -979,14 +979,14 @@ cat state/spool/archived/call-*.txt   # newest = the call you just made
 
 **Expected**: a JSON transcript line per recording. The certified 2026-08-03 run
 (synthetic 440 Hz tone) produced `{"text": ""}` — correct for a tone. For **real
-speech**, expect the words: §0.6's baresip speech phrase transcribes to
+speech**, expect the words: Section 0.6's baresip speech phrase transcribes to
 `{"text": "you have won a prime target now"}` (2026-08-06).
 
 > **Sample-rate caveat**: `pcap_to_wav.py` writes 8 kHz (PCMU native). The Vosk model
 > is 16 kHz, so an 8 kHz file transcribes reliably but with reduced fidelity — if a
 > transcript comes back empty for real speech, upsample first:
 > `ffmpeg -i state/spool/call-*.wav -ar 16000 state/spool/call-16k.wav`.
-> (The §0.5 raw pipeline already outputs 16 kHz.)
+> (The Section 0.5 raw pipeline already outputs 16 kHz.)
 
 ### Terminal T6d — post-call AI transcript verdict
 
@@ -1006,7 +1006,7 @@ curl -s 'http://localhost:8428/api/v1/query' --data-urlencode \
 `E2E-BLOCK`-bearing spam call), plus a non-zero `mvno_vosk_classified_total`.
 A filtered verdict also increments `mvno_vosk_blocked_total`. For speech matching
 the keyword rule (`won|prize|claim|free|urgent|account|blocked|confirm`) the
-verdict is `allow=false, reason='Spam (phishing phrase detected)'` — see §0.6.
+verdict is `allow=false, reason='Spam (phishing phrase detected)'` — see Section 0.6.
 
 ---
 
@@ -1154,7 +1154,7 @@ contact to that dead port. `t_relay()` forwards silently.
 listen_port)` and keeps the socket alive; the UAS replies echo `Record-Route`; ACK/BYE
 target the 200 OK Contact. Always run each role in its own container with
 `--bind-ip <container-ip> --listen-port <port>` (see Flow E). Full RCA in
-`docs/ISSUES.md` §8.27.
+`docs/ISSUES.md` Section 8.27.
 
 ### 8. Stale contacts linger in `kamailio.db` after test rigs die
 **Symptom**: `state/kamailio/kamailio.db` (usrloc, db_mode=2) can hold old
@@ -1182,7 +1182,7 @@ surgery, `podman restart mvno-kamailio` restores service (verified 2026-08-06).
   application modules, not plain `module` entries.
 - **No outgoing MESSAGE in v4.6.0's menu.so** — baresip receives SMS fine
   (console prints the body) but cannot *send* one; use the raw `nc`+digest
-  flow of §0.6c for sending.
+  flow of Section 0.6c for sending.
 - **Audio source for the speech leg**: `audio_source aufile,/media/speech8k.wav`
   in the rx config; the WAV must be 8 kHz mono s16le. Rebuild the container to
   pick up config/WAV changes.
@@ -1225,6 +1225,6 @@ retries it at poll speed during e2e cell 4, and the relay traffic trips the
 
 *End of manual testing guide. All flows verified against the running stack
 (2026-08-06; e2e_runbook.sh 7/7 and demo_runbook.sh 13/13 certified green, two
-consecutive runs each; §0 from-zero demo fully verified with baresip voice,
+consecutive runs each; Section 0 from-zero demo fully verified with baresip voice,
 tshark→WAV→Vosk spam verdict, raw SMPP/sqlite3/nc+digest SMS paths, and the
 E2E-BLOCK 403 path).*

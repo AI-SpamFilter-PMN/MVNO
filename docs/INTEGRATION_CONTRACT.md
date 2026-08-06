@@ -26,7 +26,7 @@ repositories are treated as **read-only external consumers**.
 | **SMS intercept REST** | `POST /api/v1/intercept/sms` (`mvno-api:8080`, host `8080`) | HTTP JSON + `X-API-Key` | `sms-client` (optional) | ✅ stable |
 | **Call intercept REST** | `POST|GET /api/v1/intercept/call` (`mvno-api:8080`) | HTTP JSON + `X-API-Key` | `SipClient` (via Kamailio) | ✅ stable |
 | **Subscriber balance REST** | `GET /api/v1/intercept/subscriber/{msisdn}` | HTTP JSON + `X-API-Key` | NOC / external consumers | ✅ stable |
-| **AI classifier** | `POST /api/v1/classify` on `ai-filter:8000` (host `8008`) | HTTP JSON — 3 event types (§4) | `telecom-api` outbound; drop-in target for `AI-Filteration-System` | ✅ mock-authoritative |
+| **AI classifier** | `POST /api/v1/classify` on `ai-filter:8000` (host `8008`) | HTTP JSON — 3 event types (Section 4) | `telecom-api` outbound; drop-in target for `AI-Filteration-System` | ✅ mock-authoritative |
 | **Post-call analytics REST** | `POST /api/v1/transcriptions` (`mvno-api:8080`) | HTTP JSON (transcript + biometrics + DTMF) | external clients pushing post-call analytics | ✅ stable (inbound only) |
 
 The inline mock (defined in `docker-compose.yml`) is the **authoritative classifier
@@ -175,7 +175,7 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 - `SipConfig` hardcodes `SERVER_PORT = 5060`, `LOCAL_PORT = 5070` (confirmed in
   source). Ships targeting `SERVER_PORT = 5060`, local `127.0.0.1:5070`.
 - **MVNO Kamailio host port is `5066`** (canonical). Host `5060` is occupied by a host-level
-  Asterisk (see `docs/ENVIRONMENT_MATRIX.md` §3) — the optional `MVNO_PUBLISH_5060` extra
+  Asterisk (see `docs/ENVIRONMENT_MATRIX.md` Section 3) — the optional `MVNO_PUBLISH_5060` extra
   publish is **default-off and blocked on this host**.
 - **Recommendation to the consuming client (not an MVNO edit):** set the SIP server port to `5066`
   (or make it configurable) so the unmodified client reaches Kamailio.
@@ -220,7 +220,7 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   two consecutive green runs). No external classifier or API key is required.
 - **Drop-in criteria** (to replace the mock in the live demo):
   - Must expose `POST /api/v1/classify` on `0.0.0.0:8000` inside the `mvno_net` network.
-  - Must accept **all three event types** (§3) and return `{ "allow": boolean, "reason": "string" }`.
+  - Must accept **all three event types** (Section 3) and return `{ "allow": boolean, "reason": "string" }`.
   - Must classify within the 5s read window (target ≤ 500ms per the SLA contract).
   - Package as container image `mvno-ai-filter:1.0.0`; attach to `mvno_net` in `docker-compose.yml`.
   - Verify with `make test-sms` and `make test-call`.
@@ -265,7 +265,7 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 ### AI-Filteration-System (classifier provider)
 | Artifact | Why |
 |---|---|
-| `docs/INTEGRATION_CONTRACT.md` (this file) | §3 payload schemas (3 event types), §4 SLA/fail-open |
+| `docs/INTEGRATION_CONTRACT.md` (this file) | Section 3 payload schemas (3 event types), Section 4 SLA/fail-open |
 | `docker-compose.yml` service `ai-filter` (lines ~543) | reference mock implementation to replace (incl. deterministic keyword/E2E-BLOCK fallback layer) |
 | `telecom-api/.../filter/AiFilterService.java` | exact outbound call semantics (`AI_FILTER_URL`, timeouts, circuit breaker) |
 | `telecom-api/src/test/java/.../AiFilterSlaTimeoutTest.java` | SLA behavior the model must satisfy |
@@ -276,8 +276,8 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 ### SipClient (voice user agent)
 | Artifact | Why |
 |---|---|
-| `docs/INTEGRATION_CONTRACT.md` §1, §5 (SipClient), §6 | ports, digest auth, PCMU-only codec, 403 semantics, RTP range, `MVNO_PUBLISH_5060` |
-| `docs/ENVIRONMENT_MATRIX.md` §3 | why host `5060` is blocked (Asterisk) |
+| `docs/INTEGRATION_CONTRACT.md` Section 1, Section 5 (SipClient), Section 6 | ports, digest auth, PCMU-only codec, 403 semantics, RTP range, `MVNO_PUBLISH_5060` |
+| `docs/ENVIRONMENT_MATRIX.md` Section 3 | why host `5060` is blocked (Asterisk) |
 | `configs/kamailio/kamailio.cfg` `route[INTERCEPT]` | call-intercept callout behavior |
 | `docs/MANUAL_TESTING_GUIDE.md` voice flows | end-to-end call + RTP + recording verification steps (Flow E, T6/T7/T8) |
 | `scripts/testing/sip_traffic_sim.py` | reference UA — your client must reproduce its REGISTER/407→digest→INVITE→RTP behavior |
@@ -287,7 +287,7 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 ### sms-client (SMPP ESME)
 | Artifact | Why |
 |---|---|
-| `docs/INTEGRATION_CONTRACT.md` §1, §5 (sms-client) | SMPP `2775`, `MVNO_SMSC`, ESME accounts, `ai.classify.url` replacement value, intercept REST |
+| `docs/INTEGRATION_CONTRACT.md` Section 1, Section 5 (sms-client) | SMPP `2775`, `MVNO_SMSC`, ESME accounts, `ai.classify.url` replacement value, intercept REST |
 | `configs/osmocom/osmo-smsc.cfg` | the `esme smsclient` / `esme mvno-api-route` routes |
 | `docs/MANUAL_TESTING_GUIDE.md` SMS flows | 2G/5G + IP-SM-GW delivery verification |
 | `scripts/testing/e2e_runbook.sh` | 5-cell SMS matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) |

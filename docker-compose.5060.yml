@@ -13,4 +13,4 @@ services:
   kamailio:
     ports:
       - "5066:5060/udp"
-      - "5060:5060/udp"   # extra publish for teammate SipClients that hardcode 5060
+      - "5060:5060/udp"   # extra publish for SipClients that hardcode 5060

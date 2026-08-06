@@ -2702,8 +2702,9 @@ python3 scripts/testing/inject_smsc_row.py 15554443322 15551234567 "E2E determin
 
 Inserts a clean pending row (`deliver_attempts=0`) directly into
 `state/hlr/smsc.db` — the **same `SMS` table the bridge polls**. Do NOT use
-`send_db_sms.sh` (invented `sms`/`sender_id` schema, wrong DB) and prefer this over
-`send_vty_sms.sh` (VTY driver quirks).
+`send_db_sms.sh` (invented `sms`/`sender_id` schema, wrong DB) and do not use the
+retired `send_vty_sms.sh` (the SMSC VTY is unpublished and the container lacks
+`nc`/`socat` — broken by design).
 
 ### 15.4 Defects found during Goal 7 certification (full RCAs in `docs/ISSUES.md` 8.24/8.25)
 

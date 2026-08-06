@@ -4,6 +4,8 @@
 
 This repository contains a **complete MVNO 5G SA Core with real-time interception gateway**. It combines a standards-compliant 5G Standalone core (Open5GS + UERANSIM), an Osmocom-based cellular stack (HLR/MSC/SMSC), a Spring Boot interception gateway with native Vosk ASR, and an AI spam filter integration point — all orchestrated via rootless Podman/Docker Compose. It is **not** a production billing platform, a full IMS core, or a managed SaaS — it's a developer-grade stack for building and testing spam/voice interception logic.
 
+**Recommended start**: run `docs/MANUAL_TESTING_GUIDE.md` **Section 0 "From-Zero Live Demo"** — a complete raw-shell walkthrough (no Python, no scripts) of the live stack: baresip voice call, recording → Vosk spam verdict, and all five SMS paths, ending with the automated demo/e2e gates.
+
 ## 2. Architecture Overview
 
 ```
@@ -130,18 +132,18 @@ make test                # runs test-vty + test-api + test-sms + test-call
 
 **Internal DNS:** `http://ai-filter:8000/api/v1/classify` (host port 8008)
 
-The full request/response schemas live in **`docs/INTEGRATION_CONTRACT.md` §3** — one contract with
+The full request/response schemas live in **`docs/INTEGRATION_CONTRACT.md` Section 3** — one contract with
 three event types: `SMS`, `VOICE_CALL`, and `TRANSCRIPT` (post-call ASR output). The response is
 always `{ "allow": boolean, "reason": "string" }`.
 
 **SLA:** 5s read timeout → fail-open (`allow: true`). Circuit breaker: 3 consecutive failures → 30s
-fast fail-open (~0.1ms). Full SLA/fail-open/env-variable spec: `docs/INTEGRATION_CONTRACT.md` §4.
+fast fail-open (~0.1ms). Full SLA/fail-open/env-variable spec: `docs/INTEGRATION_CONTRACT.md` Section 4.
 
 **Current mock:** `ai-filter` returns `allow:false` (reason `"Spam (E2E deterministic block)"`) when
 the payload contains the `E2E-BLOCK` marker, else `allow:true` (`"Clean content"`) — the marker
 works for all three event types. Drop-in replace the container with the real
 `AI-Filteration-System` model for live spam detection (drop-in criteria:
-`docs/INTEGRATION_CONTRACT.md` §5).
+`docs/INTEGRATION_CONTRACT.md` Section 5).
 
 **Voice post-call leg (supervisor flow):** recorded calls are transcribed in-process by Vosk ASR;
 the transcript is then POSTed to the AI filter as a `TRANSCRIPT` event
@@ -165,7 +167,7 @@ never stalls the spool loop.
   MVNO/REST → MT).
 - **Voice:** The **real-time** gate is **metadata-only with fail-open** — if the AI filter is slow or
   down, the call **passes** — and whether it was scam/spam is **determined post-call** from the
-  recording/transcript (see §6d / Vosk ASR).
+  recording/transcript (see Section 6d / Vosk ASR).
 
 ---
 
@@ -213,7 +215,7 @@ never stalls the spool loop.
 | **Vosk ASR** | English-only small model (50MB). Post-call only. ~10-15% WER. No Arabic. |
 | **AI Filter Mock** | Returns `allow:false` on the `E2E-BLOCK` marker (deterministic), else `allow:true`. Swap in the real `AI-Filteration-System` model for live spam detection. |
 | **SIP Testing** | `make test-call` uses HTTP POST; real SIP covered by `scripts/testing/sip_traffic_sim.py` (REGISTER + 407 digest challenge → INVITE handshake, used by runbook steps 5-6). No SIPp scenario included. |
-| **5G Radio Path** | 3 UERANSIM UEs registered on the AMF with a **verified UL+DL user-plane data path** (UE tun → N3 GTP-U → UPF ogstun). After any UERANSIM UE recreate, re-add the UE route (`ip route add 10.45.0.1 dev uesimtun0`) and recreate the trio atomically (see `docs/ISSUES.md` §7.4). **No SMS-over-NAS / VoNR over radio** — voice and SMS are external-path demos (SipClient / sms-client); SMS-over-NAS is on the roadmap. |
+| **5G Radio Path** | 3 UERANSIM UEs registered on the AMF with a **verified UL+DL user-plane data path** (UE tun → N3 GTP-U → UPF ogstun). After any UERANSIM UE recreate, re-add the UE route (`ip route add 10.45.0.1 dev uesimtun0`) and recreate the trio atomically (see `docs/ISSUES.md` S7.4). **No SMS-over-NAS / VoNR over radio** — voice and SMS are external-path demos (SipClient / sms-client); SMS-over-NAS is on the roadmap. |
 | **SCTP Kernel** | `modprobe sctp` required on host. Fails silently if missing (gNB↔AMF never connects). |
 | **RTPEngine Kernel** | Runs in userspace mode (kernel module not required). |
 | **First-call ASR Cold Start** | Vosk model loads lazily on first transcription (~2-5s delay). |
@@ -230,9 +232,9 @@ never stalls the spool loop.
 | `mvno-vector` crashes | Podman socket path wrong | `export PODMAN_USER_UID=$(id -u)` before `make up` |
 | No transcription in logs | Model not mounted | Run `./scripts/bootstrap.sh` to vendor model |
 | `make init-db` fails | `sqlite3` not installed | Install `sqlite3` package |
-| UL data plane dead after gNB recreate | Stale NGAP contexts; gNB silently swallows PDU Session Resource Setup | Recreate the **whole UERANSIM trio** (`podman compose up -d --force-recreate ueransim-gnb ueransim-ue-1 ueransim-ue-2 ueransim-ue-3`), never a single container — `docs/ISSUES.md` §7.4 |
+| UL data plane dead after gNB recreate | Stale NGAP contexts; gNB silently swallows PDU Session Resource Setup | Recreate the **whole UERANSIM trio** (`podman compose up -d --force-recreate ueransim-gnb ueransim-ue-1 ueransim-ue-2 ueransim-ue-3`), never a single container — `docs/ISSUES.md` S7.4 |
 | UE can't reach `10.45.0.1` | UE default route missing | `podman exec mvno-ueransim-ue-N sh -c 'ip route add 10.45.0.1 dev uesimtun0'` |
-| NFs de-register from NRF every ~30s | Rebuilt Open5GS from source | Use the layered Dockerfile on `mvno-open5gs:2.8.0-base` — never rebuild from source (`docs/ISSUES.md` §5.6) |
+| NFs de-register from NRF every ~30s | Rebuilt Open5GS from source | Use the layered Dockerfile on `mvno-open5gs:2.8.0-base` — never rebuild from source (`docs/ISSUES.md` S5.6) |
 | 5G-path SIP times out on first packet | Neighbor-resolution warm-up after UPF/bridge restarts | Re-run the simulator — subsequent exchanges are immediate |
 | UE can't reach bridge services via 5G | SNAT rule missing (UPF recreated) | Entrypoint installs it idempotently; verify `podman exec mvno-upf iptables -t nat -L POSTROUTING -n` |
 
@@ -281,7 +283,7 @@ Authoritative per-repository parameters & verified source findings live in **`do
 that is the single source of truth for repository-side values and required changes (e.g. SipClient's
 `SERVER_PORT` 5060→5066, sms-client's `ai.classify.url` mismatch), and for the **`/api/v1/classify`
 payload schemas (SMS / VOICE_CALL / TRANSCRIPT)**, X-API-Key auth, SLA/fail-open rules, and the
-partner handoff file list (contract §8). The subsections below summarize it; maintainers of all
+partner handoff file list (contract Section 8). The subsections below summarize it; maintainers of all
 three repositories should read the contract file.
 
 If you are on the **AI Model Team** developing in the [AI-Filteration-System](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) repository:
@@ -291,7 +293,7 @@ Your container model service **MUST** expose an HTTP REST classification endpoin
 `POST /api/v1/classify` (Listening on `0.0.0.0:8000` inside container network `mvno_net`), accepting
 **all three event types** — `SMS`, `VOICE_CALL`, and `TRANSCRIPT` (post-call ASR output) — and
 returning `{ "allow": boolean, "reason": "string" }`. Full JSON schemas:
-`docs/INTEGRATION_CONTRACT.md` §3 (authoritative copy).
+`docs/INTEGRATION_CONTRACT.md` Section 3 (authoritative copy).
 
 ### Contract Payload Schema
 * **SMS Classification Request (sent by `telecom-api`)**:
