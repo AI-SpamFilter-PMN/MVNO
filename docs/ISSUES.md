@@ -521,6 +521,13 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Fix**: use a zsh-safe array — `B=(-v /usr/bin/baresip:/usr/bin/baresip:ro); B+=(-v "${f}:${f}:ro"); …` then `podman run … "${B[@]}"`. Braces are mandatory around `${f}` before the `:ro` suffix.
 * **Verification**: `"${B[@]}"` form runs both baresip containers with 11 clean `src:dst:ro` mounts; containers registered and called (2026-08-06). Documented in the manual guide Section 0 step 3.
 
+### Issue 8.35: deploy.sh Offline Check Tests Nonexistent `vendor/images` Directory
+
+* **Symptom**: `./scripts/deploy.sh --offline` always warned `vendor/images absent — cannot continue offline` and fell back to `BUILD=1` (source build) even when vendored image tarballs were present and loadable.
+* **Root Cause**: `scripts/deploy.sh` (offline branch, ~line 112) tested `[ -d vendor/images ]`, but `scripts/bootstrap.sh` vendors tarballs under **`vendor/docker/`** (as documented in `docs/ENVIRONMENT_MATRIX.md` Section 4 and as consumed by `scripts/load-offline.sh`, which already checks `vendor/docker/`). The stale path made the check always false — silent degradation to source build, no error.
+* **Fix**: both `scripts/deploy.sh` occurrences changed to `vendor/docker` (directory test + warning message).
+* **Verification**: `bash -n scripts/deploy.sh` passes; with tarballs present in `vendor/docker/`, the offline branch now enters `load-offline.sh` instead of the build fallback. No image path referenced by the rest of the toolchain is named `vendor/images`.
+
 
 ---
 

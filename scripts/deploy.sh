@@ -109,8 +109,8 @@ if sudo -n modprobe sctp >/dev/null 2>&1 || modprobe sctp >/dev/null 2>&1; then 
 # ---- 4. Images ----------------------------------------------------------------------
 step "Images"
 if [ "$OFFLINE" -eq 1 ]; then
-  if [ -d vendor/images ]; then bash "$SCRIPT_DIR/load-offline.sh" && ok "vendored images loaded" || fail "load-offline.sh failed"
-  else warn "vendor/images absent — cannot continue offline"; BUILD=1; fi
+  if [ -d vendor/docker ]; then bash "$SCRIPT_DIR/load-offline.sh" && ok "vendored images loaded" || fail "load-offline.sh failed"
+  else warn "vendor/docker absent — cannot continue offline"; BUILD=1; fi
 elif [ "$BUILD" -eq 1 ]; then
   warn "will build custom images from source"
 elif bash "$SCRIPT_DIR/pull-images.sh" >/dev/null 2>&1; then
