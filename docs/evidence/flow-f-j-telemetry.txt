@@ -1,0 +1,33 @@
+=== Flow F — RTPEngine media plane metrics (evidence 2026-08-06 16:31 UTC) ===
+
+rtpengine_sessions{type="own"} 0
+rtpengine_sessions{type="foreign"} 0
+rtpengine_transcoded_media 0
+rtpengine_uptime_seconds 92644
+rtpengine_sessions_total 32
+rtpengine_closed_sessions_total{reason="rejected"} 0
+
+=== Flow J — VictoriaMetrics / Grafana NOC telemetry ===
+
+{
+    "status": "success",
+    "data": {
+        "resultType": "vector",
+        "result": [
+            {
+                "metric": {},
+                "value": [
+
+--- up targets (9/9 UP):
+  ip-sm-gw         ip-sm-gw:9100            up=1
+  mongodb          mongodb-exporter:9216    up=1
+  open5gs          amf:9090                 up=1
+  open5gs          smf:9090                 up=1
+  open5gs          upf:9090                 up=1
+  rtpengine        rtpengine:9900           up=1
+  telecom-api      mvno-api:8080            up=1
+  victoria-metrics victoria-metrics:8428    up=1
+  vmagent          localhost:8429           up=1
+
+--- Grafana 'MVNO NOC — Unified' dashboard (uid mvno-unified-noc, 35 panels): full export in docs/evidence/grafana-mvno-unified-noc.json
+--- Grafana API auth: admin/admin, datasource 'VictoriaMetrics' (uid victoriametrics) -> victoria-metrics:8428

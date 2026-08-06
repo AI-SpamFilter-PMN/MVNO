@@ -1,0 +1,19 @@
+=== Flow H — Live Microphone Recording + Transcription (evidence 2026-08-06 16:31 UTC) ===
+
+Two-leg RTP extraction (live-mic call 2026-08-06, baresip-tx pulse.so / baresip-rx aufile):
+  state/spool/archived/live-caller.wav (18,720 B mulaw src)
+  state/spool/archived/live-callee.wav (120,160 B mulaw src)
+
+--- AI verdicts (mvno-api interception, counter mvno_sms/call blocked 8->10, classified 21->25):
+  [live-caller] allow=false, reason='Spam (phishing phrase detected)'
+  [live-callee] allow=false, reason='Spam (phishing phrase detected)'
+
+--- ASR transcripts (Vosk, 16k WAV):
+  live-caller.txt: {
+  "text" : "you have won a prime target now"
+}
+  live-callee.txt: {
+  "text" : "you have one a prime target and when a prime target now you have won a prize kind of how you can win a prize told us how you have won a prize called of now you have won a prize called of out"
+}
+
+--- Audibility: aplay state/spool/archived/live-caller.wav (verified via sink RMS 211M; headless box has no physical speaker)

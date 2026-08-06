@@ -95,18 +95,27 @@ ok "mvno-api metrics reachable"
 # =============================================================================
 # Cell 1 - 2G -> 2G (2G SMSC direct; bridge must NOT be involved)
 # =============================================================================
-section "Cell 1: 2G->2G  (15554443322 -> 15557778888, 2G SMSC direct)"
+# Direction matches the manual guide's canonical 2G->2G (6a): MS2 sends, MS1
+# (the only MS that logs receipts) receives.
+section "Cell 1: 2G->2G  (15557778888 -> 15554443322, 2G SMSC direct)"
 b_25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; b_25="${b_25:-0}"
 b_52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; b_52="${b_52:-0}"
-python3 "${SCRIPT_DIR}/send_smpp_sms.py" --sender 15554443322 --recipient 15557778888 \
-  --message "E2E 2G2G ${TS}" >/dev/null
+BODY1="E2E 2G2G ${TS}"
+python3 "${SCRIPT_DIR}/send_smpp_sms.py" --sender 15557778888 --recipient 15554443322 \
+  --message "${BODY1}" >/dev/null
 sleep 8
 a_25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; a_25="${a_25:-0}"
 a_52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; a_52="${a_52:-0}"
+RECEIPTS="$(podman exec mvno-2g-ms grep -cF "${BODY1}" /root/.osmocom/bb/sms.txt 2>/dev/null || true)"
 if [ "$a_25" = "$b_25" ] && [ "$a_52" = "$b_52" ]; then
   ok "delivered via 2G SMSC; bridge counters unchanged (2g5g=$a_25,5g2g=$a_52)"
 else
   bad "bridge counters moved unexpectedly (2g5g $b_25->$a_25, 5g2g $b_52->$a_52)"
+fi
+if [ "${RECEIPTS}" -ge 1 ]; then
+  ok "MS1 handset receipt in sms.txt (${RECEIPTS}x '${BODY1}')"
+else
+  bad "no MS1 receipt for '${BODY1}' in /root/.osmocom/bb/sms.txt"
 fi
 
 # =============================================================================

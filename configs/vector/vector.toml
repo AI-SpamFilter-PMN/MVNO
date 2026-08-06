@@ -9,14 +9,22 @@
 
 [sources.container_logs]
 type = "docker_logs"
-include_containers = ["*"]
+# Explicit allow-list: the telephony/signaling containers whose logs feed the
+# parse_telecom_events transform. "mvno-vector" MUST be excluded: podman's
+# journald log driver captures this container's own stdout, and docker_logs
+# with include_containers=["*"] re-ingests it (RFC5424 self-feedback loop).
+include_containers = ["mvno-api", "mvno-kamailio", "mvno-ip-sm-gw", "mvno-osmosmsc", "mvno-osmo-msc", "mvno-2g-ms", "mvno-2g-ms2", "baresip-rx", "baresip-tx"]
 
 [transforms.parse_telecom_events]
 type = "remap"
 inputs = ["container_logs"]
 source = '''
 # Extract timestamp, container name, and raw message body
-.timestamp = parse_timestamp!(.timestamp, format: "%+")
+# Non-aborting timestamp parse: on failure (podman journald frames often carry
+# no parseable .timestamp) coalesce keeps the original value instead of
+# dropping the event. NOTE: `if t, err = parse_timestamp(...); err == null {...}`
+# is a compile error in VRL 0.44 — the coalesce form below is the supported idiom.
+.timestamp = parse_timestamp(.timestamp, format: "%+") ?? .timestamp
 .container = .container_name
 
 # VRL Regex Parsing: Extract E.164 phone numbers (MSISDN) from raw signaling logs

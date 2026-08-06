@@ -1,0 +1,19 @@
+=== Flow O.2 Bounded Retry — evidence captured 2026-08-06 16:30 UTC ===
+
+--- Bridge logs (mvno-ip-sm-gw), row_id=140:
+[2026-08-06 16:27:16] [POLL] row_id=140 15554443322->15559998888 body='will retry then drop'
+[2026-08-06 16:27:16] [RETRY] row_id=140 attempt counted, will retry next poll
+[2026-08-06 16:27:19] [POLL] row_id=140 15554443322->15559998888 body='will retry then drop'
+[2026-08-06 16:27:19] [RETRY] row_id=140 attempt counted, will retry next poll
+[2026-08-06 16:27:22] [POLL] row_id=140 15554443322->15559998888 body='will retry then drop'
+[2026-08-06 16:27:22] [RETRY] row_id=140 attempt counted, will retry next poll
+[2026-08-06 16:27:25] [POLL] row_id=140 15554443322->15559998888 body='will retry then drop'
+[2026-08-06 16:27:25] [RETRY] row_id=140 attempt counted, will retry next poll
+[2026-08-06 16:27:28] [POLL] row_id=140 15554443322->15559998888 body='will retry then drop'
+[2026-08-06 16:27:28] [RETRY] row_id=140 attempt counted, will retry next poll
+
+--- smsc.db final state (row 140 inert at MAX_ATTEMPTS=5, out of pending set):
+140|15554443322|15559998888|will retry then drop||5
+
+--- Authenticated MESSAGE to 15559998888 AFTER deregister:
+resp2: SIP/2.0 404 Not Found

@@ -65,6 +65,9 @@ def send_smpp_sms(host, port, sender, recipient, message):
     s.close()
     
     resp_cmd_id, resp_status = struct.unpack(">II", submit_resp[4:12])
+    if resp_status != 0:
+        print(f"[-] SUBMIT_SM rejected: Status=0x{resp_status:08X}", file=sys.stderr)
+        sys.exit(1)
     print(f"  ✓ SUBMIT_SM Delivered: Sender={sender} -> Recipient={recipient}")
     print(f"  ✓ Response: CMD=0x{resp_cmd_id:08X}, Status=0x{resp_status:08X} (ESME_ROK / SUCCESS)")
 

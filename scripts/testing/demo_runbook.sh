@@ -20,6 +20,10 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
+PASS=0; FAIL=0
+pass() { PASS=$((PASS+1)); echo -e "${GREEN}  ✓ $1${NC}"; }
+fail() { FAIL=$((FAIL+1)); echo -e "${RED}  ✗ $1${NC}" >&2; exit 1; }
+
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
 echo -e "${CYAN}${BOLD}  🎓 MVNO 5G SA Core & Interception Gateway — Live Demo Runbook        ${NC}"
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
@@ -34,8 +38,8 @@ echo ""
 # sufficient, and livenessState = UP.
 # ==============================================================================
 echo -e "${YELLOW}[1/13] 🏥 Checking Gateway Actuator Health & Liveness Probes...${NC}"
-curl -s http://localhost:8080/actuator/health | python3 -m json.tool
-echo -e "${GREEN}✓ Gateway Health: UP${NC}\n"
+status=$(curl -s http://localhost:8080/actuator/health | python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))" 2>/dev/null)
+[ "$status" = "UP" ] && pass "Gateway Actuator health status = UP" || fail "Gateway health not UP (got '${status:-<no JSON>}')"
 
 # ==============================================================================
 # [2/13] 5G SA CORE UE REGISTRATION AUDIT (AMF ↔ UERANSIM)
@@ -71,8 +75,18 @@ echo -e "${GREEN}✓ 5G SA Subscriber audit complete — 3/3 UEs Registered${NC}
 # Kamailio SIP, OsmoSMSC, and Gateway stdout log lines into structured JSON streams.
 # ==============================================================================
 echo -e "${YELLOW}[3/13] ⚡ Auditing Vector Container Log Aggregation (VRL JSON sink)...${NC}"
-podman exec mvno-vector tail -n 5 /var/log/vector/telecom_events.json 2>/dev/null || podman logs mvno-vector --tail 5 || true
-echo -e "${GREEN}✓ Vector VRL parsing active${NC}\n"
+events=$(podman exec mvno-vector tail -n 5 /var/log/vector/telecom_events.json 2>/dev/null || true)
+echo "$events" | python3 -c "
+import json, sys
+ok = 0
+for line in sys.stdin:
+    line = line.strip()
+    if line:
+        json.loads(line)
+        ok += 1
+assert ok >= 1, 'no parseable JSON events'
+print(f'  ✓ {ok} recent JSON event line(s) parsed by VRL')" || fail "Vector VRL sink produced no parseable telecom events"
+pass "Vector VRL JSON log aggregation active"
 
 # ==============================================================================
 # [4/13] PREPAID SUBSCRIBER LEDGER BALANCE LOOKUP
@@ -82,8 +96,8 @@ echo -e "${GREEN}✓ Vector VRL parsing active${NC}\n"
 # Validation Criteria: Verifies MSISDN 15551234567 returns balance = 100 credits.
 # ==============================================================================
 echo -e "${YELLOW}[4/13] 💳 Querying Subscriber Balance (E.164 MSISDN: 15551234567)...${NC}"
-curl -s -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -m json.tool
-echo -e "${GREEN}✓ Subscriber Balance retrieved: 100 credits${NC}\n"
+bal=$(curl -s -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15551234567 | python3 -c "import json,sys; print(json.load(sys.stdin).get('balance',''))" 2>/dev/null)
+[ "$bal" = "100" ] && pass "Subscriber 15551234567 balance = 100 credits" || fail "Subscriber balance != 100 (got '${bal:-<no JSON>}')"
 
 # ------------------------------------------------------------------------------
 # [4b/13] GATEWAY ZERO-TRUST AUTH (missing X-API-Key -> HTTP 401 Unauthorized)
@@ -147,8 +161,21 @@ podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
 # Validation Criteria: WAV extracted with audio; transcript archived <= 25s.
 # ==============================================================================
 echo -e "${YELLOW}[5c/13] 🎙️ Verifying Call Recording Pipeline (pcap -> WAV -> Vosk ASR)...${NC}"
-NEWEST_PCAP=$(ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1 || true)
-[ -n "$NEWEST_PCAP" ] || { echo "[-] Error: no recorded pcap found" >&2; exit 1; }
+# Stale-frame guard: RTPEngine occasionally writes an empty recording frame
+# (no RTP payloads, e.g. a call that produced no media) alongside the real
+# pcap. pcap_to_wav.py cannot decode these, and picking one breaks the
+# assertion. Skip-and-retry while the real (>= 1 KiB) pcap is being written.
+NEWEST_PCAP=""
+for i in $(seq 1 6); do
+    NEWEST_PCAP=$(ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1 || true)
+    if [ -n "$NEWEST_PCAP" ] && [ -s "$NEWEST_PCAP" ] && [ "$(stat -c %s "$NEWEST_PCAP")" -ge 1024 ]; then
+        break
+    fi
+    find state/spool/pcaps -name '*.pcap' -size -1k -delete 2>/dev/null || true
+    NEWEST_PCAP=""
+    sleep 2.5
+done
+[ -n "$NEWEST_PCAP" ] || { echo "[-] Error: no fresh recorded pcap found" >&2; exit 1; }
 WAV_OUT=$(python3 "${SCRIPT_DIR}/pcap_to_wav.py" "$NEWEST_PCAP" 2>&1) || true
 echo "$WAV_OUT" | grep -q "WAV extracted" || { echo "[-] Error: pcap->WAV extraction failed: ${WAV_OUT}" >&2; exit 1; }
 PCAP_WAV="${NEWEST_PCAP%.pcap}.wav"
@@ -280,30 +307,21 @@ echo -e "${GREEN}✓ Call Blocked at SIP Protocol Level (SIP/2.0 403 Forbidden R
 # triggers fraud block: {"allow": false, "reason": "EIR: SIM swap detected"}.
 # ==============================================================================
 echo -e "${YELLOW}[7/13] 🛡️ Triggering EIR SIM-Swap Anomaly (>3 distinct SIMs on IMEI: 356938035643809)...${NC}"
-curl -s -X POST http://localhost:8080/api/v1/intercept/call \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: mvno-demo-key-2026" \
-  -d '{"caller": "15551234567", "callee": "15557654321", "imei": "356938035643809"}' | grep -q "allow"
-echo -e "  Attempt 1 (Caller: 15551234567): {\"allow\":false,\"reason\":\"EIR: SIM swap detected\"}"
-
-curl -s -X POST http://localhost:8080/api/v1/intercept/call \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: mvno-demo-key-2026" \
-  -d '{"caller": "15559998888", "callee": "15557654321", "imei": "356938035643809"}' | grep -q "allow"
-echo -e "  Attempt 2 (Caller: 15559998888): {\"allow\":false,\"reason\":\"EIR: SIM swap detected\"}"
-
-curl -s -X POST http://localhost:8080/api/v1/intercept/call \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: mvno-demo-key-2026" \
-  -d '{"caller": "15554443322", "callee": "15557654321", "imei": "356938035643809"}' | grep -q "allow"
-echo -e "  Attempt 3 (Caller: 15554443322): {\"allow\":false,\"reason\":\"EIR: SIM swap detected\"}"
-
-curl -s -X POST http://localhost:8080/api/v1/intercept/call \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: mvno-demo-key-2026" \
-  -d '{"caller": "15553332211", "callee": "15557654321", "imei": "356938035643809"}' | grep -q "allow"
-echo -e "  Attempt 4 (Caller: 15553332211): {\"allow\":false,\"reason\":\"EIR: SIM swap detected\"}"
-echo -e "${GREEN}✓ EIR Fraud Detection Blocked 4th Distinct SIM Swap Attempt${NC}\n"
+for CALLER in 15551234567 15559998888 15554443322 15553332211; do
+  R=$(curl -s -X POST http://localhost:8080/api/v1/intercept/call \
+    -H "Content-Type: application/json" -H "X-API-Key: mvno-demo-key-2026" \
+    -d "{\"caller\": \"${CALLER}\", \"callee\": \"15557654321\", \"imei\": \"356938035643809\"}")
+  echo "  Attempt (${CALLER}): $(echo "$R" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f\"allow={d.get('allow')}, reason={d.get('reason')}\")" 2>/dev/null || echo "UNPARSEABLE: ${R}")"
+done
+BLOCKED=$(curl -s -X POST http://localhost:8080/api/v1/intercept/call \
+  -H "Content-Type: application/json" -H "X-API-Key: mvno-demo-key-2026" \
+  -d '{"caller": "15553332211", "callee": "15557654321", "imei": "356938035643809"}')
+python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert d.get('allow') is False and 'SIM swap' in d.get('reason', ''), f'unexpected EIR response: {d}'
+print(f\"  ✓ 4th distinct SIM blocked: {d}\")" <<< "$BLOCKED" || fail "EIR SIM-swap block not returned (got: $BLOCKED)"
+pass "EIR SIM-Swap fraud trigger verified (4 distinct SIMs on 1 IMEI)"
 
 # ==============================================================================
 # [8/13] AUTHORIZED 5G SMS INTERCEPTION FLOW
@@ -313,12 +331,17 @@ echo -e "${GREEN}✓ EIR Fraud Detection Blocked 4th Distinct SIM Swap Attempt${
 # Validation Criteria: Asserts response {"allow": true, "reason": "Clean content"}.
 # ==============================================================================
 echo -e "${YELLOW}[8/13] 💬 Simulating Authorized 5G SMS Interception Flow...${NC}"
-curl -s -X POST http://localhost:8080/api/v1/intercept/sms \
+SMSR=$(curl -s -X POST http://localhost:8080/api/v1/intercept/sms \
   -H "Content-Type: application/json" \
   -H "X-API-Key: mvno-demo-key-2026" \
-  -d '{"sender": "15551234567", "recipient": "15557654321", "content": "Hello MVNO 5G"}'
-echo ""
-echo -e "${GREEN}✓ SMS Allowed & Forwarded${NC}\n"
+  -d '{"sender": "15551234567", "recipient": "15557654321", "content": "Hello MVNO 5G"}')
+echo "  $SMSR"
+python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert d.get('allow') is True, f'unexpected: {d}'
+print('  ✓ SMS allowed: allow=true')" <<< "$SMSR" || fail "5G SMS interception did not allow (got: $SMSR)"
+pass "5G SMS allowed & forwarded (allow=true)"
 
 # ==============================================================================
 # [9/13] NATIVE VOSK JAVA 21 SPEECH-TO-TEXT ASR & SPOOL ARCHIVING PIPELINE
@@ -462,9 +485,12 @@ if not results:
     sys.exit(1)
 val = results[0]['value'][1]
 metric = results[0]['metric']['__name__']
+if int(float(val)) < 1:
+    print(f'[-] Error: {metric} value {val} < 1', file=sys.stderr)
+    sys.exit(1)
 print(f'  ✓ PromQL Series Found: {metric} = {val} (Total Series: {len(results)})')
-"
-echo -e "${GREEN}✓ Time-series metric data verified & non-empty${NC}\n"
+" || fail "mvno_call_requests_total series missing or value < 1"
+pass "VictoriaMetrics TSDB telemetry value ≥ 1"
 
 # ==============================================================================
 # [12/13] SOTA GRAFANA NOC COMMAND CENTER DASHBOARD
@@ -474,10 +500,9 @@ echo -e "${GREEN}✓ Time-series metric data verified & non-empty${NC}\n"
 # Validation Criteria: Asserts HTTP status code 200 OK.
 # ==============================================================================
 echo -e "${YELLOW}[12/13] 📊 Verifying SOTA Grafana NOC Command Center Dashboard...${NC}"
-code=$(curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/login)
+code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login)
 echo -e "  Grafana Dashboard URL: http://localhost:3000 (admin/admin)"
-echo -e "  HTTP Status Code: ${code} OK"
-echo -e "${GREEN}✓ Master NOC Command Center Operational${NC}\n"
+[ "$code" = "200" ] && pass "Grafana NOC dashboard reachable (HTTP 200)" || fail "Grafana login returned HTTP ${code} (expected 200)"
 
 # ==============================================================================
 # [13/13] OVERALL STACK GRADUATION READINESS VERIFICATION (MASTER HARD GATE)
@@ -496,10 +521,19 @@ results = data.get('data', {}).get('result', [])
 if not results:
     print('[-] Error: VictoriaMetrics returned 0 series for mvno_call_requests_total', file=sys.stderr)
     sys.exit(1)
-print(f\"  ✓ Telemetry re-asserted live: {results[0]['metric']['__name__']} = {results[0]['value'][1]}\")
-"
+val = results[0]['value'][1]
+if int(float(val)) < 1:
+    print(f'[-] Error: mvno_call_requests_total value {val} < 1', file=sys.stderr)
+    sys.exit(1)
+print(f\"  ✓ Telemetry re-asserted live: {results[0]['metric']['__name__']} = {val}\")
+" || fail "master gate: mvno_call_requests_total series missing or < 1"
+pass "Master telemetry gate re-asserted (value ≥ 1)"
 echo -e "${GREEN}✓ All core telecom, signaling, interception, ASR, and observability flows verified live${NC}\n"
 
+if [ "$FAIL" -gt 0 ]; then
+  echo -e "${RED}${BOLD}==== DEMO RUNBOOK: ${FAIL} FAILURE(S), ${PASS} PASSED — ABORTING ====${NC}"
+  exit 1
+fi
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
-echo -e "${GREEN}${BOLD}  🎉 ALL 13 DEMO ITEMS PASSED — GRADUATION PROJECT DEMO READY!         ${NC}"
+echo -e "${GREEN}${BOLD}  🎉 ALL 13 DEMO ITEMS PASSED (${PASS} real assertions) — GRADUATION PROJECT DEMO READY!${NC}"
 echo -e "${CYAN}${BOLD}========================================================================${NC}"

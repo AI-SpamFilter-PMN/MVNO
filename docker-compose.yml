@@ -619,6 +619,11 @@ services:
     # or add `DOCKER_SOCK=/var/run/docker.sock` to a top-level .env file.
     environment:
       VECTOR_LOG: error
+    # Explicit --config: the vector image ships /etc/vector/vector.yaml
+    # (demo_logs syslog generator + pretty console sink). Vector's default
+    # config search finds vector.yaml FIRST, so without this argument the
+    # real pipeline below was never loaded.
+    command: ["--config", "/etc/vector/vector.toml"]
     volumes:
       - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
       - ./state/logs/vector:/var/log/vector:z

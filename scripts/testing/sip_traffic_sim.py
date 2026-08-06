@@ -431,9 +431,10 @@ def send_sip_invite(caller, callee, password, host="127.0.0.1", port=5066):
         print(f"[+] SIP INVITE Response for {caller}->{callee}: {first_line}")
         s.close()
         resp2_str_lower = resp2_str.lower()
-        if any(status in resp2_str_lower for status in ["100 trying", "180 ringing", "200 ok", "403 forbidden"]):
-            return True
-        return False
+        if "200 ok" not in resp2_str_lower:
+            print(f"[-] INVITE not answered with 200 OK (got: {first_line})")
+            return False
+        return True
     except Exception as e:
         print(f"[-] SIP INVITE recv error: {e}")
         s.close()
