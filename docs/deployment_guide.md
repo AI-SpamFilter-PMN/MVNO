@@ -32,6 +32,10 @@ This guide covers the transaction flow, software prerequisites, and complete con
 
 ## 2. Software Prerequisites
 
+> Portability contract: see [ENVIRONMENT_MATRIX.md](ENVIRONMENT_MATRIX.md) for
+> supported OS/arch/runtime/kernel requirements and run `./scripts/preflight.sh`
+> to auto-verify them on your host. The tables below cover the install commands.
+
 ### Method A: Native (systemd)
 Deploying directly onto a Debian-slim/Ubuntu 22.04 LTS host:
 

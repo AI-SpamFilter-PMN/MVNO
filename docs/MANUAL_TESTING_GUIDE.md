@@ -572,7 +572,7 @@ podman compose ps          # expect 31/31 containers Up
 | Grafana | `http://localhost:3000` (admin/admin) |
 
 > The OsmoSMSC **VTY (127.0.0.1:4254) is not published** and the container has no
-> `nc`/`socat` — the old `send_vty_sms.sh` driver is **broken by design**; use the
+> `nc`/`socat` — the retired VTY shell driver was **broken by design**; use the
 > raw SMPP/nc commands in Section 0.6a or `send_smpp_sms.py`.
 
 ---
@@ -660,10 +660,11 @@ python3 scripts/testing/send_smpp_sms.py --sender 15554443322 --recipient 155576
 ./scripts/testing/send_rest_sms.sh 15554443322 15557654321 "Hello via REST API"
 ```
 
-> **Do NOT use `send_db_sms.sh`** (invented `sms`/`sender_id` schema writing to a
-> different DB than the bridge polls — the row is never seen) and do **not** use
-> the retired `send_vty_sms.sh` (the SMSC VTY is unpublished and the container
-> lacks `nc`/`socat` — see Section 1). Prefer the raw commands in Section 0.
+> **Do NOT inject into the SMSC DB with an invented `sms`/`sender_id` schema**
+> (it writes to a different DB than the bridge polls — the row is never seen) and
+> do **not** rely on the SMSC VTY shell (the VTY is unpublished and the container
+> lacks `nc`/`socat` — see Section 1). Use `inject_smsc_row.py` or the raw
+> commands in Section 0.
 >
 > To hit the **2G→5G bridge** use a 5G `recipient` (e.g. `15551234567`); to keep it
 > **2G→2G** use a 2G `recipient` (e.g. `15557778888`).

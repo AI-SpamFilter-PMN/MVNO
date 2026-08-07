@@ -35,6 +35,7 @@ docs/*.png
 !docs/architecture_flow.png
 !docs/ims_voice_call_flow.png
 !docs/sms_interception_flow.png
+docs/academic/
 
 # NOTE: docs/implementation_guide.md is UNIGNORED (like API_CONTRACT.md) so it can
 #       be shared with teammates on GitHub — keep the Goal 7 runbook section in sync.

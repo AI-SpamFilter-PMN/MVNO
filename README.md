@@ -165,15 +165,21 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 
 ## 7. Documentation
 
-* [ONBOARDING.md](ONBOARDING.md): Team onboarding guide, setup instructions, make targets, and Section 14 integration specs.
-* [docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md): Full multi-terminal manual testing guide — all MVP flows (2G/5G SMS, 2G↔5G IP-SM-GW bridging, SIP/IMS calls, RTP engine media, Vosk STT, recording, interception REST API, AI spam block, automated e2e gate, Grafana/VictoriaMetrics telemetry).
-* [docs/INTEGRATION_CONTRACT.md](docs/INTEGRATION_CONTRACT.md): Single source of truth for external repos — interfaces, X-API-Key auth, `/api/v1/classify` payload schemas (SMS/VOICE_CALL/TRANSCRIPT), SLA/fail-open, per-repo integration notes, partner handoff package.
-* [docs/deployment_guide.md](docs/deployment_guide.md): Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference.
-* [docs/ROADMAP.md](docs/ROADMAP.md): Architectural roadmap and operational backlog (SIP 407 + API keys implemented; VictoriaLogs, healthchecks, SBI eval open).
-* [docs/ISSUES.md](docs/ISSUES.md): Root cause analysis log and Section 10 Cross-Repo Contract Specifications.
-* [docs/architecture_flow.svg](docs/architecture_flow.svg): System architecture overview diagram.
-* [docs/ims_voice_call_flow.svg](docs/ims_voice_call_flow.svg): IMS VoLTE/VoNR Voice Call Interception sequence diagram.
-* [docs/sms_interception_flow.svg](docs/sms_interception_flow.svg): SMS Store-and-Forward Interception sequence diagram.
+| Document | Role |
+| :--- | :--- |
+| [ONBOARDING.md](ONBOARDING.md) | Team onboarding — setup, make targets, integration specs. |
+| [docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md) | Full multi-terminal manual testing guide — all MVP flows (2G/5G SMS, 2G↔5G IP-SM-GW bridging, SIP/IMS calls, RTP engine media, Vosk STT, recording, interception REST API, AI spam block, automated e2e gate, Grafana/VictoriaMetrics telemetry). |
+| [docs/INTEGRATION_CONTRACT.md](docs/INTEGRATION_CONTRACT.md) | Single source of truth for external repos — interfaces, X-API-Key auth, `/api/v1/classify` payload schemas (SMS/VOICE_CALL/TRANSCRIPT), SLA/fail-open, per-repo integration notes, partner handoff package. |
+| [docs/deployment_guide.md](docs/deployment_guide.md) | Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference. |
+| [docs/ENVIRONMENT_MATRIX.md](docs/ENVIRONMENT_MATRIX.md) | Portability contract — supported OS/arch/runtime/kernel features; run `./scripts/preflight.sh` to verify. |
+| [docs/REALTIME_AUDIO.md](docs/REALTIME_AUDIO.md) | Recording pipeline tiers (Tier-1 live tap / Tier-3 post-call), latency budget, systemd unit. |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Architectural roadmap and operational backlog. |
+| [docs/ISSUES.md](docs/ISSUES.md) | Root cause analysis log and Section 10 Cross-Repo Contract Specifications. |
+| [docs/best_practices.md](docs/best_practices.md) | Engineering conventions and pitfalls. |
+| [docs/evidence/](docs/evidence/) | Certification artifacts (certified fixture pcaps, transcripts, green logs). |
+| [docs/architecture_flow.svg](docs/architecture_flow.svg) | System architecture overview diagram. |
+| [docs/ims_voice_call_flow.svg](docs/ims_voice_call_flow.svg) | IMS VoLTE/VoNR Voice Call Interception sequence diagram. |
+| [docs/sms_interception_flow.svg](docs/sms_interception_flow.svg) | SMS Store-and-Forward Interception sequence diagram. |
 
 ### Key Environment Variable
 
