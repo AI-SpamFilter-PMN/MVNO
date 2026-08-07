@@ -29,6 +29,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
+# Evidence layer: durable e2e run log (Aug-6 convention) — tee the whole run.
+EVIDENCE_DIR="${REPO_ROOT}/docs/evidence"
+mkdir -p "${EVIDENCE_DIR}"
+RUN_LOG="${EVIDENCE_DIR}/e2e-run-$(date +%F).log"
+exec > >(tee -a "${RUN_LOG}") 2>&1
+echo "==== e2e runbook log: ${RUN_LOG} ===="
+
 CYAN='\033[0;36m'; GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 PASS=0; FAIL=0
 TS="$(date +%H%M%S)"

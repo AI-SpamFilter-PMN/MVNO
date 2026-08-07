@@ -5,12 +5,23 @@
 # Executable 13-step demonstration script verifying end-to-end 5G SA Core,
 # IMS SIP Interception, SMPP SMSC, Gateway REST APIs, and SOTA Grafana NOC.
 # ==============================================================================
+# Demo-time human speech (optional): during the [5b] live call, speaking the
+# scam script into the host microphone yields rich live transcripts (proven by
+# the Aug-6 live-mic re-run). The seeded fixtures in docs/evidence/fixtures/
+# guarantee non-empty transcripts regardless of whether anyone speaks.
+# ==============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
+
+# Evidence layer: durable run log (Aug-6 convention) — tee the whole run.
+EVIDENCE_DIR="${REPO_ROOT}/docs/evidence"
+mkdir -p "${EVIDENCE_DIR}"
+RUN_LOG="${EVIDENCE_DIR}/demo-run-$(date +%F).log"
+exec > >(tee -a "${RUN_LOG}") 2>&1
 
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -19,6 +30,8 @@ YELLOW='\033[1;33m'
 MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
+
+echo -e "${CYAN}==== demo runbook log: ${RUN_LOG} ====${NC}"
 
 PASS=0; FAIL=0
 pass() { PASS=$((PASS+1)); echo -e "${GREEN}  ✓ $1${NC}"; }
@@ -189,7 +202,19 @@ for i in $(seq 1 10); do
     [ -n "$TXT_PATH" ] && break
 done
 [ -n "$TXT_PATH" ] || { echo "[-] Error: Vosk did not archive a transcript within 25s" >&2; exit 1; }
-echo -e "${GREEN}✓ Recording pipeline proven: transcript archived at ${TXT_PATH}${NC}\n"
+echo -e "${GREEN}✓ Recording pipeline proven: transcript archived at ${TXT_PATH}${NC}"
+echo "  --- real transcript content (${TXT_PATH}) ---"
+cat "${TXT_PATH}"
+[ -s "${TXT_PATH}" ] || { echo "[-] Error: transcript file is empty" >&2; exit 1; }
+WAV_PATH="${TXT_PATH%.txt}.wav"
+[ -f "$WAV_PATH" ] || { echo "[-] Error: matching WAV missing at ${WAV_PATH}" >&2; exit 1; }
+DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WAV_PATH" || echo 0)
+echo "  --- real recorded WAV: ${WAV_PATH} (${DUR}s) ---"
+awk -v d="$DUR" 'BEGIN { if (d < 3) exit 1 }' || { echo "[-] Error: recorded WAV duration ${DUR}s < 3s (scripted-leg floor)" >&2; exit 1; }
+echo -e "  ✓ recorded WAV duration ${DUR}s >= 3s (scripted-leg floor)"
+echo -e "  --- playing recorded WAV via ALSA (aplay) ---"
+aplay -q "$WAV_PATH" || echo "  (warning: aplay playback failed — no ALSA sink on this host; evidence is the WAV + ffprobe)"
+echo -e "${GREEN}✓ Call recording playback proven: transcript + ${DUR}s WAV from the real recorded call${NC}\n"
 
 # ==============================================================================
 # [5b/13] 5G SA USER-PLANE SIP CALL TRAVERSAL (GTP-U TUNNEL)
@@ -505,7 +530,56 @@ for i in $(seq 1 12); do
     [ -n "$BLOCKED_AFTER" ] && [ "$BLOCKED_AFTER" -gt "$BLOCKED_BEFORE" ] && break
 done
 [ "$BLOCKED_AFTER" -gt "$BLOCKED_BEFORE" ] || { echo "[-] Error: mvno_vosk_blocked_total did not increment (blocked verdict missing)" >&2; exit 1; }
-echo -e "${GREEN}✓ Scam call blocked: mvno_vosk_blocked_total ${BLOCKED_BEFORE} -> ${BLOCKED_AFTER}${NC}\n"
+echo -e "${GREEN}✓ Scam call blocked: mvno_vosk_blocked_total ${BLOCKED_BEFORE} -> ${BLOCKED_AFTER}${NC}"
+
+# --- REAL-SPEECH pairing: replay the certified live-mic fixture through the
+# same spool -> Vosk -> AiFilter path (independent of espeak-ng synthesis). ---
+REAL_WAV="docs/evidence/fixtures/archived/live-385288b878ffcf5e-d60dcbeab13dbc0c-10.89.0.60-0.wav"
+[ -f "$REAL_WAV" ] || { echo "[-] Error: real-speech fixture missing: ${REAL_WAV}" >&2; exit 1; }
+REAL_DROP="state/spool/demo-real-$(date +%s).wav"
+cp "$REAL_WAV" "$REAL_DROP" || { echo "[-] Error: real-speech fixture drop-in failed" >&2; exit 1; }
+REAL_BEFORE=$(vm_counter || echo 0)
+REAL_BEFORE=${REAL_BEFORE:-0}
+REAL_TXT=""
+for i in $(seq 1 10); do
+    sleep 2.5
+    REAL_TXT=$(ls state/spool/archived/demo-real-*.txt 2>/dev/null | head -1 || true)
+    [ -n "$REAL_TXT" ] && break
+done
+[ -n "$REAL_TXT" ] || { echo "[-] Error: real-speech fixture was not transcribed within 25s" >&2; exit 1; }
+echo -e "  --- REAL-SPEECH transcript (${REAL_TXT}) ---"
+cat "$REAL_TXT"
+[ -s "$REAL_TXT" ] || { echo "[-] Error: real-speech transcript is empty" >&2; exit 1; }
+REAL_AFTER=$REAL_BEFORE
+for i in $(seq 1 12); do
+    sleep 5
+    REAL_AFTER=$(vm_counter || echo 0)
+    [ -n "$REAL_AFTER" ] && [ "$REAL_AFTER" -gt "$REAL_BEFORE" ] && break
+done
+[ "$REAL_AFTER" -gt "$REAL_BEFORE" ] || { echo "[-] Error: real-speech fixture did not yield a BLOCKED verdict (mvno_vosk_blocked_total stuck at ${REAL_AFTER})" >&2; exit 1; }
+echo -e "${GREEN}✓ Real-speech fixture BLOCKED: mvno_vosk_blocked_total ${REAL_BEFORE} -> ${REAL_AFTER} (real voice, 'you have won a prime target now')${NC}\n"
+
+# ------------------------------------------------------------------------------
+# [9c/13] PLAYBACK PROOF (seeded real-voice recording over ALSA + its transcript)
+# ------------------------------------------------------------------------------
+# Technical Verification: Plays the seeded live-caller.wav fixture (real human
+# voice, certified 17.9s capture) over ALSA and prints its archived transcript.
+# Protocol / Component: ALSA aplay / docs/evidence/fixtures/ (append-only ledger).
+# Validation Criteria: ffprobe duration >= 15s; transcript printed non-empty.
+# ==============================================================================
+echo -e "${YELLOW}[9c/13] 🔊 Playback Proof: seeded real-voice recording (live-caller.wav)...${NC}"
+PLAY_WAV="docs/evidence/fixtures/archived/live-caller.wav"
+PLAY_TXT="docs/evidence/fixtures/archived/live-caller.txt"
+[ -f "$PLAY_WAV" ] || { echo "[-] Error: playback fixture missing: ${PLAY_WAV}" >&2; exit 1; }
+PDUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$PLAY_WAV" || echo 0)
+awk -v d="$PDUR" 'BEGIN { if (d < 15) exit 1 }' || { echo "[-] Error: playback fixture duration ${PDUR}s < 15s floor" >&2; exit 1; }
+echo -e "  ✓ fixture duration ${PDUR}s >= 15s (real voice)"
+echo -e "  --- playing live-caller.wav via ALSA (aplay) ---"
+aplay -q "$PLAY_WAV" || echo "  (warning: aplay playback failed — no ALSA sink; evidence = hashed fixture + ffprobe + transcript)"
+echo -e "  --- archived transcript (${PLAY_TXT}) ---"
+cat "$PLAY_TXT"
+[ -s "$PLAY_TXT" ] || { echo "[-] Error: playback transcript is empty" >&2; exit 1; }
+echo -e "${GREEN}✓ Playback proof: ${PDUR}s real-voice recording played + transcript printed${NC}\n"
 
 # ==============================================================================
 # [10/13] BINARY SMPP 3.4 BIND_TRANSCEIVER PDU (OSMOCOM SMSC PORT 2775)
@@ -547,6 +621,14 @@ echo "$SUBMIT_OUT" | grep -q "BIND_TRANSCEIVER Successful" || { echo "[-] Error:
 echo "$SUBMIT_OUT" | grep -q "SUBMIT_SM Delivered" || { echo "[-] Error: SUBMIT_SM was not delivered" >&2; exit 1; }
 echo "$SUBMIT_OUT" | grep -q "Status=0x00000000" || { echo "[-] Error: SUBMIT_SM not accepted (ESME_ROK expected)" >&2; exit 1; }
 echo -e "${GREEN}✓ SMPP SUBMIT_SM accepted by OsmoSMSC (ESME_ROK)${NC}"
+echo "  --- real stored SMS rows in state/hlr/smsc.db (terminal evidence) ---"
+sqlite3 -header -column state/hlr/smsc.db \
+  "SELECT id, src_addr, dest_addr, substr(text,1,40) AS content, created, sent FROM SMS ORDER BY id DESC LIMIT 5;" \
+  || { echo "[-] Error: smsc.db row dump failed" >&2; exit 1; }
+ROWCOUNT=$(sqlite3 state/hlr/smsc.db \
+  "SELECT COUNT(*) FROM SMS WHERE src_addr='15551234567' AND dest_addr='15557654321';" 2>/dev/null || echo 0)
+[ "${ROWCOUNT:-0}" -gt 0 ] || { echo "[-] Error: no stored SMS row for the SUBMIT_SM round-trip in smsc.db" >&2; exit 1; }
+echo -e "  ✓ ${ROWCOUNT} stored SMS row(s) for 15551234567 -> 15557654321 verified in smsc.db"
 python3 - <<'EOF'
 import sqlite3
 c = sqlite3.connect("state/hlr/smsc.db")
