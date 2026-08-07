@@ -107,98 +107,21 @@ live** (pulse). RTPEngine records a pcap per call.
 **COMMANDS** (T-B)
 
 ```bash
-# 1) speech file: a spam-like phrase (won/prize/call = the AI filter keywords)
-espeak-ng -v en-us "You have won a prize, call us now" -w /tmp/speech.wav
-mkdir -p state/baresip/rx state/baresip/tx
-ffmpeg -y -loglevel error -i /tmp/speech.wav -ar 8000 -ac 1 -c:a pcm_s16le \
-  state/baresip/speech8k.wav
-
-# 2) baresip configs (rx = callee streams the WAV; tx = caller, live-mic pulse)
-cat > state/baresip/rx/config <<'EOF'
-module_path /usr/lib/baresip/modules
-module stdio.so
-module g711.so
-module ausine.so
-module aufile.so
-module uuid.so
-module_app account.so
-module_app menu.so
-module_app ctrl_tcp.so
-audio_source aufile,/media/speech8k.wav
-EOF
-cat > state/baresip/rx/accounts <<'EOF'
-<sip:15559998888@10.89.0.23:5060>;auth_user=15559998888;auth_pass=testpass;answermode=auto
-EOF
-cat > state/baresip/tx/config <<'EOF'
-module_path /usr/lib/baresip/modules
-module stdio.so
-module g711.so
-module pulse.so
-module aufile.so
-module uuid.so
-module_app account.so
-module_app menu.so
-module_app ctrl_tcp.so
-audio_source pulse
-audio_player pulse
-EOF
-cat > state/baresip/tx/accounts <<'EOF'
-<sip:15553332211@10.89.0.23:5060>;auth_user=15553332211;auth_pass=testpass
-EOF
-
-# 3) run the two UAs (host baresip + libs, inside ubuntu:24.04 containers)
-#    B[] just mounts the host baresip binary + its shared libs read-only
-B=(-v /usr/bin/baresip:/usr/bin/baresip:ro)
-for f in /usr/lib/libbaresip.so.26 /usr/lib/libre.so.41 \
-         /usr/lib/libbrotlicommon.so.1 /usr/lib/libbrotlidec.so.1 \
-         /usr/lib/libbrotlienc.so.1 /usr/lib/libcrypto.so.3 \
-         /usr/lib/libssl.so.3 /usr/lib/libz.so.1 /usr/lib/libzstd.so.1; do
-  B+=(-v "${f}:${f}:ro")
-done
-B+=(-v /usr/lib/baresip:/usr/lib/baresip:ro)
-for f in $(ldd /usr/lib/baresip/modules/pulse.so | grep -oE '/usr/lib/[^ ]+\.so[^ ]*' | sort -u); do
-  B+=(-v "${f}:${f}:ro")
-done
-B+=(-v /usr/lib64/ld-linux-x86-64.so.2:/hostld/ld-linux-x86-64.so.2:ro)
-B+=(-v /run/user/1000/pulse/native:/run/user/1000/pulse/native)
-B+=(-e PULSE_SERVER=unix:/run/user/1000/pulse/native)
-podman rm -f baresip-rx baresip-tx 2>/dev/null
-podman run -d --name baresip-rx --network mvno_mvno_net --ip 10.89.0.60 \
-  "${B[@]}" -v $PWD/state/baresip/rx:/cfg:z \
-  -v $PWD/state/baresip/speech8k.wav:/media/speech8k.wav:ro \
-  docker.io/library/ubuntu:24.04 \
-  /hostld/ld-linux-x86-64.so.2 --library-path /usr/lib:/usr/lib/pulseaudio \
-  /usr/bin/baresip -f /cfg -s -T
-podman run -d --name baresip-tx --network mvno_mvno_net --ip 10.89.0.61 \
-  "${B[@]}" -v $PWD/state/baresip/tx:/cfg:z \
-  docker.io/library/ubuntu:24.04 \
-  /hostld/ld-linux-x86-64.so.2 --library-path /usr/lib:/usr/lib/pulseaudio \
-  /usr/bin/baresip -f /cfg -s -T
-sleep 3
-podman logs baresip-rx | grep -c "200 OK"      # expect >= 2
-podman logs baresip-tx | grep -c "200 OK"      # expect >= 2
-
-# 4) dial the receiver, SPEAK the scam script for ~12 s, then hang up
-#    (baresip ctrl socket framing: <len>:<json>, — the MSG line IS the dial)
-MSG='{"command":"dial","params":"sip:15559998888@10.89.0.23:5060"}'
-podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; \
-  printf '${#MSG}:${MSG},' >&3; timeout 2 cat <&3"
-sleep 12   # talk into the mic now (or let the canned callee phrase carry it)
-MSG='{"command":"hangup"}'
-podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; \
-  printf '${#MSG}:${MSG},' >&3; timeout 2 cat <&3"
-podman logs baresip-rx | grep -c "200 Answering"    # expect 1
-ls -t state/spool/pcaps/*.pcap | head -1            # the fresh recording
+bash scripts/testing/demo_call.sh setup    # speech file + baresip UAs, both register (~15 s)
+bash scripts/testing/demo_call.sh dial     # real call: callee streams the scam phrase; TALK NOW for ~12 s
+podman logs baresip-rx | grep -c "200 Answering"   # expect 1
+ls -t state/spool/pcaps/*.pcap | head -1           # the fresh recording (~450 KB)
+curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_total'
 ```
 
-**EXPECT** — `CALL_OUTGOING`; rx log: `INVITE sip:15559998888@...`, `180
-Ringing`, `200 Answering` with `m=audio <port> RTP/AVP 0 8 101`, then `BYE`; a
-new pcap (~450 KB) in `state/spool/pcaps/`; RTPEngine counters moved:
-`curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_total'`.
+**EXPECT** — `dial` prints `CALL_OUTGOING → CALL_RINGING → CALL_ANSWERED →
+CALL_ESTABLISHED → CALL_RTPESTAB → CALL_CLOSED`; `200 Answering` = 1; a new
+pcap (~450 KB) in `state/spool/pcaps/`; RTPEngine counters present.
 
 **FALLBACK** — mic silent? `docs/TESTING_REFERENCE.md` §Mic pre-flight + canned
 `ausine` fallback (replace `pulse` lines); sim-based call variant:
-`docs/TESTING_REFERENCE.md` Flow E (T6/T7/T8).
+`docs/TESTING_REFERENCE.md` Flow E (T6/T7/T8); rig mechanics (baresip configs,
+mounts, ctrl-socket framing): `docs/TESTING_REFERENCE.md` §Raw mechanics.
 
 ---
 
@@ -278,26 +201,19 @@ Keep T-A attached (S6a/6c receipts land in its `sms.txt`).
 **COMMANDS** (T-B)
 
 ```bash
-( printf '\x00\x00\x00\x28\x00\x00\x00\x09\x00\x00\x00\x00\x00\x00\x00\x01smsclient\x00password\x00\x00\x34\x00\x00\x00'; \
-  sleep 1; \
-  printf '0000004500000004000000000000000200010131353535373737383838380001013135353534343433333232000000000000000000000e48656c6c6f207261772032473247' | xxd -r -p ) \
-  | nc -q 3 localhost 2775 | xxd | head -3
+python3 scripts/testing/send_raw_smpp.py 15557778888 15554443322 "Hello raw 2G2G"
 sleep 8
 podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt | tail -2
 ```
 
-**EXPECT** — `8000 0009` bind OK; SMSC logs `Rx BIND Trx` / `Rx SUBMIT-SM` /
-`SMPP SUBMIT-SM: Stored in DB`; MS1 prints `[SMS from +15557778888]` /
-`Hello raw 2G2G`. Bridge counters stay flat (not involved).
+**EXPECT** — `SMPP BIND_TRANSCEIVER Successful` + `SUBMIT_SM accepted
+(ESME_ROK)`; MS1 prints `[SMS from +15557778888]` / `Hello raw 2G2G`. Bridge
+counters stay flat (not involved).
 
-**S6b — 2G→5G (raw sqlite3 INSERT into the bridge's polled queue)**
+**S6b — 2G→5G (row into the bridge's polled queue)**
 
 ```bash
-sqlite3 state/hlr/smsc.db "INSERT INTO SMS (created, deliver_attempts,
-  reply_path_req, status_rep_req, is_report, msg_ref, protocol_id,
-  data_coding_scheme, ud_hdr_ind, src_addr, src_ton, src_npi,
-  dest_addr, dest_ton, dest_npi, text) VALUES (datetime('now'), 0, 1, 0, 0,
-  1, 0, 0, 0, '15554443322', 1, 1, '15559998888', 1, 1, 'Hello raw 2G5G');"
+python3 scripts/testing/inject_smsc_row.py 15554443322 15559998888 "Hello raw 2G5G"
 sleep 8
 podman logs mvno-ip-sm-gw --since 2m | grep -E "POLL|DELIVERED" | tail -2
 podman logs baresip-rx 2>&1 | grep "Hello raw 2G5G"        # MESSAGE body seen
@@ -307,19 +223,10 @@ podman logs baresip-rx 2>&1 | grep "Hello raw 2G5G"        # MESSAGE body seen
 Kamailio relays; baresip-rx prints the body. Cleanup afterwards so the gates
 aren't polluted: `sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"`.
 
-**S6c — 5G→2G (raw nc + MD5 digest, Kamailio 5066)**
+**S6c — 5G→2G (digest-auth SIP MESSAGE via Kamailio 5066)**
 
 ```bash
-cd /tmp && USER=15553332211 REALM=10.89.0.23 PASS=testpass \
-  URI='sip:15554443322@10.89.0.23:5060' BODY='Hello raw 5G2G'
-# 3-step SIP digest: ask for a nonce, compute HA1/HA2, resend with Proxy-Authorization
-printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK1;rport\r\nFrom: <sip:%s@%s>;tag=1\r\nTo: <sip:15554443322@%s>\r\nCall-ID: c1@10.89.0.62\r\nCSeq: 1 MESSAGE\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "${#BODY}" "$BODY" > m1.txt
-NONCE=$(timeout 5 nc -u localhost 5066 < m1.txt | grep -oE 'nonce="[^"]+"' | head -1 | sed 's/nonce="\(.*\)"/\1/')
-HA1=$(printf '%s:%s:%s' "$USER" "$REALM" "$PASS" | md5sum | cut -d' ' -f1)
-HA2=$(printf 'MESSAGE:%s' "$URI" | md5sum | cut -d' ' -f1)
-RESP=$(printf '%s:%s:%s' "$HA1" "$NONCE" "$HA2" | md5sum | cut -d' ' -f1)
-printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK2;rport\r\nFrom: <sip:%s@%s>;tag=2\r\nTo: <sip:15554443322@%s>\r\nCall-ID: c1@10.89.0.62\r\nCSeq: 2 MESSAGE\r\nProxy-Authorization: Digest username="%s", realm="%s", nonce="%s", uri="%s", response="%s", algorithm=MD5\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "$USER" "$REALM" "$NONCE" "$URI" "$RESP" "${#BODY}" "$BODY" > m2.txt
-timeout 5 nc -u localhost 5066 < m2.txt | grep -E "^SIP"
+python3 scripts/testing/send_digest_sms.py 15553332211 15554443322 "Hello raw 5G2G"
 sleep 8
 podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt | tail -2
 ```
@@ -329,18 +236,10 @@ OK` + `[SMPP] SUBMIT_SM OK`; MS1 prints `[SMS from +15553332211]` /
 `Hello raw 5G2G`. (MS2 trap: an SMS to `15557778888` is accepted but never
 receipted — the 2G container serves only MS1; always use `15554443322`.)
 
-**S6d — 5G→5G (raw nc + digest, registered IMS number)**
+**S6d — 5G→5G (digest-auth SIP MESSAGE to the registered IMS number)**
 
 ```bash
-cd /tmp && USER=15553332211 REALM=10.89.0.23 PASS=testpass \
-  URI='sip:15559998888@10.89.0.23:5060' BODY='Hello raw 5G5G'
-printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK3;rport\r\nFrom: <sip:%s@%s>;tag=3\r\nTo: <sip:15559998888@%s>\r\nCall-ID: c2@10.89.0.62\r\nCSeq: 1 MESSAGE\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "${#BODY}" "$BODY" > m1.txt
-NONCE=$(timeout 5 nc -u localhost 5066 < m1.txt | grep -oE 'nonce="[^"]+"' | head -1 | sed 's/nonce="\(.*\)"/\1/')
-HA1=$(printf '%s:%s:%s' "$USER" "$REALM" "$PASS" | md5sum | cut -d' ' -f1)
-HA2=$(printf 'MESSAGE:%s' "$URI" | md5sum | cut -d' ' -f1)
-RESP=$(printf '%s:%s:%s' "$HA1" "$NONCE" "$HA2" | md5sum | cut -d' ' -f1)
-printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK4;rport\r\nFrom: <sip:%s@%s>;tag=4\r\nTo: <sip:15559998888@%s>\r\nCall-ID: c2@10.89.0.62\r\nCSeq: 2 MESSAGE\r\nProxy-Authorization: Digest username="%s", realm="%s", nonce="%s", uri="%s", response="%s", algorithm=MD5\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "$USER" "$REALM" "$NONCE" "$URI" "$RESP" "${#BODY}" "$BODY" > m2.txt
-timeout 5 nc -u localhost 5066 < m2.txt | grep -E "^SIP"
+python3 scripts/testing/send_digest_sms.py 15553332211 15559998888 "Hello raw 5G5G"
 sleep 8
 podman logs baresip-rx 2>&1 | grep "Hello raw 5G5G"        # body received
 ```
@@ -349,7 +248,8 @@ podman logs baresip-rx 2>&1 | grep "Hello raw 5G5G"        # body received
 bridge/SMPP (counters stay flat).
 
 **FALLBACK** — per-path detail + terminal setups: `docs/TESTING_REFERENCE.md`
-Flows A–D; scripted SMPP variant: S7.
+Flows A–D; raw PDU/digest/rig mechanics (the original inline commands):
+`docs/TESTING_REFERENCE.md` §Raw mechanics; scripted SMPP variant: S7.
 
 ---
 

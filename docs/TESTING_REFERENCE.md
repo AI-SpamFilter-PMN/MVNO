@@ -168,15 +168,13 @@ OsmoSMSC to the attached 2G MS (Flow A).
 ```bash
 # A) Raw SQLite injection into the SMSC queue — the canonical 2G->5G row driver
 #    (writes the bridge's real polled SMS table: state/hlr/smsc.db, deliver_attempts=0)
-#    Full command in LIVE_DEMO.md S6b. Scripted equivalent:
 python3 scripts/testing/inject_smsc_row.py 15554443322 15551234567 "Hello via DB queue"
 
 # B) Raw binary SMPP 3.4 submit_sm (port 2775) — the same path the IP-SM-GW uses
-#    Full command in LIVE_DEMO.md S6a. Scripted equivalent:
-python3 scripts/testing/send_smpp_sms.py --sender 15554443322 --recipient 15557654321
+python3 scripts/testing/send_raw_smpp.py 15557778888 15554443322 "Hello raw 2G2G"
+#    (flags variant of the same PDU: python3 scripts/testing/send_smpp_sms.py --sender ... --recipient ...)
 
 # C) Via the Gateway REST interception API (evaluates balance/EIR/spam policies)
-#    Raw curl in LIVE_DEMO.md S8. Scripted equivalent:
 ./scripts/testing/send_rest_sms.sh 15554443322 15557654321 "Hello via REST API"
 ```
 
@@ -214,8 +212,8 @@ recipient 2G MS attached to the VLR. The raw way (full PDU command in LIVE_DEMO.
 
 ```bash
 # sender 15557778888 -> recipient 15554443322 (MS1, logs receipts):
-# paste the "( printf '<bind hex>' ; sleep 1; printf '<submit hex>' | xxd -r -p ) \
-#   | nc -q 3 localhost 2775" block from LIVE_DEMO.md S6a, changing the message bytes if desired.
+python3 scripts/testing/send_raw_smpp.py 15557778888 15554443322 "2Gto2G Native SMS"
+# raw PDU bytes for the same message: §Raw mechanics item 2
 ```
 
 Or the scripted way:
@@ -799,6 +797,140 @@ podman logs mvno-kamailio --since 2m | grep "SMS BLOCKED BY MVNO INTERCEPTION CO
 
 **Expected**: one `SMS BLOCKED...` line; the row is never delivered; the API counter
 `mvno_sms_blocked_total` (actuator) increments.
+
+---
+
+## Raw mechanics (the original inline commands)
+
+The LIVE_DEMO guide now calls one-line helpers (`demo_call.sh`,
+`send_raw_smpp.py`, `send_digest_sms.py`). This section preserves the raw
+commands they wrap, for depth / teaching / failure-path inspection.
+
+### 1. baresip call rig (what `demo_call.sh setup` assembles)
+
+Speech file + configs:
+
+```bash
+espeak-ng -v en-us "You have won a prize, call us now" -w /tmp/speech.wav
+mkdir -p state/baresip/rx state/baresip/tx
+ffmpeg -y -loglevel error -i /tmp/speech.wav -ar 8000 -ac 1 -c:a pcm_s16le \
+  state/baresip/speech8k.wav
+cat > state/baresip/rx/config <<'EOF'
+module_path /usr/lib/baresip/modules
+module stdio.so
+module g711.so
+module ausine.so
+module aufile.so
+module uuid.so
+module_app account.so
+module_app menu.so
+module_app ctrl_tcp.so
+audio_source aufile,/media/speech8k.wav
+EOF
+cat > state/baresip/rx/accounts <<'EOF'
+<sip:15559998888@10.89.0.23:5060>;auth_user=15559998888;auth_pass=testpass;answermode=auto
+EOF
+cat > state/baresip/tx/config <<'EOF'
+module_path /usr/lib/baresip/modules
+module stdio.so
+module g711.so
+module pulse.so
+module aufile.so
+module uuid.so
+module_app account.so
+module_app menu.so
+module_app ctrl_tcp.so
+audio_source pulse
+audio_player pulse
+EOF
+cat > state/baresip/tx/accounts <<'EOF'
+<sip:15553332211@10.89.0.23:5060>;auth_user=15553332211;auth_pass=testpass
+EOF
+```
+
+Containers (host baresip + shared libs mounted read-only into ubuntu:24.04):
+
+```bash
+B=(-v /usr/bin/baresip:/usr/bin/baresip:ro)
+for f in /usr/lib/libbaresip.so.26 /usr/lib/libre.so.41 \
+         /usr/lib/libbrotlicommon.so.1 /usr/lib/libbrotlidec.so.1 \
+         /usr/lib/libbrotlienc.so.1 /usr/lib/libcrypto.so.3 \
+         /usr/lib/libssl.so.3 /usr/lib/libz.so.1 /usr/lib/libzstd.so.1; do
+  B+=(-v "${f}:${f}:ro")
+done
+B+=(-v /usr/lib/baresip:/usr/lib/baresip:ro)
+for f in $(ldd /usr/lib/baresip/modules/pulse.so | grep -oE '/usr/lib/[^ ]+\.so[^ ]*' | sort -u); do
+  B+=(-v "${f}:${f}:ro")
+done
+B+=(-v /usr/lib64/ld-linux-x86-64.so.2:/hostld/ld-linux-x86-64.so.2:ro)
+B+=(-v /run/user/1000/pulse/native:/run/user/1000/pulse/native)
+B+=(-e PULSE_SERVER=unix:/run/user/1000/pulse/native)
+podman run -d --name baresip-rx --network mvno_mvno_net --ip 10.89.0.60 \
+  "${B[@]}" -v $PWD/state/baresip/rx:/cfg:z \
+  -v $PWD/state/baresip/speech8k.wav:/media/speech8k.wav:ro \
+  docker.io/library/ubuntu:24.04 \
+  /hostld/ld-linux-x86-64.so.2 --library-path /usr/lib:/usr/lib/pulseaudio \
+  /usr/bin/baresip -f /cfg -s -T
+podman run -d --name baresip-tx --network mvno_mvno_net --ip 10.89.0.61 \
+  "${B[@]}" -v $PWD/state/baresip/tx:/cfg:z \
+  docker.io/library/ubuntu:24.04 \
+  /hostld/ld-linux-x86-64.so.2 --library-path /usr/lib:/usr/lib/pulseaudio \
+  /usr/bin/baresip -f /cfg -s -T
+sleep 3
+podman logs baresip-rx | grep -c "200 OK"      # expect >= 2
+podman logs baresip-tx | grep -c "200 OK"      # expect >= 2
+```
+
+Dial/hangup via the ctrl socket (framing `<len>:<json>,` — what `demo_call.sh dial` does):
+
+```bash
+MSG='{"command":"dial","params":"sip:15559998888@10.89.0.23:5060"}'
+podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; \
+  printf '${#MSG}:${MSG},' >&3; timeout 2 cat <&3"
+sleep 12   # talk into the mic now (or let the canned callee phrase carry it)
+MSG='{"command":"hangup"}'
+podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; \
+  printf '${#MSG}:${MSG},' >&3; timeout 2 cat <&3"
+podman logs baresip-rx | grep -c "200 Answering"    # expect 1
+ls -t state/spool/pcaps/*.pcap | head -1            # the fresh recording
+```
+
+### 2. Raw binary SMPP 3.4 (what `send_raw_smpp.py` sends)
+
+BIND_TRANSCEIVER (`0x00000009`) + SUBMIT_SM (`0x00000004`) PDU over
+`nc -q 3 localhost 2775` — the `Hello raw 2G2G` example:
+
+```bash
+( printf '\x00\x00\x00\x28\x00\x00\x00\x09\x00\x00\x00\x00\x00\x00\x00\x01smsclient\x00password\x00\x00\x34\x00\x00\x00'; \
+  sleep 1; \
+  printf '0000004500000004000000000000000200010131353535373737383838380001013135353534343433333232000000000000000000000e48656c6c6f207261772032473247' | xxd -r -p ) \
+  | nc -q 3 localhost 2775 | xxd | head -3
+sleep 8
+podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt | tail -2
+```
+
+### 3. SIP digest dance (what `send_digest_sms.py` does)
+
+3-step MESSAGE over UDP to Kamailio `5066`: unauthenticated request → 407
+challenge (`nonce`) → compute `HA1/HA2` → resend with `Proxy-Authorization`:
+
+```bash
+cd /tmp && USER=15553332211 REALM=10.89.0.23 PASS=testpass \
+  URI='sip:15554443322@10.89.0.23:5060' BODY='Hello raw 5G2G'
+printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK1;rport\r\nFrom: <sip:%s@%s>;tag=1\r\nTo: <sip:15554443322@%s>\r\nCall-ID: c1@10.89.0.62\r\nCSeq: 1 MESSAGE\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "${#BODY}" "$BODY" > m1.txt
+NONCE=$(timeout 5 nc -u localhost 5066 < m1.txt | grep -oE 'nonce="[^"]+"' | head -1 | sed 's/nonce="\(.*\)"/\1/')
+HA1=$(printf '%s:%s:%s' "$USER" "$REALM" "$PASS" | md5sum | cut -d' ' -f1)
+HA2=$(printf 'MESSAGE:%s' "$URI" | md5sum | cut -d' ' -f1)
+RESP=$(printf '%s:%s:%s' "$HA1" "$NONCE" "$HA2" | md5sum | cut -d' ' -f1)
+printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK2;rport\r\nFrom: <sip:%s@%s>;tag=2\r\nTo: <sip:15554443322@%s>\r\nCall-ID: c1@10.89.0.62\r\nCSeq: 2 MESSAGE\r\nProxy-Authorization: Digest username="%s", realm="%s", nonce="%s", uri="%s", response="%s", algorithm=MD5\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "$USER" "$REALM" "$NONCE" "$URI" "$RESP" "${#BODY}" "$BODY" > m2.txt
+timeout 5 nc -u localhost 5066 < m2.txt | grep -E "^SIP"
+sleep 8
+podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt | tail -2
+```
+
+For 5G→5G (S6d) change `URI`/`To`/`From` to `15559998888` and a fresh Call-ID;
+the dance itself is identical. Each helper gets its own nonce — there is no
+cross-block file dependency between S6c and S6d.
 
 ---
 
