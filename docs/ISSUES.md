@@ -1,5 +1,6 @@
 # Telecom & Cloud-Native System Issues, Root Causes, and Verification Reference (`ISSUES.md`)
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 This document is the authoritative troubleshooting, root-cause analysis, and deployment architecture reference for the MVNO Interception Core. It details every technical issue encountered across Osmocom, Kamailio, RTPEngine, Open5GS, VictoriaMetrics, Grafana, Vector, and UERANSIM, along with empirical verification steps and deployment models (Native, Containerized, and Mixed).
 
 ---

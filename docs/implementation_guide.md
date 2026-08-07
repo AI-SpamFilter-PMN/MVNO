@@ -2573,41 +2573,8 @@ The user-plane path is: **UE tun → N3 GTP-U (gNB `10.89.0.30` ↔ UPF `10.89.0
 
 ### C. Abbreviation Glossary
 
-| Abbreviation | Full Form | Context |
-|-------------|-----------|---------|
-| **AMF** | Access and Mobility Management Function | 5GC — UE registration, mobility, connection management |
-| **AUSF** | Authentication Server Function | 5GC — subscriber authentication |
-| **BSF** | Binding Support Function | 5GC — PCF discovery |
-| **DTMF** | Dual-Tone Multi-Frequency | Touch-tone keypad signals during calls |
-| **EIR** | Equipment Identity Register | Device IMEI tracking and SIM swap detection |
-| **ESME** | External Short Message Entity | SMS client that connects to an SMSC via SMPP |
-| **GTP-U** | GPRS Tunneling Protocol — User Plane | 5GC — tunnel carrying user data between UPF and gNB |
-| **HLR** | Home Location Register | Subscriber database (IMSI, MSISDN, services) |
-| **IMEI** | International Mobile Equipment Identity | Unique hardware identifier for mobile devices |
-| **IMSI** | International Mobile Subscriber Identity | Unique SIM card identifier |
-| **LAC** | Location Area Code | Cell tower grouping for geofencing |
-| **MSISDN** | Mobile Subscriber ISDN Number | The phone number (what you dial) |
-| **NF** | Network Function | A 5GC logical component (AMF, SMF, UPF, etc.) |
-| **NGAP** | Next Generation Application Protocol | 5GC — signaling between gNB and AMF (N2 interface) |
-| **NRF** | Network Repository Function | 5GC — service registry for all NFs |
-| **NSSF** | Network Slice Selection Function | 5GC — selects network slice for UE |
-| **OCS** | Online Charging System | Real-time prepaid balance management |
-| **PCF** | Policy Control Function | 5GC — QoS and charging policies |
-| **PFCP** | Packet Forwarding Control Protocol | 5GC — control channel between SMF and UPF |
-| **SBI** | Service-Based Interface | 5GC — HTTP/2 communication between NFs |
-| **SCTP** | Stream Control Transmission Protocol | Transport for NGAP between gNB and AMF |
-| **SDP** | Session Description Protocol | SIP body describing media codecs, ports |
-| **SIP** | Session Initiation Protocol | Signaling protocol for voice/video calls |
-| **SLA** | Service Level Agreement | Fallback whitelist when AI filter is unreachable |
-| **SMF** | Session Management Function | 5GC — PDU session establishment, IP allocation |
-| **SMPP** | Short Message Peer-to-Peer | Protocol for SMS exchange between ESME and SMSC |
-| **SMSC** | Short Message Service Center | Store-and-forward for SMS messages |
-| **STIR/SHAKEN** | Secure Telephony Identity Revisited / Signature-based Handling of Asserted information using toKENs | Anti-spoofing framework for SIP caller ID |
-| **TEID** | Tunnel Endpoint Identifier | GTP-U tunnel identifier between UPF and gNB |
-| **UDM** | Unified Data Management | 5GC — subscriber data store |
-| **UDR** | Unified Data Repository | 5GC — backend storage for UDM and PCF |
-| **UPF** | User Plane Function | 5GC — packet forwarding, QoE enforcement |
-
+The complete abbreviation glossary (single source of truth) lives in
+**docs/GLOSSARY.md** — see the link under the title of this document.
 ### D. Architectural Decisions Summary
 
 | Decision | Alternative | Why Chosen |

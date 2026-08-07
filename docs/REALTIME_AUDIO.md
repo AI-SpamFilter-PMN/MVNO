@@ -1,5 +1,6 @@
 # Real-Time Call Transcription — Tier 1 Live + Tier 3 Fallback
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 Audio path for the MVNO interception demo: rtpengine records calls as pcap,
 `live_tap.sh` turns them into WAVs, and the Native Vosk ASR watcher transcribes
 them **live, during the call** (Tier 1) — with a post-call extraction fallback

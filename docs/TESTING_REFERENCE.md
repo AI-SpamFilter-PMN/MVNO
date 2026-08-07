@@ -1,5 +1,6 @@
 # MVNO Telecom Core — Manual Testing Guide
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 A hands-on, terminal-by-terminal guide for verifying **every** active flow in the MVNO
 private-mobile-network core: **2G SMS, 5G/IMS SMS, 2G↔5G SMS bridging (IP-SM-GW),
 SIP/IMS calls, RTPEngine media plane, Vosk speech-to-text, live call recording +

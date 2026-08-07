@@ -1,6 +1,7 @@
 # MVNO Interception & Monitoring Core
 ### Core Network Interception & Observability for the AI Spam Filter Platform
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 [![Orchestration](https://img.shields.io/badge/Orchestration-Podman--Compose_%7C_Docker-orange?style=for-the-badge&logo=podman)](docs/deployment_guide.md)
 [![Database](https://img.shields.io/badge/Database-SQLite_WAL_%7C_MongoDB-green?style=for-the-badge&logo=sqlite)](docs/deployment_guide.md)
 [![Observability](https://img.shields.io/badge/Observability-VictoriaMetrics_%7C_Grafana-purple?style=for-the-badge&logo=grafana)](docs/deployment_guide.md)

@@ -1,9 +1,10 @@
 # MVNO Telecom Core — LIVE DEMO (Presentation Script)
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 **This is the demo.** Every block below was verified live (2026-08-06 audit +
 evidence-layer runs in `docs/evidence/demo-run-2026-08-07.log` /
 `e2e-run-2026-08-07.log`). One terminal (T-B) at the repo root does almost
-everything; T-A holds the 2G MS for receipts; optional extra terminals are
+everything; T-A holds the 2G Mobile Station (MS) for receipts; optional extra terminals are
 listed per step. Paste each block **verbatim** and read the EXPECT line.
 
 > **Fallback convention**: every step's FALLBACK points at a seeded fixture in
@@ -28,7 +29,7 @@ Terminal map:
 **PURPOSE** — prove the stack is up and the host has the demo toolchain.
 
 **CLEAN SLATE (run before every demo re-run)** — prior runs leave baresip
-terminals running and live SIP registrations in Kamailio's usrloc (Issue 8.37)
+terminals running and live Session Initiation Protocol (SIP) registrations in Kamailio's usrloc (Issue 8.37)
 that mask the bounded-retry and 404 flows. Reset first:
 
 ```bash
@@ -66,8 +67,8 @@ cat $(ls -t state/spool/archived/mic_call_*.txt | head -1)
 ```
 
 **EXPECT** — a non-empty transcript line (what you just spoke; English words are
-most reliable). If Vosk is unavailable the demo still proceeds — transcripts
-are demo-grade, the AI verdicts come from the REST/SMS paths.
+most reliable). If the Vosk offline speech engine is unavailable the demo still proceeds — transcripts
+are demo-grade, the AI verdicts come from the REST/Short Message Service (SMS) paths.
 
 **FALLBACK** — fixtures: `docs/evidence/fixtures/MANIFEST.md` (45/45 checksummed
 reference transcripts/verdicts, no mic required).
@@ -98,7 +99,7 @@ after S2 — Steps S3+ run on the **host** (T-B).
 
 ---
 
-## S3 — Real Call + Speak the Scam Script + RTPEngine Bytes  ·  ~3 min
+## S3 — Real Call + Speak the Scam Script + RTPEngine (media proxy) Bytes  ·  ~3 min
 
 **PURPOSE** — a real `baresip` voice call, auto-answered, media through
 RTPEngine; the **callee streams a canned scam phrase**, the **caller can speak
@@ -196,7 +197,7 @@ curl -s 'http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total'
 **PURPOSE** — every messaging path the core implements, raw and observable.
 Keep T-A attached (S6a/6c receipts land in its `sms.txt`).
 
-**S6a — 2G→2G (raw binary SMPP over nc, port 2775)**
+**S6a — 2G→2G (raw binary Short Message Peer-to-Peer (SMPP) over nc, port 2775)**
 
 **COMMANDS** (T-B)
 
@@ -248,7 +249,7 @@ podman logs baresip-rx 2>&1 | grep "Hello raw 5G5G"        # body received
 bridge/SMPP (counters stay flat).
 
 **FALLBACK** — per-path detail + terminal setups: `docs/TESTING_REFERENCE.md`
-Flows A–D; raw PDU/digest/rig mechanics (the original inline commands):
+Flows A–D; raw PDU (Protocol Data Unit)/digest/rig mechanics (the original inline commands):
 `docs/TESTING_REFERENCE.md` §Raw mechanics; scripted SMPP variant: S7.
 
 ---
@@ -306,7 +307,7 @@ SMS rows (real terminal evidence, non-empty).
 ## S9 — PromQL / Grafana  ·  ~1 min
 
 **PURPOSE** — telemetry: the interception counters live in VictoriaMetrics and
-the NOC dashboard renders.
+the Network Operations Center (NOC) dashboard renders.
 
 **COMMANDS** (T-B)
 

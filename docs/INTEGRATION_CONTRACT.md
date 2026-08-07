@@ -1,5 +1,6 @@
 # MVNO Core — Integration & API Contract (External Repositories)
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 This document is the **single source of truth** for every public interface the MVNO core exposes
 to the three external repositories (`AI-Filteration-System`, `SipClient`, `sms-client`), so their
 clients can plug in **without modifying this repo**. The MVNO is the central repo; those

@@ -1,10 +1,11 @@
 # MVNO Core — Team Onboarding Guide
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 
 ## 1. Project Identity
 
-This repository contains a **complete MVNO 5G SA Core with real-time interception gateway**. It combines a standards-compliant 5G Standalone core (Open5GS + UERANSIM), an Osmocom-based cellular stack (HLR/MSC/SMSC), a Spring Boot interception gateway with native Vosk ASR, and an AI spam filter integration point — all orchestrated via rootless Podman/Docker Compose. It is **not** a production billing platform, a full IMS core, or a managed SaaS — it's a developer-grade stack for building and testing spam/voice interception logic.
+This repository contains a **complete Mobile Virtual Network Operator (MVNO) 5G SA Core with real-time interception gateway**. It combines a standards-compliant 5G Standalone core (Open5GS + UERANSIM), an Osmocom-based cellular stack (HLR/MSC/SMSC), a Spring Boot interception gateway with native Vosk ASR (Automatic Speech Recognition), and an AI spam filter integration point — all orchestrated via rootless Podman/Docker Compose. It is **not** a production billing platform, a full IMS core, or a managed SaaS — it's a developer-grade stack for building and testing spam/voice interception logic.
 
-**Recommended start**: run `docs/LIVE_DEMO.md` — the from-zero live demo (S1–S10): a complete raw-shell walkthrough (no Python, no scripts) of the live stack: baresip voice call, recording → Vosk spam verdict, and all five SMS paths, ending with the automated demo/e2e gates. The full terminal-by-terminal reference (scripted variants, troubleshooting, certification log) is `docs/TESTING_REFERENCE.md`.
+**Recommended start**: run `docs/LIVE_DEMO.md` — the from-zero live demo (S1–S10): a complete raw-shell walkthrough (no Python, no scripts) of the live stack: baresip voice call, recording → Vosk spam verdict, and all five Short Message Service (SMS) paths, ending with the automated demo/e2e gates. The full terminal-by-terminal reference (scripted variants, troubleshooting, certification log) is `docs/TESTING_REFERENCE.md`.
 
 ## 2. Architecture Overview
 
@@ -30,11 +31,11 @@ This repository contains a **complete MVNO 5G SA Core with real-time interceptio
 ```
 
 **Components:**
-- **5G SA Core**: Open5GS 10 NFs (NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + UERANSIM gNB + 3 UEs
-- **Osmocom Stack**: HLR (GSUP) + SMSC (SMPP 3.4) via `osmo-hlr` + `osmo-smsc` containers (the `osmo-msc` binary runs in SMSC mode)
-- **Interception Gateway**: Kamailio SIP registrar/proxy → `rtpengine` media fork → Vosk ASR (native JNI) → Spring Boot gateway (Java 21, virtual threads)
+- **5G SA Core**: Open5GS 10 NFs (NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + UERANSIM gNB + 3 UEs (User Equipment)
+- **Osmocom Stack**: HLR (GSUP) + SMSC (Short Message Peer-to-Peer (SMPP) 3.4) via `osmo-hlr` + `osmo-smsc` containers (the `osmo-msc` binary runs in SMSC mode)
+- **Interception Gateway**: Kamailio Session Initiation Protocol (SIP) registrar/proxy → `rtpengine` media fork → Vosk ASR (native JNI) → Spring Boot gateway (Java 21, virtual threads)
 - **AI Spam Filter**: External REST service at `http://ai-filter:8000/api/v1/classify`
-- **Observability**: Vector (stdout log driver) → VictoriaMetrics (metrics TSDB) → Grafana (2 dashboards: Unified NOC + VictoriaMetrics System NOC)
+- **Observability**: Vector (stdout log driver) → VictoriaMetrics (metrics TSDB) → Grafana (2 dashboards: Unified Network Operations Center (NOC) + VictoriaMetrics System NOC)
 
 **Diagrams:** `docs/architecture_flow.svg`, `docs/ims_voice_call_flow.svg`, `docs/sms_interception_flow.svg`
 
@@ -158,7 +159,7 @@ never stalls the spool loop.
 | Layer | Check | Block Condition |
 |-------|-------|-----------------|
 | 1. Prepaid OCS | SQLite balance ≤ 0 | `allow: false, "Prepaid balance exhausted"` |
-| 2. EIR | IMEI→MSISDN binding >3 swaps/10min | `allow: false, "EIR: SIM swap detected"` |
+| 2. Equipment Identity Register (EIR) | IMEI→MSISDN binding >3 swaps/10min | `allow: false, "EIR: SIM swap detected"` |
 | 3. AI Filter | External model classification | `allow: false, "AI: spam detected"` |
 
 **End-to-end flow narrative:**
@@ -192,6 +193,7 @@ never stalls the spool loop.
 | `make test-call` | `allow: false, "EIR: SIM swap detected"` (test IMEI) |
 | `make test` | All 4 pass |
 | `cd telecom-api && ./mvnw test` | 26/26 pass (includes SLA + circuit breaker + distinct EIR + GET intercept + API-key interceptor + Vosk verdict tests) |
+| `bash scripts/check-glossary.sh` | exit 0: `✓ 0 uncovered` (glossary lint gate) |
 
 ---
 
@@ -217,7 +219,7 @@ never stalls the spool loop.
 | **SIP Testing** | `make test-call` uses HTTP POST; real SIP covered by `scripts/testing/sip_traffic_sim.py` (REGISTER + 407 digest challenge → INVITE handshake, used by runbook steps 5-6). No SIPp scenario included. |
 | **5G Radio Path** | 3 UERANSIM UEs registered on the AMF with a **verified UL+DL user-plane data path** (UE tun → N3 GTP-U → UPF ogstun). After any UERANSIM UE recreate, re-add the UE route (`ip route add 10.45.0.1 dev uesimtun0`) and recreate the trio atomically (see `docs/ISSUES.md` S7.4). **No SMS-over-NAS / VoNR over radio** — voice and SMS are external-path demos (SipClient / sms-client); SMS-over-NAS is on the roadmap. |
 | **SCTP Kernel** | `modprobe sctp` required on host. Fails silently if missing (gNB↔AMF never connects). |
-| **RTPEngine Kernel** | Runs in userspace mode (kernel module not required). |
+| **RTPEngine (rtpengine media proxy) Kernel** | Runs in userspace mode (kernel module not required). |
 | **First-call ASR Cold Start** | Vosk model loads lazily on first transcription (~2-5s delay). |
 
 ---
@@ -337,7 +339,7 @@ returning `{ "allow": boolean, "reason": "string" }`. Full JSON schemas:
 * **SMS Client (`sms-client`)**:
   - SMPP 3.4 Host & Port: `osmo-smsc:2775` (inside `mvno_net`)
   - SMSC System-ID: `MVNO_SMSC`
-  - Primary ESME Account: `mvno-api-route` / password `changeme`
+  - Primary ESME (External Short Message Entity) Account: `mvno-api-route` / password `changeme`
   - Secondary Client ESME Account: `smsclient` / password `password`
   - REST Interception Endpoint: `POST http://telecom-api:8080/api/v1/intercept/sms` — **requires header `X-API-Key: mvno-demo-key-2026`** (missing/mismatched key → `401 Unauthorized`; demo key via env `X_API_KEY`)
 * **Voice Client (`SipClient`)**:

@@ -1,5 +1,6 @@
 # Deployment and Configuration Guide — MVNO Core
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 This guide covers the transaction flow, software prerequisites, and complete configuration files for deploying the MVNO Core using both the **Native (systemd)** and **Containerized (Podman Compose)** methods.
 
 ---

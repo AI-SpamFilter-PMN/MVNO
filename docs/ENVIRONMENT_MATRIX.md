@@ -1,5 +1,6 @@
 # MVNO Core — Supported Environment Matrix
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 This document is the **authoritative portability contract** for running the MVNO core stack.
 It is the single source of truth for what OS / architecture / runtime / kernel features are
 required, and what will *not* work. External clients and reviewers: read this before `make up`.

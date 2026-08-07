@@ -1,5 +1,6 @@
 # MVNO Core — Architectural & Operational Roadmap (`docs/ROADMAP.md`)
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 This document outlines upcoming architectural enhancements, operational backlog items, security hardening notes, and subsystem evaluations for the **MVNO Cellular Core** infrastructure.
 
 ---

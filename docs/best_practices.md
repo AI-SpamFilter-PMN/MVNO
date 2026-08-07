@@ -1,6 +1,7 @@
 # MVNO Core — Best Practices & SOTA Additions
 _Augmenting the 5 existing practices without exceeding lightweight/optimized constraints_
 
+> Abbreviations: **docs/GLOSSARY.md** — single source of truth
 ---
 
 ## Already Adopted (the 5 from previous answer)
