@@ -4,7 +4,7 @@
 
 This repository contains a **complete MVNO 5G SA Core with real-time interception gateway**. It combines a standards-compliant 5G Standalone core (Open5GS + UERANSIM), an Osmocom-based cellular stack (HLR/MSC/SMSC), a Spring Boot interception gateway with native Vosk ASR, and an AI spam filter integration point — all orchestrated via rootless Podman/Docker Compose. It is **not** a production billing platform, a full IMS core, or a managed SaaS — it's a developer-grade stack for building and testing spam/voice interception logic.
 
-**Recommended start**: run `docs/MANUAL_TESTING_GUIDE.md` **Section 0 "From-Zero Live Demo"** — a complete raw-shell walkthrough (no Python, no scripts) of the live stack: baresip voice call, recording → Vosk spam verdict, and all five SMS paths, ending with the automated demo/e2e gates.
+**Recommended start**: run `docs/LIVE_DEMO.md` — the from-zero live demo (S1–S10): a complete raw-shell walkthrough (no Python, no scripts) of the live stack: baresip voice call, recording → Vosk spam verdict, and all five SMS paths, ending with the automated demo/e2e gates. The full terminal-by-terminal reference (scripted variants, troubleshooting, certification log) is `docs/TESTING_REFERENCE.md`.
 
 ## 2. Architecture Overview
 

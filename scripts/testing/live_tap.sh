@@ -5,7 +5,7 @@
 # Converts rtpengine pcap recordings (recording-method=pcap, recording-format=eth)
 # to G.711u 16 kHz mono WAV files for the Native Vosk ASR spool watcher — zero
 # Python, reusing the certified tshark -> awk -> xxd -> ffmpeg extraction chain
-# (see docs/REALTIME_AUDIO.md and MANUAL_TESTING_GUIDE.md Section 0.5).
+# (see docs/REALTIME_AUDIO.md and docs/LIVE_DEMO.md S4).
 #
 # Extraction chain (per packet, certified byte-parity vs the retired Python
 # baseline): tshark fields (ip.src, udp.dstport, data.data) -> awk keeps only

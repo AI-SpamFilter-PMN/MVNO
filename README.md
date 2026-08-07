@@ -5,7 +5,7 @@
 [![Database](https://img.shields.io/badge/Database-SQLite_WAL_%7C_MongoDB-green?style=for-the-badge&logo=sqlite)](docs/deployment_guide.md)
 [![Observability](https://img.shields.io/badge/Observability-VictoriaMetrics_%7C_Grafana-purple?style=for-the-badge&logo=grafana)](docs/deployment_guide.md)
 [![SMS Interworking](https://img.shields.io/badge/2G%E2%86%945G_SMS-IP--SM--GW_%7C_Kamailio-blue?style=for-the-badge)](docs/implementation_guide.md)
-[![AI Block](https://img.shields.io/badge/AI_Spam_Block-Deterministic_E2E--BLOCK-red?style=for-the-badge)](docs/MANUAL_TESTING_GUIDE.md)
+[![AI Block](https://img.shields.io/badge/AI_Spam_Block-Deterministic_E2E--BLOCK-red?style=for-the-badge)](docs/LIVE_DEMO.md)
 [![E2E Gate](https://img.shields.io/badge/E2E_Runbook-5_of_5_Cells_Green-brightgreen?style=for-the-badge)](scripts/testing/e2e_runbook.sh)
 
 Simulates an MVNO / Private Mobile Network core for the companion [AI Spam Filter](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) platform. Handles SMS routing and SIP/VoIP calling, intercepts payloads in real-time, and enforces allow/block decisions from the AI filter REST API.
@@ -168,7 +168,8 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | Document | Role |
 | :--- | :--- |
 | [ONBOARDING.md](ONBOARDING.md) | Team onboarding — setup, make targets, integration specs. |
-| [docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md) | Full multi-terminal manual testing guide — all MVP flows (2G/5G SMS, 2G↔5G IP-SM-GW bridging, SIP/IMS calls, RTP engine media, Vosk STT, recording, interception REST API, AI spam block, automated e2e gate, Grafana/VictoriaMetrics telemetry). |
+| [docs/LIVE_DEMO.md](docs/LIVE_DEMO.md) | The from-zero live demo (S1–S10): raw-shell walkthrough of voice call, RTPEngine media, live_tap → WAV → Vosk spam verdict, all five SMS paths, REST + smsc dump, telemetry, and the automated demo/e2e gates. |
+| [docs/TESTING_REFERENCE.md](docs/TESTING_REFERENCE.md) | Full multi-terminal testing reference — scripted/containerized variants of all MVP flows (2G/5G SMS, 2G↔5G IP-SM-GW bridging, SIP/IMS calls, RTP engine media, Vosk STT, recording, interception REST API, AI spam block, automated e2e gate, Grafana/VictoriaMetrics telemetry), plus troubleshooting and the certification log. |
 | [docs/INTEGRATION_CONTRACT.md](docs/INTEGRATION_CONTRACT.md) | Single source of truth for external repos — interfaces, X-API-Key auth, `/api/v1/classify` payload schemas (SMS/VOICE_CALL/TRANSCRIPT), SLA/fail-open, per-repo integration notes, partner handoff package. |
 | [docs/deployment_guide.md](docs/deployment_guide.md) | Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference. |
 | [docs/ENVIRONMENT_MATRIX.md](docs/ENVIRONMENT_MATRIX.md) | Portability contract — supported OS/arch/runtime/kernel features; run `./scripts/preflight.sh` to verify. |

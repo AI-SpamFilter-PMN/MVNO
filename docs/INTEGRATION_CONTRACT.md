@@ -279,7 +279,7 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 | `docs/INTEGRATION_CONTRACT.md` Section 1, Section 5 (SipClient), Section 6 | ports, digest auth, PCMU-only codec, 403 semantics, RTP range, `MVNO_PUBLISH_5060` |
 | `docs/ENVIRONMENT_MATRIX.md` Section 3 | why host `5060` is blocked (Asterisk) |
 | `configs/kamailio/kamailio.cfg` `route[INTERCEPT]` | call-intercept callout behavior |
-| `docs/MANUAL_TESTING_GUIDE.md` voice flows | end-to-end call + RTP + recording verification steps (Flow E, T6/T7/T8) |
+| `docs/TESTING_REFERENCE.md` voice flows | end-to-end call + RTP + recording verification steps (Flow E, T6/T7/T8); raw-shell baresip variant in `docs/LIVE_DEMO.md` S3 |
 | `scripts/testing/sip_traffic_sim.py` | reference UA — your client must reproduce its REGISTER/407→digest→INVITE→RTP behavior |
 
 **Prove your integration with**: `./scripts/testing/demo_runbook.sh` check 5 (replace the sim caller with your client: REGISTER 200 OK, call answered, `rtpengine_bytes_total` moves) and check 6 (your client must surface the 403 Forbidden from a zero-balance call). Also Flow E T6/T7 for the full media dialog.
@@ -289,7 +289,7 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 |---|---|
 | `docs/INTEGRATION_CONTRACT.md` Section 1, Section 5 (sms-client) | SMPP `2775`, `MVNO_SMSC`, ESME accounts, `ai.classify.url` replacement value, intercept REST |
 | `configs/osmocom/osmo-smsc.cfg` | the `esme smsclient` / `esme mvno-api-route` routes |
-| `docs/MANUAL_TESTING_GUIDE.md` SMS flows | 2G/5G + IP-SM-GW delivery verification |
+| `docs/TESTING_REFERENCE.md` SMS flows | 2G/5G + IP-SM-GW delivery verification; raw-shell variants in `docs/LIVE_DEMO.md` S6–S8 |
 | `scripts/testing/e2e_runbook.sh` | 5-cell SMS matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) |
 | `scripts/testing/send_smpp_sms.py` | reference ESME — your client must reproduce BIND_TRANSCEIVER + SUBMIT_SM against `127.0.0.1:2775` |
 
