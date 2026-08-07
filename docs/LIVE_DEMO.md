@@ -27,6 +27,21 @@ Terminal map:
 
 **PURPOSE** — prove the stack is up and the host has the demo toolchain.
 
+**CLEAN SLATE (run before every demo re-run)** — prior runs leave baresip
+terminals running and live SIP registrations in Kamailio's usrloc (Issue 8.37)
+that mask the bounded-retry and 404 flows. Reset first:
+
+```bash
+podman rm -f baresip-rx baresip-tx 2>/dev/null
+for u in 15559998888 15557654321 15554443322 15557778888; do
+  python3 scripts/testing/sip_traffic_sim.py --callee $u --deregister
+done
+sqlite3 state/kamailio/kamailio.db "DELETE FROM location WHERE expires < julianday('now');"
+```
+
+**EXPECT** — `SIP DEREGISTER 200 OK` per user; `location` holds only the rigs
+you registered this session.
+
 **COMMANDS**
 
 ```bash

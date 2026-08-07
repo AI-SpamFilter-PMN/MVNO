@@ -45,6 +45,64 @@ def _extract_nonce(resp_text, header):
     return ""
 
 
+def deregister_subscriber(username, password, host="127.0.0.1", port=5066):
+    """Digest-authenticated deregister: REGISTER carrying Contact: * with
+    Expires: 0 clears ALL bindings for the AoR in Kamailio's usrloc
+    (Issue 8.37 pattern — the demo leaves stale registrations behind; a plain
+    Expires: 0 with a specific Contact only drops that one binding).
+    Returns True on SIP/2.0 200 OK."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(3)
+    call_id = f"dereg-{username}-{int(time.time())}@127.0.0.1"
+
+    def build_reg(cseq, auth=""):
+        auth_hdr = f"Authorization: {auth}\r\n" if auth else ""
+        return (
+            f"REGISTER sip:localhost:{port} SIP/2.0\r\n"
+            f"Via: SIP/2.0/UDP 127.0.0.1:5070;branch=z9hG4bK-drg{cseq}-{username}\r\n"
+            f"From: <sip:{username}@localhost>;tag=tag-drg-{username}\r\n"
+            f"To: <sip:{username}@localhost>\r\n"
+            f"Call-ID: {call_id}\r\n"
+            f"CSeq: {cseq} REGISTER\r\n"
+            f"Contact: *\r\n"
+            f"{auth_hdr}"
+            f"Expires: 0\r\n"
+            f"Content-Length: 0\r\n\r\n"
+        )
+
+    s.sendto(build_reg(1).encode(), (host, port))
+    try:
+        resp1, _ = s.recvfrom(4096)
+        resp1_str = resp1.decode("utf-8", errors="ignore")
+    except Exception as e:
+        print(f"[-] Deregister failed for {username}: {e}")
+        s.close()
+        return False
+    nonce = _extract_nonce(resp1_str, "www-authenticate")
+    if not nonce:
+        print(f"[-] Deregister failed for {username}: No nonce received")
+        s.close()
+        return False
+    digest = calculate_digest_response(username, "localhost", password, "REGISTER",
+                                       f"sip:localhost:{port}", nonce)
+    auth = f'Digest username="{username}", realm="localhost", nonce="{nonce}", uri="sip:localhost:{port}", response="{digest}"'
+    s.sendto(build_reg(2, auth).encode(), (host, port))
+    try:
+        resp2, _ = s.recvfrom(4096)
+        resp2_str = resp2.decode("utf-8", errors="ignore")
+    except Exception as e:
+        print(f"[-] SIP DEREGISTER response error: {e}")
+        s.close()
+        return False
+    if "200 OK" in resp2_str:
+        print(f"[+] SIP DEREGISTER 200 OK for {username} (all bindings cleared)")
+        s.close()
+        return True
+    print(f"[-] SIP DEREGISTER rejected for {username}:\n{resp2_str}")
+    s.close()
+    return False
+
+
 def register_subscriber(username, password, host="127.0.0.1", port=5066,
                         bind_ip="127.0.0.1", listen_port=5070):
     """Register via a socket bound to (bind_ip, listen_port) so the source
@@ -465,7 +523,12 @@ if __name__ == "__main__":
     parser.add_argument("--listen-port", type=int, default=5070, help="Local UDP listen port (media on port+1)")
     parser.add_argument("--uas", default=None, metavar="MSISDN", help="UAS role: register MSISDN and answer INVITEs, counting RTP")
     parser.add_argument("--rtp", type=int, default=0, metavar="SECONDS", help="Caller role with real RTP media for N seconds")
+    parser.add_argument("--deregister", action="store_true", help="Digest-authenticated Contact: * Expires: 0 deregister of --callee (clears ALL usrloc bindings for the AoR)")
     args = parser.parse_args()
+
+    if args.deregister:
+        ok = deregister_subscriber(args.callee, args.password, args.host, args.port)
+        sys.exit(0 if ok else 1)
 
     if args.uas:
         ok = run_uas(args.uas, args.password, args.host, args.port,
