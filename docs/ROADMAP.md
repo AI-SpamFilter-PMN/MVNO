@@ -13,7 +13,7 @@ This document outlines upcoming architectural enhancements, operational backlog 
 
 ### 2. Gateway API Key Authentication — ✅ IMPLEMENTED
 - **Current State**: `telecom-api` enforces `X-API-Key` on all `/api/v1/intercept/**` endpoints via `ApiKeyInterceptor` (commit `0590aac`). Missing/mismatched key → `401 Unauthorized`. Key from `intercept.api-key` property (`X_API_KEY` env override, demo default `mvno-demo-key-2026`); Kamailio INTERCEPT queries carry the header via 4-arg `http_client_query`.
-- **Verification**: unit tests (3 interceptor cases, 22/22 total), Makefile + runbook curls all carry the header; no-header → 401 confirmed live.
+- **Verification**: unit tests (3 interceptor cases, 26/26 total), Makefile + runbook curls all carry the header; no-header → 401 confirmed live.
 
 ### 3. VictoriaLogs Log Ingestion Sink
 - **Current State**: Vector outputs JSON logs to `[sinks.stdout]`.

@@ -191,7 +191,7 @@ never stalls the spool loop.
 | `make test-sms` | `allow: true, "Clean content"` |
 | `make test-call` | `allow: false, "EIR: SIM swap detected"` (test IMEI) |
 | `make test` | All 4 pass |
-| `cd telecom-api && ./mvnw test` | 22/22 pass (includes SLA + circuit breaker + distinct EIR + GET intercept + API-key interceptor tests) |
+| `cd telecom-api && ./mvnw test` | 26/26 pass (includes SLA + circuit breaker + distinct EIR + GET intercept + API-key interceptor + Vosk verdict tests) |
 
 ---
 

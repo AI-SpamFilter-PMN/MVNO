@@ -1104,21 +1104,36 @@ request_route {
         exit;
     }
 
-    // Handle INVITE — check with gateway before routing
+    // Handle INVITE — authenticate, then check with the gateway before routing
     if (is_method("INVITE")) {
-        $var(payload) = "{"
-            + "\"caller\":\"" + $fU + "\","
-            + "\"callee\":\"" + $rU + "\","
-            + "\"call_id\":\"" + $ci + "\""
-            + "}";
-        // http_connect("api_gw", "/intercept/call", "", $var(payload));
-        // TODO: Enable when http_client module is available.
-        // Read the response: check if $var(result) is "allow" before forwarding.
-        // For now, always allow (bypass).
+        if ($au == "" && !auth_check("$fd", "subscriber", "1")) {
+            auth_challenge("$fd", "0");
+            exit;
+        }
+        route(INTERCEPT);
         route(LOCATION);
+        exit;
     }
 
     route(FORWARD);
+}
+
+// Outbound HTTP REST Interception Subroute (enabled — HTTP client in use)
+// Kamailio queries the MVNO gateway before routing any INVITE:
+//   GET http://mvno-api:8080/api/v1/intercept/call?caller=$fU&callee=$rU
+//   Header: X-API-Key: mvno-demo-key-2026
+// A 200 response whose JSON body contains "allow": false is a hard block:
+//   sl_send_reply(403, "Call Intercepted / Blocked"); exit;
+// Only "allow": true (or any non-200 response, per 5.0s SLA fail-open) forwards.
+route[INTERCEPT] {
+    xlog("L_INFO", "INTERCEPT QUERY: caller=$fU callee=$rU\n");
+    $var(res) = http_client_query("http://mvno-api:8080/api/v1/intercept/call?caller=" + $fU + "&callee=" + $rU, "", "X-API-Key: mvno-demo-key-2026\r\n", "$var(res_body)");
+    xlog("L_INFO", "INTERCEPT RESPONSE: status=$var(res) body=$var(res_body)\n");
+    if ($var(res) == 200 && $var(res_body) =~ ".*\"allow\"[[:space:]]*:[[:space:]]*false.*") {
+        xlog("L_WARN", "CALL BLOCKED BY MVNO INTERCEPTION CORE: $fU -> $rU\n");
+        sl_send_reply(403, "Call Intercepted / Blocked");
+        exit;
+    }
 }
 
 // Media anchor subroute — called for INVITE
