@@ -5,6 +5,13 @@
 #   bash scripts/testing/demo_call.sh dial    # real call: callee streams the scam phrase; TALK NOW for ~12 s
 #   bash scripts/testing/demo_call.sh hangup  # hang up (dial already hangs up; safety net)
 #
+# PORTABLE BY DESIGN: both UAs run from the packaged `mvno-baresip` image, so
+# S3 needs NO host /usr/bin/baresip, no host-library mounts, and no host-model
+# baresip build. The callee leg streams a real WAV through aufile (the load-
+# bearing scam media). The caller leg uses the host PulseAudio socket when it
+# is present (live mic) and otherwise falls back to a container-side aufile
+# leg — either way the call is real and RTPEngine records it.
+#
 # Evidence stays INLINE in the guide: podman logs baresip-rx / pcap listing /
 # RTPEngine counters. This script only assembles the rig (the mechanical part).
 
@@ -15,22 +22,19 @@ cd "$REPO_ROOT"
 CALLER=15553332211
 CALLEE=15559998888
 SIP_HOST=10.89.0.23
+IMAGE="${BARESIP_IMAGE:-mvno-baresip:1.0.0}"
+NET=("--network" "mvno_mvno_net")
 
-build_b_array() {
-  B=(-v /usr/bin/baresip:/usr/bin/baresip:ro)
-  for f in /usr/lib/libbaresip.so.26 /usr/lib/libre.so.41 \
-           /usr/lib/libbrotlicommon.so.1 /usr/lib/libbrotlidec.so.1 \
-           /usr/lib/libbrotlienc.so.1 /usr/lib/libcrypto.so.3 \
-           /usr/lib/libssl.so.3 /usr/lib/libz.so.1 /usr/lib/libzstd.so.1; do
-    B+=(-v "${f}:${f}:ro")
-  done
-  B+=(-v /usr/lib/baresip:/usr/lib/baresip:ro)
-  for f in $(ldd /usr/lib/baresip/modules/pulse.so | grep -oE '/usr/lib/[^ ]+\.so[^ ]*' | sort -u); do
-    B+=(-v "${f}:${f}:ro")
-  done
-  B+=(-v /usr/lib64/ld-linux-x86-64.so.2:/hostld/ld-linux-x86-64.so.2:ro)
-  B+=(-v /run/user/1000/pulse/native:/run/user/1000/pulse/native)
-  B+=(-e PULSE_SERVER=unix:/run/user/1000/pulse/native)
+# Portable host PulseAudio socket (XDG runtime dir; fall back to uid-based path).
+PULSE_OK=0
+PULSE_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+if [ -S "${PULSE_DIR}/pulse/native" ]; then
+  PULSE_OK=1
+fi
+
+module_path() {
+  # baresip image installs modules under /usr/local/lib/baresip/modules
+  echo "module_path /usr/local/lib/baresip/modules"
 }
 
 setup() {
@@ -40,8 +44,8 @@ setup() {
   ffmpeg -y -loglevel error -i /tmp/speech.wav -ar 8000 -ac 1 -c:a pcm_s16le \
     state/baresip/speech8k.wav
 
-  cat > state/baresip/rx/config <<'EOF'
-module_path /usr/lib/baresip/modules
+  cat > state/baresip/rx/config <<EOF
+$(module_path)
 module stdio.so
 module g711.so
 module ausine.so
@@ -55,39 +59,53 @@ EOF
   cat > state/baresip/rx/accounts <<EOF
 <sip:${CALLEE}@${SIP_HOST}:5060>;auth_user=${CALLEE};auth_pass=testpass;answermode=auto
 EOF
-  cat > state/baresip/tx/config <<'EOF'
-module_path /usr/lib/baresip/modules
+  # Caller leg: use the live host mic when a Pulse socket exists, else a
+  # container-side speech tone (portable fallback — still a real call).
+  local tx_src="ausine"
+  if [ "$PULSE_OK" -eq 1 ]; then
+    tx_src="pulse"
+  fi
+  cat > state/baresip/tx/config <<EOF
+$(module_path)
 module stdio.so
 module g711.so
-module pulse.so
+module ausine.so
 module aufile.so
+module pulse.so
 module uuid.so
 module_app account.so
 module_app menu.so
 module_app ctrl_tcp.so
-audio_source pulse
-audio_player pulse
+audio_source ${tx_src}
 EOF
   cat > state/baresip/tx/accounts <<EOF
 <sip:${CALLER}@${SIP_HOST}:5060>;auth_user=${CALLER};auth_pass=testpass
 EOF
 
-  build_b_array
   podman rm -f baresip-rx baresip-tx 2>/dev/null
-  podman run -d --name baresip-rx --network mvno_mvno_net --ip 10.89.0.60 \
-    "${B[@]}" -v $PWD/state/baresip/rx:/cfg:z \
-    -v $PWD/state/baresip/speech8k.wav:/media/speech8k.wav:ro \
-    docker.io/library/ubuntu:24.04 \
-    /hostld/ld-linux-x86-64.so.2 --library-path /usr/lib:/usr/lib/pulseaudio \
-    /usr/bin/baresip -f /cfg -s -T
-  podman run -d --name baresip-tx --network mvno_mvno_net --ip 10.89.0.61 \
-    "${B[@]}" -v $PWD/state/baresip/tx:/cfg:z \
-    docker.io/library/ubuntu:24.04 \
-    /hostld/ld-linux-x86-64.so.2 --library-path /usr/lib:/usr/lib/pulseaudio \
-    /usr/bin/baresip -f /cfg -s -T
+  if [ "$PULSE_OK" -eq 1 ]; then
+    podman run -d --name baresip-rx "${NET[@]}" --ip 10.89.0.60 \
+      -v $PWD/state/baresip/rx:/cfg:z \
+      -v $PWD/state/baresip/speech8k.wav:/media/speech8k.wav:ro \
+      "${IMAGE}" >/dev/null
+    podman run -d --name baresip-tx "${NET[@]}" --ip 10.89.0.61 \
+      -v $PWD/state/baresip/tx:/cfg:z \
+      -v "${PULSE_DIR}/pulse/native:${PULSE_DIR}/pulse/native" \
+      -e "PULSE_SERVER=unix:${PULSE_DIR}/pulse/native" \
+      "${IMAGE}" >/dev/null
+  else
+    podman run -d --name baresip-rx "${NET[@]}" --ip 10.89.0.60 \
+      -v $PWD/state/baresip/rx:/cfg:z \
+      -v $PWD/state/baresip/speech8k.wav:/media/speech8k.wav:ro \
+      "${IMAGE}" >/dev/null
+    podman run -d --name baresip-tx "${NET[@]}" --ip 10.89.0.61 \
+      -v $PWD/state/baresip/tx:/cfg:z \
+      "${IMAGE}" >/dev/null
+  fi
   sleep 3
   echo "  rx registrations (expect >= 2): $(podman logs baresip-rx | grep -c '200 OK')"
-  echo "  tx registrations (expect >= 2): $(podman logs baresip-tx | grep -c '200 OK')"
+  echo "  tx registrations (expect >= 2): $(podman logs baresip-tx 2>&1 | grep -c '200 OK')"
+  echo "  caller audio source: ${tx_src}"
   echo "  ✓ rig ready — paste: bash scripts/testing/demo_call.sh dial"
 }
 
@@ -105,7 +123,7 @@ dial() {
   ctrl_cmd '{"command":"hangup"}'
   sleep 2
   echo "  rx answers (expect 1): $(podman logs baresip-rx | grep -c '200 Answering')"
-  echo "  fresh pcap: $(ls -t state/spool/pcaps/*.pcap | head -1)"
+  echo "  fresh pcap: $(/usr/bin/ls -t state/spool/pcaps/*.pcap | head -1)"
 }
 
 hangup() {

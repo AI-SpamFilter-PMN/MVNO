@@ -182,7 +182,7 @@ echo -e "${YELLOW}[5c/13] 🎙️ Verifying Call Recording Pipeline (pcap -> WAV
 # assertion. Skip-and-retry while the real (>= 1 KiB) pcap is being written.
 NEWEST_PCAP=""
 for i in $(seq 1 6); do
-    NEWEST_PCAP=$(ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1 || true)
+    NEWEST_PCAP=$(\ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1 || true)
     if [ -n "$NEWEST_PCAP" ] && [ -s "$NEWEST_PCAP" ] && [ "$(stat -c %s "$NEWEST_PCAP")" -ge 1024 ]; then
         break
     fi

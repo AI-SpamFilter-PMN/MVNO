@@ -56,10 +56,10 @@ scripts/testing/live_tap.sh daemon
 # env: PCAP_DIR, SPOOL_DIR, TAP_DIR, POLL_SECS (1), CHUNK_SECS (4), IDLE_FINALIZE (3)
 
 # Tier 3 — one completed call, straight into the Vosk spool:
-scripts/testing/live_tap.sh --once $(ls -t state/spool/pcaps/*.pcap | head -1)
+scripts/testing/live_tap.sh --once $(\ls -t state/spool/pcaps/*.pcap | head -1)
 
 # Watch transcripts + verdicts land:
-watch -n2 'ls -t state/spool/archived/live-* 2>/dev/null | head'
+watch -n2 '\ls -t state/spool/archived/live-* 2>/dev/null | head'
 ```
 
 ### systemd --user unit (optional, rootless)

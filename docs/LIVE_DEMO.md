@@ -63,7 +63,7 @@ curl -s http://localhost:8080/actuator/health | head -c 80
 bash scripts/testing/mic_record.sh 2
 sleep 4
 ls -la state/spool/archived/mic_call_*.txt | tail -1
-cat $(ls -t state/spool/archived/mic_call_*.txt | head -1)
+cat $(\ls -t state/spool/archived/mic_call_*.txt | head -1)
 ```
 
 **EXPECT** — a non-empty transcript line (what you just spoke; English words are
@@ -111,7 +111,7 @@ live** (pulse). RTPEngine records a pcap per call.
 bash scripts/testing/demo_call.sh setup    # speech file + baresip UAs, both register (~15 s)
 bash scripts/testing/demo_call.sh dial     # real call: callee streams the scam phrase; TALK NOW for ~12 s
 podman logs baresip-rx | grep -c "200 Answering"   # expect 1
-ls -t state/spool/pcaps/*.pcap | head -1           # the fresh recording (~450 KB)
+\ls -t state/spool/pcaps/*.pcap | head -1           # the fresh recording (~450 KB)
 curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_total'
 ```
 
@@ -141,7 +141,7 @@ watch -n2 'cat state/spool/archived/live-caller.txt state/spool/archived/live-ca
 
 ```bash
 # T-B — extract the newest recorded call (Tier-3, --once)
-NEW=$(ls -t state/spool/pcaps/*.pcap | head -1)
+NEW=$(\ls -t state/spool/pcaps/*.pcap | head -1)
 bash scripts/testing/live_tap.sh --once "$NEW"
 ffprobe -v error -show_entries format=duration -of csv=p=0 \
   state/spool/archived/live-caller.wav        # >= 3s (scripted-leg floor)

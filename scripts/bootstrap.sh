@@ -250,11 +250,16 @@ for build_target in \
     "mvno-open5gs-webui:$PROJECT_DIR/configs/open5gs/Dockerfile.webui:$PROJECT_DIR" \
     "mvno-kamailio:$PROJECT_DIR/configs/kamailio/Dockerfile:$PROJECT_DIR" \
     "mvno-2g-core:$PROJECT_DIR/configs/2g/Dockerfile.core:$PROJECT_DIR/configs/2g" \
-    "mvno-2g-ms:$PROJECT_DIR/configs/2g/Dockerfile.ms:$PROJECT_DIR/configs/2g"; do
+    "mvno-2g-ms:$PROJECT_DIR/configs/2g/Dockerfile.ms:$PROJECT_DIR/configs/2g" \
+    "mvno-baresip:$PROJECT_DIR/configs/baresip/Dockerfile:$PROJECT_DIR/configs/baresip"; do
     IFS=':' read -r tag dockerfile ctx <<< "$build_target"
     label="build:${tag}"
     try_log_quiet "$label" "$DOCKER_CMD build -t '${tag}:latest' -f '$dockerfile' '$ctx'"
 done
+
+# Version-tag the baresip rig image (rig is not a compose service, so no
+# compose build: stanza produces its pinned tag — do it here for the bundle).
+try_log_quiet "tag:mvno-baresip" "$DOCKER_CMD tag 'mvno-baresip:latest' 'mvno-baresip:1.0.0'"
 
 # ─── Step 7: Save all images as tarballs ────────────────
 # Tag compose-built images with stable names
@@ -288,6 +293,7 @@ declare -A SAVE_IMAGES=(
     ["mvno-open5gs-2.8.0"]="mvno-open5gs:2.8.0"
     ["mvno-open5gs-webui-2.8.0"]="mvno-open5gs-webui:2.8.0"
     ["mvno-ueransim-3.2.6"]="mvno-ueransim:3.2.6"
+    ["mvno-baresip-1.0.0"]="mvno-baresip:1.0.0"
 )
 
 for name in "${!SAVE_IMAGES[@]}"; do

@@ -653,11 +653,11 @@ replacement, see `docs/REALTIME_AUDIO.md`):
 
 ```bash
 # 1) Find the newest recording (also in state/spool/metadata/):
-ls -t state/spool/pcaps/ | head -1
+\ls -t state/spool/pcaps/ | head -1
 
 # 2) Extract it — one WAV per source-IP leg, straight into the Vosk spool root
 #    (watcher polls this directory):
-scripts/testing/live_tap.sh --once $(ls -t state/spool/pcaps/*.pcap | head -1)
+scripts/testing/live_tap.sh --once $(\ls -t state/spool/pcaps/*.pcap | head -1)
 ```
 
 **Expected** (one line per voice leg — even dstport = RTP, odd = RTCP dropped):
@@ -893,7 +893,7 @@ MSG='{"command":"hangup"}'
 podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; \
   printf '${#MSG}:${MSG},' >&3; timeout 2 cat <&3"
 podman logs baresip-rx | grep -c "200 Answering"    # expect 1
-ls -t state/spool/pcaps/*.pcap | head -1            # the fresh recording
+\ls -t state/spool/pcaps/*.pcap | head -1            # the fresh recording
 ```
 
 ### 2. Raw binary SMPP 3.4 (what `send_raw_smpp.py` sends)
