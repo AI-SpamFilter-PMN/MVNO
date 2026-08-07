@@ -247,7 +247,7 @@ try_log "build:compose" "$COMPOSE_CMD -f '$PROJECT_DIR/docker-compose.yml' -f '$
 for build_target in \
     "mvno-open5gs:$OPEN5GS_DIR/Dockerfile:$OPEN5GS_DIR" \
     "mvno-ueransim:$PROJECT_DIR/configs/ueransim/Dockerfile:$PROJECT_DIR" \
-    "mvno-open5gs-webui:$OPEN5GS_DIR/webui/Dockerfile:$OPEN5GS_DIR/webui" \
+    "mvno-open5gs-webui:$PROJECT_DIR/configs/open5gs/Dockerfile.webui:$PROJECT_DIR" \
     "mvno-kamailio:$PROJECT_DIR/configs/kamailio/Dockerfile:$PROJECT_DIR" \
     "mvno-2g-core:$PROJECT_DIR/configs/2g/Dockerfile.core:$PROJECT_DIR/configs/2g" \
     "mvno-2g-ms:$PROJECT_DIR/configs/2g/Dockerfile.ms:$PROJECT_DIR/configs/2g"; do
@@ -302,7 +302,9 @@ for name in "${!SAVE_IMAGES[@]}"; do
 done
 
 # ─── Step 8: Generate checksums ─────────────────────────
-try_log "checksums" "find '$VENDOR_DIR' -type f ! -path '*/checksums/*' ! -path '*/logs/*' -exec sha256sum {} \; > '$VENDOR_DIR/checksums/sha256sums.txt'"
+# Paths are RELATIVE to the project root so the file is portable across
+# machines (absolute paths would break `sha256sum -c` on the air-gapped host).
+try_log "checksums" "(cd '$PROJECT_DIR' && find vendor -type f ! -path 'vendor/checksums/*' ! -path 'vendor/logs/*' -exec sha256sum {} \; > '$VENDOR_DIR/checksums/sha256sums.txt')"
 
 # ─── Summary ────────────────────────────────────────────
 echo ""

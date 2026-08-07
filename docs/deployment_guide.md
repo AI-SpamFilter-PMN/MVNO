@@ -865,3 +865,68 @@ All developer lifecycle operations are in the `Makefile`:
 | `make clean` | `rm -rf state/*` | Wipe all state data |
 | `make rebuild` | `clean + init-db + up --build` | Full teardown and rebuild |
 
+
+---
+
+## 8. Air-Gapped Deployment (No Internet)
+
+For networks that cannot reach Docker Hub (or any registry), ship the
+**vendor bundle** produced on an online machine over USB/exchange media.
+
+### 8.1 What the bundle contains
+
+| Item | Location (after ship) | Purpose |
+|---|---|---|
+| Versioned image tarballs (21) | `vendor/docker/*.tar` | All 16 compose pins + build deps (maven/temurin/alpine/node/debian), exact tags |
+| Integrity manifest | `vendor/checksums/sha256sums.txt` | sha256 of every vendored file, **paths relative to the repo root** (portable across machines) |
+| Vosk model + UERANSIM source + wheels | `vendor/vosk/`, `vendor/ueransim/`, `vendor/pip/` | Offline ASR/UE sources |
+
+### 8.2 Producer side (ONLINE machine — one command)
+
+```bash
+./scripts/vendor-bundle.sh        # offline re-bundle from the local image store
+tar czf mvno-offline.tar.gz vendor/   # ~5 GB — the ship artifact
+```
+
+`vendor-bundle.sh` is **surgical and needs no network**: it re-saves the
+already-present local images with the exact `bootstrap.sh` SAVE_IMAGES tags,
+removes stale unversioned tars (`mongo-8.0.tar`, `grafana-oss-latest.tar`, …),
+and regenerates the checksums. Gates inside: 21 tars present, `sha256sum -c`
+all OK. Exit 0 means ship-ready.
+
+### 8.3 Consumer side (AIR-GAPPED machine)
+
+> Out-of-scope assumption: **OS packages** (podman, docker-compose plugin,
+> baresip, espeak-ng, tshark, ffmpeg, sqlite3, python3) must come from the
+> machine's own package media/mirror — the repo cannot bundle them. Preflight
+> verifies everything else.
+
+```bash
+tar xzf mvno-offline.tar.gz          # unpack vendor/ into the repo root
+./scripts/preflight.sh               # host checks (rootless podman, tun, tools)
+./scripts/load-offline.sh --verify-tags   # 16 compose pins found in the tars
+./scripts/load-offline.sh            # verify checksums + load all 21 images
+./scripts/up.sh                      # init-db/seed + compose up (offline-first)
+make test                            # 4 gate suites green
+```
+
+Behavior guarantees of `load-offline.sh` on the air-gapped host:
+- `--verify-tags` parses each tar's `manifest.json` **read-only** (never loads
+  images just to check) and exits non-zero if any compose pin is missing.
+- Checksum mismatch → loud WARN listing `vendor/logs/checksum_verify.log`;
+  loading continues (the failed image is only ever detected at load time).
+- **Any image that actually fails to load → hard stop (exit 1) with remediation**
+  ("re-transfer the bundle", or "run ./scripts/deploy.sh if this machine has
+  internet"). No partial stack.
+
+### 8.4 Re-vendoring after a change (online machine)
+
+After a new compose pin or image rebuild, regenerate the bundle:
+
+```bash
+./scripts/bootstrap.sh          # full online vendor (deps, model, sources)
+# or surgically, if only images changed:
+./scripts/vendor-bundle.sh
+```
+
+Then re-ship `tar czf mvno-offline.tar.gz vendor/`.

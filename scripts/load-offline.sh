@@ -23,9 +23,11 @@ try_log() {
     if eval "$cmd" >> "$logfile" 2>&1; then
         echo "  ✓ $label"
         SUCCESSES+=("$label")
+        return 0
     else
         echo "  ✗ $label (see $logfile)"
         FAILURES+=("$label")
+        return 1
     fi
 }
 
@@ -68,17 +70,25 @@ if [ "${1:-}" = "--verify-tags" ]; then
         echo "  ✗ vendor/docker/ not found — run bootstrap.sh first"; exit 1
     fi
     # Collect the image tags present in vendored tarballs.
-    # `podman/docker load` prints "Loaded image: <repo:tag>"; we mirror that by
-    # inspecting each tar's manifest via the engine if available, else fall back to
-    # the tarball filename convention used by bootstrap.sh SAVE_IMAGES keys.
+    # READ-ONLY: parse each tar's manifest.json (docker save format) instead of
+    # `docker load` — loading mutates the local image store just to verify tags
+    # and can fail on archives that were already loaded. Normalize registry
+    # prefixes so fully-qualified refs ("docker.io/library/mongo:7.0",
+    # "localhost/drachtio/rtpengine:mr9.4.0.0") match short compose pins.
     declare -a VENDOR_TAGS=()
     for tar in "$VENDOR_DIR/docker"/*.tar; do
         [ -f "$tar" ] || continue
-        # Inspect the tar for repository tags (works for docker save format).
-        # Normalize registry prefixes: podman prints fully-qualified refs
-        # ("docker.io/library/mongo:7.0", "localhost/drachtio/rtpengine:mr9.4.0.0")
-        # while docker prints short names — both must match compose pins.
-        tags=$($DOCKER_CMD load -i "$tar" 2>/dev/null | grep -oE 'Loaded image[^:]*: [^ ]+' | sed -E 's/Loaded image[^:]*: //; s#^(docker\.io/|localhost/)##')
+        tags=$(tar -xOf "$tar" manifest.json 2>/dev/null \
+            | python3 -c 'import sys,json
+try:
+    for item in json.load(sys.stdin):
+        for t in item.get("RepoTags", []):
+            t = t.replace("docker.io/library/", "", 1) \
+                 .replace("docker.io/", "", 1) \
+                 .replace("localhost/", "", 1)
+            print(t)
+except Exception:
+    pass')
         if [ -z "$tags" ]; then
             # Fallback: skip (cannot determine tag) — recorded as unknown.
             VENDOR_TAGS+=("UNKNOWN:$(basename "$tar" .tar)")
@@ -119,11 +129,15 @@ fi
 # ─── Verify checksums ──────────────────────────────────
 echo ""
 echo "=== Verifying checksums ==="
+CHECKSUM_OK=0
 if [ -f "$VENDOR_DIR/checksums/sha256sums.txt" ]; then
-    if (cd "$PROJECT_DIR" && sha256sum -c "$VENDOR_DIR/checksums/sha256sums.txt" 2>/dev/null); then
+    if (cd "$PROJECT_DIR" && sha256sum -c "$VENDOR_DIR/checksums/sha256sums.txt" > "$VENDOR_DIR/logs/checksum_verify.log" 2>&1); then
         echo "  ✓ All checksums match"
+        CHECKSUM_OK=1
     else
-        echo "  [WARN] Some files have changed or are corrupt" | tee -a "$VENDOR_DIR/logs/checksum_error.log"
+        echo "  [WARN] Checksum mismatch detected — see vendor/logs/checksum_verify.log"
+        echo "         The bundle may be corrupt or modified in transit. Loading continues"
+        echo "         but ANY image that fails to load aborts the run (below)."
     fi
 else
     echo "  [WARN] No checksums file found (vendor/checksums/sha256sums.txt)"
@@ -137,7 +151,17 @@ skipped=0
 for tar in "$VENDOR_DIR/docker"/*.tar; do
     [ -f "$tar" ] || continue
     name=$(basename "$tar" .tar)
-    try_log "load:$name" "$DOCKER_CMD load -i '$tar'"
+    # Fail-hard: a corrupt/truncated tar cannot be loaded — abort immediately
+    # rather than carrying on with a partial stack. On an air-gapped machine a
+    # pull fallback is impossible, so the actionable message is the remediation.
+    if ! try_log "load:$name" "$DOCKER_CMD load -i '$tar'"; then
+        echo ""
+        echo "  ✗ FATAL: image '$name' failed to load (corrupt or incomplete bundle)."
+        echo "    Remediation: re-transfer vendor/ from the online machine"
+        echo "    (re-run ./scripts/vendor-bundle.sh there) and retry."
+        echo "    If this machine has internet, run ./scripts/deploy.sh instead."
+        exit 1
+    fi
 done
 
 # ─── Summary ────────────────────────────────────────────
