@@ -59,9 +59,11 @@ Manual equivalents:
 | Arch/CachyOS | `pacman -S podman docker-compose sqlite3 lksctp-tools espeak-ng ffmpeg` |
 | **All** | `sudo modprobe sctp` (verify: `lsmod \| grep sctp`) |
 
-> `espeak-ng` + `ffmpeg` are used by `demo_runbook.sh` check 9b to synthesize the
-> demo scam-call speech ("You have won a prize, call us now") into a 16 kHz WAV for
-> the Vosk → AI blocked-verdict path. `deploy.sh` installs them automatically.
+> `espeak-ng` + `ffmpeg` are used by `demo_call.sh setup` to synthesize the
+> canned callee scam phrase ("You have won a prize, call us now or your account
+> will be closed") into an 8 kHz WAV. `demo_runbook.sh` then proves the REAL path
+> (baresip → Kamailio → RTPEngine → pcap → live_tap → Vosk) end-to-end — no TTS in
+> the 9b verdict; it re-arches the live recorded call. `deploy.sh` installs them.
 
 > **Note**: SCTP kernel module is mandatory for 5G NGAP (gNB ↔ AMF). Without it, gNB never connects.
 > **Image source**: the 8 custom images (`mvno-*`) are **public on Docker Hub**

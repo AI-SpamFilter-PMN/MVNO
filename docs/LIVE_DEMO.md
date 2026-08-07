@@ -188,7 +188,9 @@ curl -s 'http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total'
 `demo_runbook.sh` [9b] asserts).
 
 **FALLBACK** — deterministic SIP-side block (E2E-BLOCK → 403):
-`docs/TESTING_REFERENCE.md` Flow K; automated variant: `demo_runbook.sh` item 9b.
+`docs/TESTING_REFERENCE.md` Flow K; automated variant: `demo_runbook.sh` item 9b
+(re-arches the **live** recorded call from its own S3/S4 S5 pipeline, echoes the
+real Vosk transcript, and asserts the block counter climbs).
 
 ---
 

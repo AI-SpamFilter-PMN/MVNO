@@ -812,7 +812,7 @@ commands they wrap, for depth / teaching / failure-path inspection.
 Speech file + configs:
 
 ```bash
-espeak-ng -v en-us "You have won a prize, call us now" -w /tmp/speech.wav
+espeak-ng -v en-us "You have won a prize, call us now or your account will be closed" -w /tmp/speech.wav
 mkdir -p state/baresip/rx state/baresip/tx
 ffmpeg -y -loglevel error -i /tmp/speech.wav -ar 8000 -ac 1 -c:a pcm_s16le \
   state/baresip/speech8k.wav
@@ -849,34 +849,26 @@ cat > state/baresip/tx/accounts <<'EOF'
 EOF
 ```
 
-Containers (host baresip + shared libs mounted read-only into ubuntu:24.04):
+Containers (packaged `mvno-baresip:1.0.0` rig — no host baresip / shared libs
+/ pulse mounts; the image is built from `configs/baresip/Dockerfile`, see
+`scripts/demo_call.sh setup` and `scripts/bootstrap.sh`):
 
 ```bash
-B=(-v /usr/bin/baresip:/usr/bin/baresip:ro)
-for f in /usr/lib/libbaresip.so.26 /usr/lib/libre.so.41 \
-         /usr/lib/libbrotlicommon.so.1 /usr/lib/libbrotlidec.so.1 \
-         /usr/lib/libbrotlienc.so.1 /usr/lib/libcrypto.so.3 \
-         /usr/lib/libssl.so.3 /usr/lib/libz.so.1 /usr/lib/libzstd.so.1; do
-  B+=(-v "${f}:${f}:ro")
-done
-B+=(-v /usr/lib/baresip:/usr/lib/baresip:ro)
-for f in $(ldd /usr/lib/baresip/modules/pulse.so | grep -oE '/usr/lib/[^ ]+\.so[^ ]*' | sort -u); do
-  B+=(-v "${f}:${f}:ro")
-done
-B+=(-v /usr/lib64/ld-linux-x86-64.so.2:/hostld/ld-linux-x86-64.so.2:ro)
-B+=(-v /run/user/1000/pulse/native:/run/user/1000/pulse/native)
-B+=(-e PULSE_SERVER=unix:/run/user/1000/pulse/native)
+PULSE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/pulse/native"
 podman run -d --name baresip-rx --network mvno_mvno_net --ip 10.89.0.60 \
-  "${B[@]}" -v $PWD/state/baresip/rx:/cfg:z \
+  -v $PWD/state/baresip/rx:/cfg:z \
   -v $PWD/state/baresip/speech8k.wav:/media/speech8k.wav:ro \
-  docker.io/library/ubuntu:24.04 \
-  /hostld/ld-linux-x86-64.so.2 --library-path /usr/lib:/usr/lib/pulseaudio \
-  /usr/bin/baresip -f /cfg -s -T
-podman run -d --name baresip-tx --network mvno_mvno_net --ip 10.89.0.61 \
-  "${B[@]}" -v $PWD/state/baresip/tx:/cfg:z \
-  docker.io/library/ubuntu:24.04 \
-  /hostld/ld-linux-x86-64.so.2 --library-path /usr/lib:/usr/lib/pulseaudio \
-  /usr/bin/baresip -f /cfg -s -T
+  mvno-baresip:1.0.0
+if [ -S "$PULSE" ]; then
+  podman run -d --name baresip-tx --network mvno_mvno_net --ip 10.89.0.61 \
+    -v $PWD/state/baresip/tx:/cfg:z \
+    -v "${PULSE}:${PULSE}" -e "PULSE_SERVER=unix:${PULSE}" \
+    mvno-baresip:1.0.0
+else
+  podman run -d --name baresip-tx --network mvno_mvno_net --ip 10.89.0.61 \
+    -v $PWD/state/baresip/tx:/cfg:z \
+    mvno-baresip:1.0.0
+fi
 sleep 3
 podman logs baresip-rx | grep -c "200 OK"      # expect >= 2
 podman logs baresip-tx | grep -c "200 OK"      # expect >= 2

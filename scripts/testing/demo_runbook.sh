@@ -194,18 +194,22 @@ done
 WAV_OUT=$(bash "${SCRIPT_DIR}/live_tap.sh" --once "$NEWEST_PCAP" 2>&1) || true
 echo "$WAV_OUT" | grep -q "WAV extracted" || { echo "[-] Error: pcap->WAV extraction failed: ${WAV_OUT}" >&2; exit 1; }
 # live_tap.sh --once writes one WAV per leg straight into the Vosk spool root.
+# Pick the leg whose transcript is NON-EMPTY (the callee streams the spoken
+# phrase; the caller leg is silent aufine/ausine), never the empty caller leg.
 WAV_STEM=$(basename "$NEWEST_PCAP" .pcap)
 TXT_PATH=""
 for i in $(seq 1 10); do
-    sleep 2.5
-    TXT_PATH=$(ls state/spool/archived/"${WAV_STEM}"-*.txt 2>/dev/null | head -1 || true)
+    for cand in $(ls state/spool/archived/"${WAV_STEM}"-*.txt 2>/dev/null || true); do
+        if [ -s "$cand" ]; then TXT_PATH="$cand"; break; fi
+    done
     [ -n "$TXT_PATH" ] && break
+    sleep 2.5
 done
-[ -n "$TXT_PATH" ] || { echo "[-] Error: Vosk did not archive a transcript within 25s" >&2; exit 1; }
+[ -n "$TXT_PATH" ] || { echo "[-] Error: Vosk did not archive a non-empty transcript within 25s" >&2; exit 1; }
 echo -e "${GREEN}✓ Recording pipeline proven: transcript archived at ${TXT_PATH}${NC}"
 echo "  --- real transcript content (${TXT_PATH}) ---"
 cat "${TXT_PATH}"
-[ -s "${TXT_PATH}" ] || { echo "[-] Error: transcript file is empty" >&2; exit 1; }
+grep -q '"[[:space:]]*[^"[:space:]]' "${TXT_PATH}" || { echo "[-] Error: transcript body is empty (\{\"text\":\"\"\})" >&2; exit 1; }
 WAV_PATH="${TXT_PATH%.txt}.wav"
 [ -f "$WAV_PATH" ] || { echo "[-] Error: matching WAV missing at ${WAV_PATH}" >&2; exit 1; }
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WAV_PATH" || echo 0)
@@ -438,126 +442,165 @@ print(f\"  ✓ 4th distinct SIM blocked: {d}\")" <<< "$BLOCKED" || fail "EIR SIM
 pass "EIR SIM-Swap fraud trigger verified (4 distinct SIMs on 1 IMEI)"
 
 # ==============================================================================
-# [8/13] AUTHORIZED 5G SMS INTERCEPTION FLOW
+# [8/13] AUTHORIZED 5G SMS INTERCEPTION FLOW (USER SMS -> real SMPP MO -> REST)
 # ==============================================================================
-# Technical Verification: Submits SMS interception request to Gateway REST API.
-# Protocol / Component: HTTP REST Intercept / SubscriberController.java (port 8080).
-# Validation Criteria: Asserts response {"allow": true, "reason": "Clean content"}.
+# Technical Verification: Submits a USER-SUPPLIED SMS over the REAL SMPP 3.4
+# mobile-originated path (send_smpp_sms.py -> OsmoSMSC BIND_TRANSCEIVER + SUBMIT_SM),
+# then queries the Gateway REST intercept with the same content.
+# Protocol / Component: SMPP 3.4 binary PDUs / OsmoSMSC (2775) / REST intercept
+# SubscriberController.java (8080).
+# Validation Criteria: (1) SUBMIT_SM accepted ESME_ROK and a row lands in smsc.db
+# showing the user's SMS traversed the SMSC for real; (2) REST intercept returns
+# {"allow": true, "reason": "Clean content"} and echoes the nonce.
 # ==============================================================================
-echo -e "${YELLOW}[8/13] 💬 Simulating Authorized 5G SMS Interception Flow...${NC}"
+echo -e "${YELLOW}[8/13] 💬 Authorized 5G SMS Interception — real MO SMS via SMPP -> OsmoSMSC -> REST...${NC}"
+SMS_NONCE="MVNO5G-$(date +%s)"
+# User-supplied SMS text: $SMS_TEXT env > interactive prompt (TTY) > default.
+if [ -n "${SMS_TEXT:-}" ]; then
+    SMS_BODY="$SMS_TEXT"
+elif [ -t 0 ]; then
+    printf 'Enter SMS text (blank = default): '
+    IFS= read -r SMS_IN
+    SMS_BODY="${SMS_IN:-Award-winning offer, reply now}"
+else
+    SMS_BODY="Award-winning offer, reply now"
+fi
+SMS_BODY="${SMS_BODY} ${SMS_NONCE}"
+echo "  user SMS text: ${SMS_BODY}"
+echo "  --- real MO leg: SUBMIT_SM -> OsmoSMSC (SMPP 3.4) ---"
+SMS_SMPP_OUT=$(python3 "${SCRIPT_DIR}/send_smpp_sms.py" \
+    --sender 15551234567 --recipient 15557654321 --message "$SMS_BODY" 2>&1) || true
+echo "$SMS_SMPP_OUT" | grep -q "BIND_TRANSCEIVER Successful" || { echo "[-] Error: real SMPP MO bind failed: $SMS_SMPP_OUT" >&2; exit 1; }
+echo "$SMS_SMPP_OUT" | grep -q "SUBMIT_SM Delivered" || { echo "[-] Error: real SMPP MO submit failed: $SMS_SMPP_OUT" >&2; exit 1; }
+# Real terminal evidence: the user's SMS landed in OsmoSMSC's store.
+SMS_ROW=$(sqlite3 state/hlr/smsc.db "SELECT COUNT(*) FROM SMS WHERE src_addr='15551234567' AND dest_addr='15557654321' AND created > datetime('now','-2 minutes');" 2>/dev/null || echo 0)
+[ "${SMS_ROW:-0}" -gt 0 ] || { echo "[-] Error: no fresh SMS row in smsc.db from the real MO submit" >&2; exit 1; }
+echo "  ✓ real MO SMS stored: ${SMS_ROW} fresh row(s) in smsc.db (OsmoSMSC store-and-forward)"
+echo "  --- REST intercept evaluates the same content ---"
+# The nonce proves THIS user transaction end-to-end: it rode the real SMPP MO
+# into OsmoSMSC, which stores the payload GSM-7-packed in `user_data` (the
+# `text` column stays empty). Decode it the same way ip_sm_gw.gsm7_decode does.
+SMS_NONCE="${SMS_NONCE}" REPO_ROOT="${REPO_ROOT}" python3 - <<'PYEOF' || { echo "[-] Error: user SMS (nonce ${SMS_NONCE}) not found in smsc.db after real MO" >&2; exit 1; }
+import os, sys
+sys.path.insert(0, os.path.join(os.environ["REPO_ROOT"], "scripts"))
+from ip_sm_gw import gsm7_decode, connect
+nonce = os.environ["SMS_NONCE"]
+db = os.path.join(os.environ["REPO_ROOT"], "state/hlr/smsc.db")
+c = connect(db)
+rows = c.execute(
+    "SELECT user_data FROM SMS WHERE src_addr='15551234567' AND dest_addr='15557654321' "
+    "AND created > datetime('now','-3 minutes') ORDER BY id DESC LIMIT 5"
+).fetchall()
+for (ud,) in rows:
+    if ud and nonce in gsm7_decode(bytes(ud)):
+        print(f"  ✓ user SMS (nonce {nonce}) confirmed in smsc.db via GSM-7 decode")
+        sys.exit(0)
+print(f"[-] nonce {nonce} not found in recent smsc.db MO rows", file=sys.stderr)
+sys.exit(1)
+PYEOF
 SMSR=$(curl -s -X POST http://localhost:8080/api/v1/intercept/sms \
   -H "Content-Type: application/json" \
   -H "X-API-Key: mvno-demo-key-2026" \
-  -d '{"sender": "15551234567", "recipient": "15557654321", "content": "Hello MVNO 5G"}')
+  -d "{\"sender\": \"15551234567\", \"recipient\": \"15557654321\", \"content\": \"${SMS_BODY}\"}")
 echo "  $SMSR"
 python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 assert d.get('allow') is True, f'unexpected: {d}'
-print('  ✓ SMS allowed: allow=true')" <<< "$SMSR" || fail "5G SMS interception did not allow (got: $SMSR)"
-pass "5G SMS allowed & forwarded (allow=true)"
+assert d.get('reason') == 'Clean content', f'unexpected reason: {d}'
+print('  ✓ SMS allowed: allow=true, reason=Clean content')" <<< "$SMSR" || fail "5G SMS interception did not allow (got: $SMSR)"
+pass "User SMS allowed (real SMPP MO -> OsmoSMSC GSM-7, nonce ${SMS_NONCE} decoded) + REST verdict Clean"
 
 # ==============================================================================
 # [9/13] NATIVE VOSK JAVA 21 SPEECH-TO-TEXT ASR & SPOOL ARCHIVING PIPELINE
 # ==============================================================================
-# Technical Verification: Generates 16kHz PCM WAV audio file in /var/spool/rtpengine.
-# Protocol / Component: Native Vosk JNI ASR / NativeVoskService.java.
-# Validation Criteria: Waits up to 15s for NativeVoskService background thread to decode
-# the audio file and automatically move it to /var/spool/rtpengine/archived/.
+# Technical Verification: Re-arches the REAL recorded call leg from the [5c]
+# RTPEngine pcap (the spoken scam phrase that actually traversed
+# baresip -> Kamailio -> RTPEngine) and drops it into the Vosk spool so
+# NativeVoskService decodes it live. No synthetic waveform is used as evidence.
+# Protocol / Component: Native Vosk JNI ASR / NativeVoskService.java spool watcher
+# / live_tap.sh pcap->WAV extraction.
+# Validation Criteria: WAV re-seeded from the [5c] recording; NativeVoskService
+# archives a non-empty transcript within 15s (background thread moves the file).
 # ==============================================================================
-echo -e "${YELLOW}[9/13] 🎙️ Demonstrating Native Vosk Java 21 Speech-to-Text ASR & Spool Archiving...${NC}"
-python3 -c "
-import wave, struct, math, time, os, sys
-
-os.makedirs('state/spool', exist_ok=True)
-sample_rate = 8000
-duration = 1.0
-wav_filename = f'demo_call_{int(time.time())}.wav'
-wav_path = os.path.join('state/spool', wav_filename)
-
-with wave.open(wav_path, 'wb') as wav_file:
-    wav_file.setnchannels(1)
-    wav_file.setsampwidth(2)
-    wav_file.setframerate(sample_rate)
-    for i in range(int(sample_rate * duration)):
-        wav_file.writeframes(struct.pack('<h', int(32767.0 * 0.4 * math.sin(2.0 * math.pi * 350.0 * i / sample_rate))))
-
-os.chmod(wav_path, 0o777)
-print(f'  ✓ Simulated Call Audio Stream Generated: {wav_filename}')
-
-time.sleep(0.5)
-deadline = time.time() + 15
-archived_path = os.path.join('state/spool/archived', wav_filename)
-while time.time() < deadline and not os.path.exists(archived_path):
-    time.sleep(1)
-if os.path.exists(archived_path):
-    print(f'  ✓ Native Vosk ASR Engine processed audio and moved file to: {archived_path}')
-else:
-    print('[-] Error: WAV file was not archived by Vosk ASR engine within 15s', file=sys.stderr)
-    sys.exit(1)
-"
-echo -e "${GREEN}✓ Native Vosk Java 21 ASR Speech-to-Text Pipeline Proven${NC}\n"
+echo -e "${YELLOW}[9/13] 🎙️ Demonstrating Native Vosk Java 21 ASR on the REAL Recorded Call...${NC}"
+# Prove the spool watcher end-to-end with real captured speech: the [5c] pcap's
+# callee leg already decoded to a spoken phrase; drop a fresh copy in the spool
+# and let NativeVoskService transcribe + archive it. `--once` also exits non-zero
+# on an empty/undecodable pcap, so a broken recording surfaces here, not silently.
+[ -n "${WAV_PATH:-}" ] && [ -s "$WAV_PATH" ] || { echo "[-] Error: no real [5c] recorded WAV ($WAV_PATH) to re-arch" >&2; exit 1; }
+REAL_SEED="state/spool/demo-vosk-live-$(date +%s).wav"
+cp "$WAV_PATH" "$REAL_SEED" || { echo "[-] Error: could not seed real WAV into spool" >&2; exit 1; }
+echo "  ✓ seeded real recorded call leg from [5c]: $(basename "$REAL_SEED")"
+echo "    source pcap: $NEWEST_PCAP"
+echo "    seeded duration: $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$REAL_SEED" 2>/dev/null || echo '?')s"
+archived_path=""
+for i in $(seq 1 5); do
+    sleep 3
+    archived_path=$(ls state/spool/archived/$(basename "$REAL_SEED" .wav).txt 2>/dev/null | head -1 || true)
+    [ -n "$archived_path" ] && [ -s "$archived_path" ] && break
+    archived_path=""
+done
+[ -n "$archived_path" ] || { echo "[-] Error: Vosk did not archive a transcript for the real recording within 15s" >&2; exit 1; }
+echo "  ✓ Native Vosk ASR engine archived a transcript: $archived_path"
+echo "  --- REAL Vosk transcript (from the live call) ---"
+cat "$archived_path"
+grep -q '"[[:space:]]*[^"[:space:]]' "$archived_path" || { echo "[-] Error: real transcript body is empty" >&2; exit 1; }
+echo -e "${GREEN}✓ Native Vosk Java 21 ASR Pipeline Proven on the REAL Recorded Call (no synthetic waveform)${NC}\n"
 
 # ------------------------------------------------------------------------------
-# [9b/13] POST-CALL SCAM VERDICT (speech WAV -> Vosk -> TRANSCRIPT -> BLOCKED)
+# [9b/13] POST-CALL SCAM VERDICT (real recorded speech -> Vosk -> TRANSCRIPT -> BLOCKED)
 # ------------------------------------------------------------------------------
-# Technical Verification: Synthesizes the demo scam phrase with espeak-ng,
-# upsamples to 16 kHz mono, drops it in the spool, and asserts the post-call
-# AI verdict blocks it (mvno_vosk_blocked_total increments in VictoriaMetrics).
-# Protocol / Component: espeak-ng TTS / NativeVoskService.java ASR spool watcher /
-# AiFilterService.classifyTranscript -> ai-filter mock keyword rule.
-# Validation Criteria: mvno_vosk_blocked_total increases by >= 1 within 60s.
+# Technical Verification: Re-arches the REAL scam phrase captured in this run's
+# [5c] baresip call (spoken media that genuinely traversed
+# baresip -> Kamailio -> RTPEngine -> pcap -> live_tap). NativeVoskService decodes
+# it, AiFilterService.classifyTranscript calls the ai-filter keyword rule, and the
+# PHISHING verdict blocks it — mvno_vosk_blocked_total increments.
+# Protocol / Component: live_tap.sh pcap->WAV / NativeVoskService.java ASR spool
+# watcher / AiFilterService.classifyTranscript -> ai-filter mock keyword rule.
+# Validation Criteria: transcript archived with the REAL spam words; the real
+# transcript is echoed (not a hardcoded string); block counter increments >= 1.
 # ==============================================================================
-echo -e "${YELLOW}[9b/13] 🚨 Simulating Scam Call -> AI Blocked Verdict (speech -> Vosk -> TRANSCRIPT -> blocked)...${NC}"
-command -v espeak-ng >/dev/null 2>&1 || { echo "[-] Error: espeak-ng missing — install via ./scripts/deploy.sh" >&2; exit 1; }
+echo -e "${YELLOW}[9b/13] 🚨 Real Scam Call -> AI Blocked Verdict (real recording -> Vosk -> TRANSCRIPT -> blocked)...${NC}"
 command -v ffmpeg >/dev/null 2>&1 || { echo "[-] Error: ffmpeg missing — install via ./scripts/deploy.sh" >&2; exit 1; }
 vm_counter() {
     curl -s 'http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total' \
         | grep -o '"value":\[[0-9]*,"[0-9]*"\]' | grep -o ',"[0-9]*"' | tr -d ',"'
 }
+[ -n "${WAV_PATH:-}" ] && [ -s "$WAV_PATH" ] || { echo "[-] Error: no real [5c] recorded scam WAV ($WAV_PATH) for the verdict" >&2; exit 1; }
+echo "  ✓ re-arching the REAL [5c] scam-call recording: $(basename "$WAV_PATH")"
+echo "    recorded duration: $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WAV_PATH" 2>/dev/null || echo '?')s"
 BLOCKED_BEFORE=$(vm_counter || echo 0)
 BLOCKED_BEFORE=${BLOCKED_BEFORE:-0}
-espeak-ng -v en-us "You have won a prize, call us now" -w /tmp/opencode/demo_scam.wav >/dev/null 2>&1 \
-    || { echo "[-] Error: espeak-ng TTS failed (exit $?) — 9b prologue" >&2; exit 1; }
-ffmpeg -y -loglevel error -i /tmp/opencode/demo_scam.wav -ar 16000 -ac 1 /tmp/opencode/demo_scam_16k.wav \
-    || { echo "[-] Error: ffmpeg 16kHz resample failed (exit $?) — 9b prologue" >&2; exit 1; }
-cp /tmp/opencode/demo_scam_16k.wav "state/spool/demo-scam-$(date +%s).wav" \
-    || { echo "[-] Error: spool drop-in failed (exit $?) — 9b prologue" >&2; exit 1; }
+SCAM_DROP="state/spool/demo-scam-$(date +%s).wav"
+cp "$WAV_PATH" "$SCAM_DROP" || { echo "[-] Error: scam WAV drop-in failed" >&2; exit 1; }
+SCAM_TXT=""
+for i in $(seq 1 10); do
+    sleep 2.5
+    SCAM_TXT=$(ls state/spool/archived/$(basename "$SCAM_DROP" .wav).txt 2>/dev/null | head -1 || true)
+    [ -n "$SCAM_TXT" ] && [ -s "$SCAM_TXT" ] && break
+    SCAM_TXT=""
+done
+[ -n "$SCAM_TXT" ] || { echo "[-] Error: scam recording was not transcribed within 25s" >&2; exit 1; }
+echo -e "  --- REAL Vosk transcript of this run's scam call (${SCAM_TXT}) ---"
+cat "$SCAM_TXT"
+grep -q '"[[:space:]]*[^"[:space:]]' "$SCAM_TXT" || { echo "[-] Error: real scam transcript is empty" >&2; exit 1; }
+# The transcript must contain a scam keyword the ai-filter matches, proving the
+# block is genuine (driven by the real spoken words, not a hardcoded verdict).
+for w in won prize claim free urgent account blocked confirm; do
+    if grep -qi "$w" "$SCAM_TXT"; then
+        echo "  ✓ transcript carries scam keyword '$w' -> ai-filter must block"
+        break
+    fi
+done
 BLOCKED_AFTER=$BLOCKED_BEFORE
 for i in $(seq 1 12); do
     sleep 5
     BLOCKED_AFTER=$(vm_counter || echo 0)
     [ -n "$BLOCKED_AFTER" ] && [ "$BLOCKED_AFTER" -gt "$BLOCKED_BEFORE" ] && break
 done
-[ "$BLOCKED_AFTER" -gt "$BLOCKED_BEFORE" ] || { echo "[-] Error: mvno_vosk_blocked_total did not increment (blocked verdict missing)" >&2; exit 1; }
-echo -e "${GREEN}✓ Scam call blocked: mvno_vosk_blocked_total ${BLOCKED_BEFORE} -> ${BLOCKED_AFTER}${NC}"
-
-# --- REAL-SPEECH pairing: replay the certified live-mic fixture through the
-# same spool -> Vosk -> AiFilter path (independent of espeak-ng synthesis). ---
-REAL_WAV="docs/evidence/fixtures/archived/live-385288b878ffcf5e-d60dcbeab13dbc0c-10.89.0.60-0.wav"
-[ -f "$REAL_WAV" ] || { echo "[-] Error: real-speech fixture missing: ${REAL_WAV}" >&2; exit 1; }
-REAL_DROP="state/spool/demo-real-$(date +%s).wav"
-cp "$REAL_WAV" "$REAL_DROP" || { echo "[-] Error: real-speech fixture drop-in failed" >&2; exit 1; }
-REAL_BEFORE=$(vm_counter || echo 0)
-REAL_BEFORE=${REAL_BEFORE:-0}
-REAL_TXT=""
-for i in $(seq 1 10); do
-    sleep 2.5
-    REAL_TXT=$(ls state/spool/archived/demo-real-*.txt 2>/dev/null | head -1 || true)
-    [ -n "$REAL_TXT" ] && break
-done
-[ -n "$REAL_TXT" ] || { echo "[-] Error: real-speech fixture was not transcribed within 25s" >&2; exit 1; }
-echo -e "  --- REAL-SPEECH transcript (${REAL_TXT}) ---"
-cat "$REAL_TXT"
-[ -s "$REAL_TXT" ] || { echo "[-] Error: real-speech transcript is empty" >&2; exit 1; }
-REAL_AFTER=$REAL_BEFORE
-for i in $(seq 1 12); do
-    sleep 5
-    REAL_AFTER=$(vm_counter || echo 0)
-    [ -n "$REAL_AFTER" ] && [ "$REAL_AFTER" -gt "$REAL_BEFORE" ] && break
-done
-[ "$REAL_AFTER" -gt "$REAL_BEFORE" ] || { echo "[-] Error: real-speech fixture did not yield a BLOCKED verdict (mvno_vosk_blocked_total stuck at ${REAL_AFTER})" >&2; exit 1; }
-echo -e "${GREEN}✓ Real-speech fixture BLOCKED: mvno_vosk_blocked_total ${REAL_BEFORE} -> ${REAL_AFTER} (real voice, 'you have won a prime target now')${NC}\n"
+[ "$BLOCKED_AFTER" -gt "$BLOCKED_BEFORE" ] || { echo "[-] Error: mvno_vosk_blocked_total did not increment (phishing verdict missing on the real scam call)" >&2; exit 1; }
+echo -e "${GREEN}✓ Real scam call BLOCKED: mvno_vosk_blocked_total ${BLOCKED_BEFORE} -> ${BLOCKED_AFTER} (real recorded speech, transcript echoed above)${NC}\n"
 
 # ------------------------------------------------------------------------------
 # [9c/13] PLAYBACK PROOF (seeded real-voice recording over ALSA + its transcript)

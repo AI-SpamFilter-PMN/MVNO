@@ -892,8 +892,9 @@ tar czf mvno-offline.tar.gz vendor/   # ~5 GB — the ship artifact
 `vendor-bundle.sh` is **surgical and needs no network**: it re-saves the
 already-present local images with the exact `bootstrap.sh` SAVE_IMAGES tags,
 removes stale unversioned tars (`mongo-8.0.tar`, `grafana-oss-latest.tar`, …),
-and regenerates the checksums. Gates inside: 21 tars present, `sha256sum -c`
-all OK. Exit 0 means ship-ready.
+and regenerates the checksums. Gates inside: 22 tars present (incl. the
+containerized `mvno-baresip:1.0.0` rig image), `sha256sum -c` all OK. Exit 0
+means ship-ready.
 
 ### 8.3 Consumer side (AIR-GAPPED machine)
 
@@ -906,7 +907,7 @@ all OK. Exit 0 means ship-ready.
 tar xzf mvno-offline.tar.gz          # unpack vendor/ into the repo root
 ./scripts/preflight.sh               # host checks (rootless podman, tun, tools)
 ./scripts/load-offline.sh --verify-tags   # 16 compose pins found in the tars
-./scripts/load-offline.sh            # verify checksums + load all 21 images
+./scripts/load-offline.sh            # verify checksums + load all 22 images
 ./scripts/up.sh                      # init-db/seed + compose up (offline-first)
 make test                            # 4 gate suites green
 ```

@@ -39,7 +39,7 @@ module_path() {
 
 setup() {
   echo "=== demo_call.sh setup: speech file + baresip rig ==="
-  espeak-ng -v en-us "You have won a prize, call us now" -w /tmp/speech.wav
+  espeak-ng -v en-us "You have won a prize, call us now or your account will be closed" -w /tmp/speech.wav
   mkdir -p state/baresip/rx state/baresip/tx
   ffmpeg -y -loglevel error -i /tmp/speech.wav -ar 8000 -ac 1 -c:a pcm_s16le \
     state/baresip/speech8k.wav
@@ -118,8 +118,20 @@ ctrl_cmd() {
 dial() {
   echo "=== demo_call.sh dial: ${CALLER} -> ${CALLEE} ==="
   ctrl_cmd "{\"command\":\"dial\",\"params\":\"sip:${CALLEE}@${SIP_HOST}:5060\"}"
-  echo "  >>> TALK NOW — the callee streams the canned scam phrase for ~12 s <<<"
-  sleep 12
+  if [ "$PULSE_OK" -eq 1 ] && [ -t 0 ]; then
+    echo "  ⏳ The caller leg is LIVE on your microphone. In ~3s SPEAK THE SCAM PHRASE"
+    echo "     into the mic for ~12s — Vosk transcribes YOUR voice:"
+    echo "        \"You have won a prize, call us now or your account will be closed\""
+    sleep 3
+    for s in 12 9 6 3; do
+      printf "  >>> SPEAK NOW (%ss window) ...\r" "$s"
+      sleep 3
+    done
+    echo ""
+  else
+    echo "  >>> TALK NOW — the callee streams the canned scam phrase for ~12 s <<<"
+    sleep 12
+  fi
   ctrl_cmd '{"command":"hangup"}'
   sleep 2
   echo "  rx answers (expect 1): $(podman logs baresip-rx | grep -c '200 Answering')"

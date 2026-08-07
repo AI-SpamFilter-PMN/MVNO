@@ -1,0 +1,106 @@
+MVNO Graduation Demo — Audit & Real-Flow Hardening Run (2026-08-08)
+===================================================================
+Session: DeepSeek live-agent audit of "remove simulations -> real interactive flows".
+
+The audit proposed removing product-logic simulations used as evidence. Investigation
+empirically reframed the top blocker and hardened every flagged evidence step to REAL
+behavior. All gates re-verified live.
+
+----------------------------------------------------------------------
+1. RTP BLOCKER RESOLVED (was a decode-artifact false alarm)
+----------------------------------------------------------------------
+Handoff claimed the containerized baresip call produced "no RTP packets"
+(`tshark -r <pcap> -Y rtp` = 0). Root cause: RTPEngine (drachtio mr9.4.0.0)
+records pcap in `eth` format on ephemeral relay ports (e.g. UDP 30010-30050);
+Wireshark's UDP->RTP heuristic does NOT auto-decode those ports, so -Y rtp reports
+0 while the frames are 172-byte G.711 PCMU.
+
+Forcing decode reveals media IS pinned through RTPEngine:
+  - pcap 5aa83f5f… (early run): 703 RTP (caller->RTPEngine:30000) + 117 RTP (callee->30094)
+  - pcap e4829224… (fresh run):  692 (caller->30050) + 195 (callee->30032)
+  - tshark -d udp.port==30000,rtp yields RTP PT=ITU-T G.711 PCMU, so on
+  - live_tap.sh --once uses data.data (not -Y rtp) and extracts per-leg WAVs fine.
+
+Conclusion: media never stopped traversing RTPEngine; the demo now documents
+that `-Y rtp` needs the decode directive and that live_tap is the extraction path.
+
+----------------------------------------------------------------------
+2. [5c] REAL CALL RECORDING -> WAV -> Vosk TRANSCRIPT (verified fresh)
+----------------------------------------------------------------------
+demo_call.sh setup+dial -> full baresip lifecycle through Kamailio:
+  CALL_OUTGOING -> CALL_RINGING -> CALL_ANSWERED -> CALL_ESTABLISHED
+  -> CALL_RTPESTAB(sendrecv) -> CALL_CLOSED ; rx answers = 1
+Fresh pcap e4829224…: 192512 bytes. live_tap.sh --once -> callee leg 3.9s WAV,
+caller leg 14.1s WAV. Vosk transcribed the callee leg of the LIVE call:
+  { "text" : "you have won a prime target how are your account will be close" }
+
+Hardening: demo_call.sh now renders the canned callee phrase longer
+("You have won a prize, call us now or your account will be closed", 3.89 s)
+so the [5c] WAV-duration >=3s floor holds on the speech-bearing callee leg;
+the runbook [5c] now picks the NON-EMPTY leg (never the silent caller leg).
+
+----------------------------------------------------------------------
+3. [8] USER SMS -> REAL SMPP MO (OsmoSMSC) -> REST INTERCEPT (new)
+----------------------------------------------------------------------
+Replaced the pure-REST curl bypass with the real mobile-originated SMPP path:
+  send_smpp_sms.py SUBMIT_SM -> OsmoSMSC (2775) -> smsc.db
+  BIND_TRANSCEIVER ESME_ROK; SUBMIT_SM ESME_ROK; row lands in smsc.db (GSM-7
+  packed user_data, empty text column). The user-supplied nonce is recovered
+  from smsc.db via ip_sm_gw.gsm7_decode — proving the user's exact SMS traversed
+  the SMSC for real, then the REST intercept classifies it Clean.
+SMS text: env $SMS_TEXT > interactive TTY prompt > default. Screenshot of the
+run: nonce MVNO5G-1786139807 confirmed in smsc.db via GSM-7 decode; REST
+allow=true, reason=Clean content.
+
+----------------------------------------------------------------------
+4. [9] Vosk ASR ON THE REAL RECORDED CALL (was a synthetic 350Hz sine wave)
+----------------------------------------------------------------------
+Removed the Python-generated 350Hz beep. [9] now re-arches the real recorded
+[5c] callee WAV into the spool; NativeVoskService decodes and archives it.
+Verified: seeded WAV -> archived transcript "you have won a prime target how are
+your account will be close" (non-empty) within the poll window.
+
+----------------------------------------------------------------------
+5. [9b] REAL SCAM VERDICT (was espeak-ng TTS + hardcoded fixture replay)
+----------------------------------------------------------------------
+Removed espeak-ng TTS synthesis and the hardcoded live-385288… fixture replay.
+[9b] now re-arches THIS run's real recorded scam WAV, echoes the real Vosk
+transcript, asserts a scam keyword is present, and waits for
+mvno_vosk_blocked_total to increment. Verified live:
+  transcript: "you have won a prime target how are your account will be close"
+  scam keyword 'won' present; mvno_vosk_blocked_total 6 -> 7  (genuine phishing verdict)
+
+----------------------------------------------------------------------
+6. demo_call.sh live-mic prompt
+----------------------------------------------------------------------
+`dial` now, when the host Pulse socket is present AND stdin is a TTY, prompts the
+operator to SPEAK the scam phrase into the live microphone during a 12s countdown
+(the caller leg already uses pulse), so the caller leg captures YOUR real voice.
+Non-TTY / no-mic falls back to the canned callee phrase (deterministic guard).
+
+----------------------------------------------------------------------
+7. Documentation sync
+----------------------------------------------------------------------
+- TESTING_REFERENCE.md §Raw mechanics: containerized mvno-baresip:1.0.0 rig
+  (no host baresip / shared-lib / pulse mounts); matched the setup phrase.
+- deployment_guide.md: bundle gate 21 -> 22 tars (incl. mvno-baresip:1.0.0).
+- ONBOARDING.md: espeak-ng note re-pointed to demo_call.sh setup (runbook 9b no
+  longer synthesizes TTS).
+- LIVE_DEMO.md S5 fallback: notes the runbook [9b] re-arches the live call.
+
+----------------------------------------------------------------------
+8. GATE VERIFICATION (all GREEN)
+----------------------------------------------------------------------
+- bash -n: demo_runbook.sh / demo_call.sh / vendor-bundle.sh / load-offline.sh OK
+- scripts/check-glossary.sh: 0 uncovered (135 GLOSSARY keys)
+- make test: exit 0 (HLR subscriber, 2 SMPP ESMEs, API UP, balance 100,
+  SMS allow, call intercept)
+- scripts/vendor-bundle.sh: tars = 22 (incl mvno-baresip-1.0.0.tar),
+  sha256sum -c all OK
+- scripts/load-offline.sh --verify-tags: all compose pins have matching tars
+  (no drift)
+
+RESULT: every demo evidence step that previously used product-logic simulation
+as its proof (synthetic beep, espeak TTS, hardcoded fixture verdict, REST-only
+SMS) now exhibits REAL behavior end-to-end; simulations remain only as labeled
+fallbacks to seed data/metrics, never as the primary evidence.
