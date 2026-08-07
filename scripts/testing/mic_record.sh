@@ -7,9 +7,9 @@
 # lets Native Vosk ASR transcribe what you spoke in real-time!
 #
 # Usage:
-#   ./scripts/testing/record_mic_call.sh [duration_in_seconds]
+#   ./scripts/testing/mic_record.sh [duration_in_seconds]
 # Example:
-#   ./scripts/testing/record_mic_call.sh 5
+#   ./scripts/testing/mic_record.sh 5
 # ==============================================================================
 
 set -euo pipefail

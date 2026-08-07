@@ -512,7 +512,7 @@ sleep 5 && cat state/spool/archived/sample.txt
 ### Flow H — Live microphone recording + transcription
 
 ```bash
-./scripts/testing/record_mic_call.sh 5        # records 5 s -> spool -> transcript
+./scripts/testing/mic_record.sh 5        # records 5 s -> spool -> transcript
 ```
 
 The script auto-falls back through `ffmpeg -f pulse` → `ffmpeg -f alsa` → `arecord`,

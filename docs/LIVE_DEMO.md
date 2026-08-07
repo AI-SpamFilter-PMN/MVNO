@@ -55,6 +55,23 @@ curl -s http://localhost:8080/actuator/health | head -c 80
 
 **EXPECT** — no `MISSING` lines; 31 `Up`; actuator health JSON contains `"UP"`.
 
+**MIC SELF-TEST (2 s)** — proves the full live-speech path (mic → 16 kHz WAV →
+`NativeVoskService` → transcript) before the scam-call demo depends on it:
+
+```bash
+bash scripts/testing/mic_record.sh 2
+sleep 4
+ls -la state/spool/archived/mic_call_*.txt | tail -1
+cat $(ls -t state/spool/archived/mic_call_*.txt | head -1)
+```
+
+**EXPECT** — a non-empty transcript line (what you just spoke; English words are
+most reliable). If Vosk is unavailable the demo still proceeds — transcripts
+are demo-grade, the AI verdicts come from the REST/SMS paths.
+
+**FALLBACK** — fixtures: `docs/evidence/fixtures/MANIFEST.md` (45/45 checksummed
+reference transcripts/verdicts, no mic required).
+
 **FALLBACK** — stack gates: `docs/TESTING_REFERENCE.md` §Prerequisites;
 `./scripts/preflight.sh` auto-verifies the host.
 

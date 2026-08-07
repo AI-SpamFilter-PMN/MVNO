@@ -69,6 +69,16 @@ for tool in sqlite3 nc curl python3; do
   else fail "${tool} not found (required by make init-db / vty.sh / demo_runbook)"; fi
 done
 
+# ─── 3b. Demo toolchain (live-demo S1–S10: calls, ASR, pcap, audio) ─────────
+DEMO_TOOLS="tshark ffprobe aplay espeak-ng xxd ffmpeg md5sum"
+DEMO_MISSING=""
+for tool in ${DEMO_TOOLS}; do
+  if command -v "${tool}" >/dev/null 2>&1; then ok "${tool} present (live-demo)"
+  else DEMO_MISSING="${DEMO_MISSING} ${tool}"
+       warn "${tool} not found — live-demo speech/pcap/audio steps will fail" ; fi
+done
+[ -z "${DEMO_MISSING}" ] || WARN_FAIL=1
+
 # ─── 4. /dev/net/tun (5G UPF + UERANSIM) ─────────────────────────────────────
 if [ -c /dev/net/tun ]; then ok "/dev/net/tun present (5G user-plane)"
 else fail "/dev/net/tun missing — 5G SA core cannot run (Linux only)"; fi
