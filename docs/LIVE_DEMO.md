@@ -147,6 +147,7 @@ cat > state/baresip/tx/accounts <<'EOF'
 EOF
 
 # 3) run the two UAs (host baresip + libs, inside ubuntu:24.04 containers)
+#    B[] just mounts the host baresip binary + its shared libs read-only
 B=(-v /usr/bin/baresip:/usr/bin/baresip:ro)
 for f in /usr/lib/libbaresip.so.26 /usr/lib/libre.so.41 \
          /usr/lib/libbrotlicommon.so.1 /usr/lib/libbrotlidec.so.1 \
@@ -178,6 +179,7 @@ podman logs baresip-rx | grep -c "200 OK"      # expect >= 2
 podman logs baresip-tx | grep -c "200 OK"      # expect >= 2
 
 # 4) dial the receiver, SPEAK the scam script for ~12 s, then hang up
+#    (baresip ctrl socket framing: <len>:<json>, — the MSG line IS the dial)
 MSG='{"command":"dial","params":"sip:15559998888@10.89.0.23:5060"}'
 podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; \
   printf '${#MSG}:${MSG},' >&3; timeout 2 cat <&3"
@@ -310,6 +312,7 @@ aren't polluted: `sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;
 ```bash
 cd /tmp && USER=15553332211 REALM=10.89.0.23 PASS=testpass \
   URI='sip:15554443322@10.89.0.23:5060' BODY='Hello raw 5G2G'
+# 3-step SIP digest: ask for a nonce, compute HA1/HA2, resend with Proxy-Authorization
 printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK1;rport\r\nFrom: <sip:%s@%s>;tag=1\r\nTo: <sip:15554443322@%s>\r\nCall-ID: c1@10.89.0.62\r\nCSeq: 1 MESSAGE\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "${#BODY}" "$BODY" > m1.txt
 NONCE=$(timeout 5 nc -u localhost 5066 < m1.txt | grep -oE 'nonce="[^"]+"' | head -1 | sed 's/nonce="\(.*\)"/\1/')
 HA1=$(printf '%s:%s:%s' "$USER" "$REALM" "$PASS" | md5sum | cut -d' ' -f1)
@@ -331,8 +334,14 @@ receipted — the 2G container serves only MS1; always use `15554443322`.)
 ```bash
 cd /tmp && USER=15553332211 REALM=10.89.0.23 PASS=testpass \
   URI='sip:15559998888@10.89.0.23:5060' BODY='Hello raw 5G5G'
-# ...same 3-step nonce/digest dance as S6c (different URI/Call-ID)...
+printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK3;rport\r\nFrom: <sip:%s@%s>;tag=3\r\nTo: <sip:15559998888@%s>\r\nCall-ID: c2@10.89.0.62\r\nCSeq: 1 MESSAGE\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "${#BODY}" "$BODY" > m1.txt
+NONCE=$(timeout 5 nc -u localhost 5066 < m1.txt | grep -oE 'nonce="[^"]+"' | head -1 | sed 's/nonce="\(.*\)"/\1/')
+HA1=$(printf '%s:%s:%s' "$USER" "$REALM" "$PASS" | md5sum | cut -d' ' -f1)
+HA2=$(printf 'MESSAGE:%s' "$URI" | md5sum | cut -d' ' -f1)
+RESP=$(printf '%s:%s:%s' "$HA1" "$NONCE" "$HA2" | md5sum | cut -d' ' -f1)
+printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK4;rport\r\nFrom: <sip:%s@%s>;tag=4\r\nTo: <sip:15559998888@%s>\r\nCall-ID: c2@10.89.0.62\r\nCSeq: 2 MESSAGE\r\nProxy-Authorization: Digest username="%s", realm="%s", nonce="%s", uri="%s", response="%s", algorithm=MD5\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "$USER" "$REALM" "$NONCE" "$URI" "$RESP" "${#BODY}" "$BODY" > m2.txt
 timeout 5 nc -u localhost 5066 < m2.txt | grep -E "^SIP"
+sleep 8
 podman logs baresip-rx 2>&1 | grep "Hello raw 5G5G"        # body received
 ```
 
