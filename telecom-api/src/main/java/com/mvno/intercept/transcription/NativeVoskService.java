@@ -14,6 +14,8 @@ import org.vosk.Recognizer;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +24,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import jakarta.annotation.PreDestroy;
 
@@ -51,7 +52,10 @@ public class NativeVoskService {
     private final Counter decodeErrors;
     private final Counter classified;
     private final Counter blocked;
+    private final Counter unavailable;
     private final AtomicInteger modelReady = new AtomicInteger(0);
+    private final AtomicLong lastStandbyWarn = new AtomicLong(0);
+    private final AtomicLong lastSpoolWarn = new AtomicLong(0);
     private Model voskModel;
 
     public NativeVoskService(
@@ -67,6 +71,7 @@ public class NativeVoskService {
         this.decodeErrors = meterRegistry.counter("mvno.vosk.decode.errors");
         this.classified = meterRegistry.counter("mvno.vosk.classified");
         this.blocked = meterRegistry.counter("mvno.vosk.blocked");
+        this.unavailable = meterRegistry.counter("mvno.vosk.unavailable");
         meterRegistry.gauge("mvno.vosk.model.ready", modelReady);
         initModel();
     }
@@ -166,11 +171,24 @@ public class NativeVoskService {
     @Scheduled(fixedDelay = 3000)
     public void pollSpoolDirectory() {
         if (voskModel == null) {
+            // Fail-open: calls proceed; transcription is best-effort post-call analytics.
+            // Visible marker (throttled) so operators know ASR is unavailable.
+            unavailable.increment();
+            final long now = System.currentTimeMillis();
+            if (now - lastStandbyWarn.get() > 60_000) {
+                lastStandbyWarn.set(now);
+                logger.warn("TRANSCRIPTION UNAVAILABLE: Vosk ASR model not loaded - calls proceed, transcription skipped (mvno.vosk.unavailable={})", unavailable.count());
+            }
             return;
         }
         try {
             final Path spoolPath = Paths.get(spoolDir);
             if (!Files.exists(spoolPath)) {
+                final long now = System.currentTimeMillis();
+                if (now - lastSpoolWarn.get() > 60_000) {
+                    lastSpoolWarn.set(now);
+                    logger.warn("RECORDING SPOOL MISSING: {} not found - no recordings to transcribe (fail-open, calls unaffected)", spoolDir);
+                }
                 return;
             }
 

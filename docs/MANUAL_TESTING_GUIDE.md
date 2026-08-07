@@ -1127,21 +1127,23 @@ directly, see `configs/rtpengine/rtpengine.conf`). The Vosk ASR watcher polls
 ### Terminal T6b — extract the latest recorded call
 
 Raw (canonical — Section 0.5: `tshark -d udp.port==<even-dst>,rtp` +
-`rtp.p_type==0` + `xxd -r -p` + `ffmpeg -f mulaw`), or scripted:
+`rtp.p_type==0` + `xxd -r -p` + `ffmpeg -f mulaw`), or scripted (Tier-3
+fallback; `pcap_to_wav.py` was retired — `live_tap.sh` is the native
+replacement, see `docs/REALTIME_AUDIO.md`):
 
 ```bash
 # 1) Find the newest recording (also in state/spool/metadata/):
 ls -t state/spool/pcaps/ | head -1
 
-# 2) Extract it to the Vosk spool root (watcher polls this directory):
-python3 scripts/testing/pcap_to_wav.py $(ls -t state/spool/pcaps/*.pcap | head -1)
-cp $(ls -t state/spool/pcaps/*.wav | head -1) state/spool/
+# 2) Extract it — one WAV per source-IP leg, straight into the Vosk spool root
+#    (watcher polls this directory):
+scripts/testing/live_tap.sh --once $(ls -t state/spool/pcaps/*.pcap | head -1)
 ```
 
-**Expected**:
+**Expected** (one line per voice leg — even dstport = RTP, odd = RTCP dropped):
 
 ```
-[+] WAV extracted: state/spool/pcaps/call-1785779063@mvno-xxxxxxxx.pcap.wav (10.9s audio)
+[+] WAV extracted: /path/to/MVNO/state/spool/call-1785779063@mvno-xxxxxxxx-10.89.0.61.wav (10.9s audio)
 ```
 
 ### Terminal T6c — read the transcript
@@ -1156,11 +1158,11 @@ cat state/spool/archived/call-*.txt   # newest = the call you just made
 speech**, expect the words: Section 0.6's baresip speech phrase transcribes to
 `{"text": "you have won a prime target now"}` (2026-08-06).
 
-> **Sample-rate caveat**: `pcap_to_wav.py` writes 8 kHz (PCMU native). The Vosk model
-> is 16 kHz, so an 8 kHz file transcribes reliably but with reduced fidelity — if a
-> transcript comes back empty for real speech, upsample first:
-> `ffmpeg -i state/spool/call-*.wav -ar 16000 state/spool/call-16k.wav`.
-> (The Section 0.5 raw pipeline already outputs 16 kHz.)
+> **Sample-rate note**: `live_tap.sh` decodes PCMU (8 kHz native) and resamples to
+> **16 kHz** on output — the certified 2026-08-06 evidence shows the raw 8 kHz WAV
+> transcribes empty in Vosk while the 16 kHz resample yields the spoken words
+> (`{"text": "you have won a prime target now"}`). The Section 0.5 raw pipeline
+> outputs 16 kHz directly; both paths are equivalent.
 
 ### Terminal T6d — post-call AI transcript verdict
 

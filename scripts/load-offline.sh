@@ -75,7 +75,10 @@ if [ "${1:-}" = "--verify-tags" ]; then
     for tar in "$VENDOR_DIR/docker"/*.tar; do
         [ -f "$tar" ] || continue
         # Inspect the tar for repository tags (works for docker save format).
-        tags=$($DOCKER_CMD load -i "$tar" 2>/dev/null | grep -oE 'Loaded image[^:]*: [^ ]+' | sed -E 's/Loaded image[^:]*: //')
+        # Normalize registry prefixes: podman prints fully-qualified refs
+        # ("docker.io/library/mongo:7.0", "localhost/drachtio/rtpengine:mr9.4.0.0")
+        # while docker prints short names — both must match compose pins.
+        tags=$($DOCKER_CMD load -i "$tar" 2>/dev/null | grep -oE 'Loaded image[^:]*: [^ ]+' | sed -E 's/Loaded image[^:]*: //; s#^(docker\.io/|localhost/)##')
         if [ -z "$tags" ]; then
             # Fallback: skip (cannot determine tag) — recorded as unknown.
             VENDOR_TAGS+=("UNKNOWN:$(basename "$tar" .tar)")

@@ -20,10 +20,10 @@ This document outlines upcoming architectural enhancements, operational backlog 
 - **Roadmap Item**: Add `[sinks.victorialogs]` HTTP ingestion sink targeting `victorialogs:9428` for long-term log archiving and Grafana log queries.
 
 ### 3b. Real-Call Recording → ASR Transcription Pipeline (pcap→wav→Vosk) — ✅ IMPLEMENTED
-- **Current State**: rtpengine mr9.4 records calls as `recording-format=eth` pcaps only (no WAV support in this build); `record-call=yes` was producing pcaps while the Vosk watcher consumed `.wav` — real calls were never transcribed.
-- **Implementation**: `scripts/testing/pcap_to_wav.py` (stdlib-only) parses the eth pcap, decodes G.711 PCMU RTP (both legs, interleaved by capture time) and writes a 16-bit 8 kHz WAV into `state/spool/`, where `NativeVoskService` polls every 3 s, transcribes, and archives `.wav` + `.txt`. Verified end-to-end on a real call (Issue 8.27).
-- **Usage**: `python3 scripts/testing/pcap_to_wav.py state/spool/pcaps/call-*.pcap state/spool/call-<id>.wav`
-- **Roadmap Item**: Watch the pcaps dir automatically (or teach `NativeVoskService` to convert pcaps natively) so transcription needs no manual step.
+- **Current State**: rtpengine mr9.4 records calls as `recording-format=eth` pcaps only (no WAV support in this build); `record-call=yes` produces pcaps while the Vosk watcher consumed `.wav` — real calls were never transcribed.
+- **Implementation**: `scripts/testing/live_tap.sh` (tshark → awk → xxd → ffmpeg, zero Python) decodes G.711 PCMU RTP per source-IP leg (RTCP odd ports dropped, 12-byte RTP header stripped) into 8 kHz WAVs in `state/spool/`, where `NativeVoskService` polls every 3 s, transcribes, and archives `.wav` + `.txt`. Two modes: `--once` post-call extraction (Tier-3 fallback, replaces the retired `pcap_to_wav.py`) and a `daemon` watcher that incrementally chunks the growing pcap into `live-*.wav` for mid-call (Tier-1) transcription. Verified end-to-end on a real call (Issue 8.27; see `docs/REALTIME_AUDIO.md`).
+- **Usage**: `scripts/testing/live_tap.sh --once state/spool/pcaps/call-*.pcap` (or `live_tap.sh daemon` for Tier-1 live chunks)
+- **Roadmap Item**: ✅ Implemented — the `daemon` mode auto-watches the pcaps dir (1 s poll, 4 s chunks); optional tuning documented in `docs/REALTIME_AUDIO.md` (poll timings, kernel-proc route).
 
 ### 4. Container Native Healthcheck Endpoints
 - **Current State**: Container healthchecks use CLI tools (`mongosh`, `curl`).

@@ -52,6 +52,9 @@ intercept:
 # ------------------------------------------------------------------------------
 # Native Vosk Speech-to-Text ASR Engine (JVM JNI)
 # ------------------------------------------------------------------------------
+# spool-dir points at the RTPEngine pcap recording directory. Vosk watches for
+# .wav files dropped there (live_tap.sh Tier-1 live chunks or Tier-3 --once
+# post-call extractions) and archives them after transcription.
 vosk:
   spool-dir: /var/spool/rtpengine
   model-path: ${VOSK_MODEL_PATH:/opt/vosk-model-small-en-us-0.15}

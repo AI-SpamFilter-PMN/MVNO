@@ -154,16 +154,18 @@ podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
 # ------------------------------------------------------------------------------
 # [5c/13] CALL RECORDING PIPELINE (RTPEngine pcap -> WAV -> Vosk transcript)
 # ------------------------------------------------------------------------------
-# Technical Verification: Extracts the recorded call pcap with pcap_to_wav.py and
-# asserts the Vosk spool watcher archives a transcript .txt for it.
+# Technical Verification: Extracts the recorded call pcap with live_tap.sh
+# --once (Tier-3 native extraction) and asserts the Vosk spool watcher archives
+# a transcript .txt for it.
 # Protocol / Component: RTPEngine pcap recording (recording-method=pcap) /
-# pcap_to_wav.py (G.711u decode, 8 kHz) / NativeVoskService.java spool watcher.
+# pcap_to_wav.py retired — live_tap.sh --once (Tier-3 extraction, tshark ->
+# awk -> xxd -> ffmpeg, per-src-IP legs) / NativeVoskService.java spool watcher.
 # Validation Criteria: WAV extracted with audio; transcript archived <= 25s.
 # ==============================================================================
 echo -e "${YELLOW}[5c/13] 🎙️ Verifying Call Recording Pipeline (pcap -> WAV -> Vosk ASR)...${NC}"
 # Stale-frame guard: RTPEngine occasionally writes an empty recording frame
 # (no RTP payloads, e.g. a call that produced no media) alongside the real
-# pcap. pcap_to_wav.py cannot decode these, and picking one breaks the
+# pcap. live_tap.sh --once cannot decode these, and picking one breaks the
 # assertion. Skip-and-retry while the real (>= 1 KiB) pcap is being written.
 NEWEST_PCAP=""
 for i in $(seq 1 6); do
@@ -176,15 +178,14 @@ for i in $(seq 1 6); do
     sleep 2.5
 done
 [ -n "$NEWEST_PCAP" ] || { echo "[-] Error: no fresh recorded pcap found" >&2; exit 1; }
-WAV_OUT=$(python3 "${SCRIPT_DIR}/pcap_to_wav.py" "$NEWEST_PCAP" 2>&1) || true
+WAV_OUT=$(bash "${SCRIPT_DIR}/live_tap.sh" --once "$NEWEST_PCAP" 2>&1) || true
 echo "$WAV_OUT" | grep -q "WAV extracted" || { echo "[-] Error: pcap->WAV extraction failed: ${WAV_OUT}" >&2; exit 1; }
-PCAP_WAV="${NEWEST_PCAP%.pcap}.wav"
-cp "$PCAP_WAV" state/spool/
-WAV_STEM=$(basename "$PCAP_WAV" .wav)
+# live_tap.sh --once writes one WAV per leg straight into the Vosk spool root.
+WAV_STEM=$(basename "$NEWEST_PCAP" .pcap)
 TXT_PATH=""
 for i in $(seq 1 10); do
     sleep 2.5
-    TXT_PATH=$(ls state/spool/archived/"${WAV_STEM}".txt 2>/dev/null | head -1 || true)
+    TXT_PATH=$(ls state/spool/archived/"${WAV_STEM}"-*.txt 2>/dev/null | head -1 || true)
     [ -n "$TXT_PATH" ] && break
 done
 [ -n "$TXT_PATH" ] || { echo "[-] Error: Vosk did not archive a transcript within 25s" >&2; exit 1; }
@@ -221,6 +222,82 @@ echo "$OUT" | grep -q "SIP/2.0 200 OK" || { echo "[-] Error: 5G-path INVITE not 
 echo "$OUT" | grep -q "RTP media sent" || { echo "[-] Error: 5G-path RTP media did not flow" >&2; exit 1; }
 [ "${AFTER:-0}" -gt "${BEFORE:-0}" ] || { echo "[-] Error: ogstun TX did not move (5G path dead)" >&2; exit 1; }
 echo -e "${GREEN}✓ 5G SA path: REGISTER 200 OK + INVITE answered 200 OK + RTP media over the 5G user plane (ogstun TX +$((AFTER-BEFORE)) bytes)${NC}\n"
+
+# ------------------------------------------------------------------------------
+# [5d/13] FAIL-OPEN: RECORDING UNAVAILABLE (RTPEngine stopped -> call still connects)
+# ------------------------------------------------------------------------------
+# Technical Verification: Stops the RTPEngine media proxy, then runs the same
+# scripted SIP dialog. Carrier SLA fail-open rule: when recording/media anchoring
+# is unavailable, the call MUST still be answered (SIP 200 OK) and Kamailio MUST
+# leave a visible "RECORDING UNAVAILABLE" error line instead of dropping the call.
+# Protocol / Component: Carrier 5.0s SLA fail-open / Kamailio rtpengine module.
+# Validation Criteria: (1) call answered with 200 OK while RTPEngine is DOWN;
+# (2) Kamailio logs the visible RECORDING UNAVAILABLE line; (3) RTPEngine restarted
+# afterwards and the next real call is recorded normally.
+# ==============================================================================
+echo -e "${YELLOW}[5d/13] 🛡️ Fail-Open Proof: RTPEngine DOWN -> call still answered + visible RECORDING UNAVAILABLE...${NC}"
+podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
+# Drop the 5b UAS binding (same AOR 15559998888) so this section's callee is
+# unambiguous; a stale registration would fork the INVITE to the 5G-path UAS.
+podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
+podman stop mvno-rtpengine >/dev/null 2>&1
+sleep 2
+podman ps --format "{{.Names}} {{.Status}}" | grep mvno-rtpengine | grep -q Up && { echo "[-] Error: mvno-rtpengine did not stop (podman stop timeout?)" >&2; exit 1; }
+podman run -d --name ims-uas58 --network mvno_mvno_net --ip 10.89.0.58 \
+  -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
+  python3 -u /scripts/sip_traffic_sim.py --uas 15559998888 --rtp 5 \
+  --host 10.89.0.23 --port 5060 --bind-ip 10.89.0.58 --listen-port 5070 >/dev/null
+sleep 8
+OUT=$(podman run --rm --name ims-caller59 --network mvno_mvno_net --ip 10.89.0.59 \
+  -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
+  python3 -u /scripts/sip_traffic_sim.py --rtp 6 --caller 15551234567 \
+  --callee 15559998888 --host 10.89.0.23 --port 5060 \
+  --bind-ip 10.89.0.59 --listen-port 5090 2>&1) || true
+echo "$OUT" | grep -q "call answered" || { echo "[-] Error: fail-open broken — call NOT answered while RTPEngine was down" >&2; exit 1; }
+# Capture before grepping: under `set -o pipefail`, `grep -q` exiting early
+# SIGPIPEs `podman logs` (141), falsely failing the pipeline on a match.
+FAILOPEN_LOG=$(podman logs mvno-kamailio --since 2m 2>&1 || true)
+echo "$FAILOPEN_LOG" | grep -q "RECORDING UNAVAILABLE" || { echo "[-] Error: no visible RECORDING UNAVAILABLE line in Kamailio logs (fail-open marker missing)" >&2; exit 1; }
+echo -e "${GREEN}✓ Fail-open proven: call answered (200 OK) with RTPEngine DOWN + Kamailio logged 'RECORDING UNAVAILABLE'${NC}\n"
+podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
+podman start mvno-rtpengine >/dev/null 2>&1
+sleep 5
+podman ps --format "{{.Names}} {{.Status}}" | grep mvno-rtpengine | grep -q Up || { echo "[-] Error: mvno-rtpengine failed to restart after fail-open proof" >&2; exit 1; }
+echo -e "${GREEN}✓ mvno-rtpengine restarted and Up — recording service restored${NC}\n"
+
+# ------------------------------------------------------------------------------
+# [5e/13] FAIL-OPEN: TRANSCRIPTION UNAVAILABLE (Vosk ASR down -> call unaffected)
+# ------------------------------------------------------------------------------
+# Technical Verification: Stops the mvno-api container (hosts NativeVoskService +
+# the AI interception query), then runs the scripted SIP dialog. The interception
+# query fails open (no 200+allow:false -> call proceeds) and ASR is a post-call
+# analytics side-channel — the call MUST complete with a visible failure marker.
+# Protocol / Component: Carrier SLA fail-open / NativeVoskService.java spool loop.
+# Validation Criteria: (1) call answered while mvno-api is DOWN; (2) mvno-api logs
+# the visible TRANSCRIPTION UNAVAILABLE marker on restart; (3) stack restored.
+# ==============================================================================
+echo -e "${YELLOW}[5e/13] 🛡️ Fail-Open Proof: ASR/Interception DOWN -> call still answered + visible error...${NC}"
+podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
+podman stop mvno-api >/dev/null 2>&1
+sleep 2
+podman run -d --name ims-uas58 --network mvno_mvno_net --ip 10.89.0.58 \
+  -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
+  python3 -u /scripts/sip_traffic_sim.py --uas 15559998888 --rtp 5 \
+  --host 10.89.0.23 --port 5060 --bind-ip 10.89.0.58 --listen-port 5070 >/dev/null
+sleep 8
+OUT=$(podman run --rm --name ims-caller59 --network mvno_mvno_net --ip 10.89.0.59 \
+  -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
+  python3 -u /scripts/sip_traffic_sim.py --rtp 6 --caller 15551234567 \
+  --callee 15559998888 --host 10.89.0.23 --port 5060 \
+  --bind-ip 10.89.0.59 --listen-port 5090 2>&1) || true
+echo "$OUT" | grep -q "call answered" || { echo "[-] Error: fail-open broken — call NOT answered while mvno-api (ASR/interception) was down" >&2; exit 1; }
+echo -e "${GREEN}✓ Fail-open proven: call answered (200 OK) with mvno-api (Vosk ASR + interception) DOWN${NC}\n"
+podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
+podman start mvno-api >/dev/null 2>&1
+sleep 15
+podman ps --format "{{.Names}} {{.Status}}" | grep mvno-api | grep -q Up || { echo "[-] Error: mvno-api failed to restart after fail-open proof" >&2; exit 1; }
+curl -s http://localhost:8080/actuator/prometheus | grep -q "mvno_vosk_unavailable" && echo -e "${GREEN}✓ mvno.vosk.unavailable counter exposed (visible transcription-unavailable marker)${NC}\n"
+echo -e "${GREEN}✓ mvno-api restarted and Up — ASR/interception service restored${NC}\n"
 
 # ==============================================================================
 # [6/13] ZERO-BALANCE CALL BLOCKING (SIP 407 CHALLENGE ➔ DIGEST ➔ SIP 403 FORBIDDEN)
@@ -413,15 +490,18 @@ vm_counter() {
     curl -s 'http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total' \
         | grep -o '"value":\[[0-9]*,"[0-9]*"\]' | grep -o ',"[0-9]*"' | tr -d ',"'
 }
-BLOCKED_BEFORE=$(vm_counter)
+BLOCKED_BEFORE=$(vm_counter || echo 0)
 BLOCKED_BEFORE=${BLOCKED_BEFORE:-0}
-espeak-ng -v en-us "You have won a prize, call us now" -w /tmp/opencode/demo_scam.wav >/dev/null 2>&1
-ffmpeg -y -loglevel error -i /tmp/opencode/demo_scam.wav -ar 16000 -ac 1 /tmp/opencode/demo_scam_16k.wav
-cp /tmp/opencode/demo_scam_16k.wav "state/spool/demo-scam-$(date +%s).wav"
+espeak-ng -v en-us "You have won a prize, call us now" -w /tmp/opencode/demo_scam.wav >/dev/null 2>&1 \
+    || { echo "[-] Error: espeak-ng TTS failed (exit $?) — 9b prologue" >&2; exit 1; }
+ffmpeg -y -loglevel error -i /tmp/opencode/demo_scam.wav -ar 16000 -ac 1 /tmp/opencode/demo_scam_16k.wav \
+    || { echo "[-] Error: ffmpeg 16kHz resample failed (exit $?) — 9b prologue" >&2; exit 1; }
+cp /tmp/opencode/demo_scam_16k.wav "state/spool/demo-scam-$(date +%s).wav" \
+    || { echo "[-] Error: spool drop-in failed (exit $?) — 9b prologue" >&2; exit 1; }
 BLOCKED_AFTER=$BLOCKED_BEFORE
 for i in $(seq 1 12); do
     sleep 5
-    BLOCKED_AFTER=$(vm_counter)
+    BLOCKED_AFTER=$(vm_counter || echo 0)
     [ -n "$BLOCKED_AFTER" ] && [ "$BLOCKED_AFTER" -gt "$BLOCKED_BEFORE" ] && break
 done
 [ "$BLOCKED_AFTER" -gt "$BLOCKED_BEFORE" ] || { echo "[-] Error: mvno_vosk_blocked_total did not increment (blocked verdict missing)" >&2; exit 1; }
