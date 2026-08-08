@@ -70,8 +70,9 @@ retag them in one step, then launch the stack offline:
 ./scripts/up.sh
 ```
 
-One-command path (≡ pull-images + init-db + up, with preflight and self-heal):
-`./scripts/deploy.sh` — see Section 2B.
+One-command path (≡ pull-images + init-db + up + seed-mongo, with preflight and self-heal):
+`./scripts/deploy.sh` — see Section 2B. (seed-mongo runs **after** launch — it
+`exec`s into the running mongodb container; without it the 5G UEs cannot register.)
 
 Vendor images (`mongo:7.0`, `grafana/grafana-oss:11.6.0`, `timberio/vector`,
 `victoriametrics/*`, `drachtio/rtpengine`, `percona/mongodb_exporter`, `python:3.11-alpine`)
@@ -865,6 +866,7 @@ All developer lifecycle operations are in the `Makefile`:
 | `make up-native` | `init-db` + systemd services | Native (non-containerized) deployment |
 | `make clean` | `rm -rf state/*` | Wipe all state data |
 | `make rebuild` | `clean + init-db + up --build` | Full teardown and rebuild |
+| `make bootstrap` | `init-db → up → seed-mongo` | One-command cold start (fresh box / after `make clean`) |
 
 
 ---

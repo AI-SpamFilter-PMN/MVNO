@@ -33,15 +33,32 @@
 **PURPOSE** — start the stack from cold, configure the host toolchain, and reset
 state so every repeat run starts identical.
 
-**BRING-UP** (T-B, once per session — mostly "already Up" on a live box):
+**BRING-UP** (T-B, once per session — mostly "already Up" on a live box).
+On a **fresh box** the order matters — `make up` alone does **not** create the
+subscriber DBs or seed Open5GS, so the SMS auth / balance-403 / HLR lookups and
+5G UE registration would all fail. The canonical cold-start sequence is:
 
 ```bash
-make up                # builds images + `podman compose up -d` (idempotent)
+make init-db        # SQLite WAL DBs (Kamailio auth + balance, HLR) — idempotent upserts
+make up             # image gate + `podman compose up -d` (idempotent)
+make seed-mongo     # Open5GS 5G subscriber docs — AFTER up: it execs into the
+                    # running mongodb container (without it: UDR "No UE-AMBR" ->
+                    # 5G UEs cannot register, gate cell 2 fails)
 ```
-If `make` isn't available, the compose path is:
+One-command equivalent (≡ `init-db` → `up` → `seed-mongo`):
 ```bash
-podman compose up -d   # or `docker compose up -d`
+make bootstrap
 ```
+If `make` isn't available, the compose path is `podman compose up -d` (or
+`docker compose up -d`) — but still run `make init-db` and `make seed-mongo`
+first (or the equivalent `sqlite3`/`mongosh` steps in `scripts/seed-mongo.sh`).
+
+**Image mode**: if the 8 custom `mvno-*` images are already in local storage,
+`make up` launches instantly (offline-first). If they are missing, `up.sh`
+auto-falls back to a source build (`docker-compose.build.yml`); a fresh machine
+with internet can pre-pull instead: `./scripts/pull-images.sh && make up`.
+`make rebuild` = clean teardown + source rebuild (use when the stack misbehaves
+at the image/state level). Full details: `docs/deployment_guide.md` §2 / §2B.
 
 **EXPECT** — `Started`/`Up` lines; `podman compose ps | grep -c Up` eventually
 returns **32** (the core stack; `baresip-rx`/`baresip-tx` are demo-only and are
@@ -60,8 +77,11 @@ for t in sqlite3 curl espeak-ng ffmpeg nc tshark xxd md5sum aplay ffprobe jq; do
   command -v $t >/dev/null || echo "MISSING: $t"
 done
 ```
-**EXPECT** — no `MISSING` lines. `espeak-ng` only matters if you want to
-re-synthesize the scam script yourself; the canned fixture ships in the repo.
+**EXPECT** — no `MISSING` lines. If anything is missing, install it (Debian)
+via `sudo apt install sqlite3 curl espeak-ng ffmpeg tshark xxd jq pulseaudio-utils`
+(see `docs/deployment_guide.md` §2 for the authoritative list). `espeak-ng` only
+matters if you want to re-synthesize the scam script yourself; the canned fixture
+ships in the repo.
 
 **CLEAN SLATE** — prior runs leave baresip terminals running and live SIP
 registrations in Kamailio's usrloc (Issue 8.37) that mask the bounded-retry and
@@ -707,8 +727,15 @@ depending on the partner repo's state.
 
 ## Quick Gate Checklist (before calling it done)
 
+> **First-run prerequisite** — on a fresh box run `make bootstrap` (≡ `make
+> init-db` → `make up` → `make seed-mongo`) once first; every gate below assumes
+> the subscriber DBs and Open5GS Mongo are populated. `make gate` is the
+> deterministic oracle (5G preflight + 8-cell SMS matrix); the two scripts below
+> are its narrated equivalents.
+
 ```bash
 bash scripts/check-glossary.sh                                    # exit 0 (docs lint)
+make gate                                                       # exit 0 (8/8 oracle)
 ./scripts/testing/sms_matrix.sh >/dev/null && echo "E2E OK"     # exit 0
 ./scripts/testing/live_demo.sh >/dev/null && echo "DEMO OK"   # exit 0
 ```

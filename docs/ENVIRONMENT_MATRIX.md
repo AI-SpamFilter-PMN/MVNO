@@ -51,7 +51,13 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 
 ```bash
 ./scripts/preflight.sh        # verify host (must be ✓ ALL CLEAR or ! WARN)
-make init-db                  # SQLite subscriber DBs
+make init-db                  # SQLite subscriber DBs (Kamailio auth + balance, HLR)
 make up                       # 31 containers, offline-first
+make seed-mongo               # Open5GS 5G subscribers — AFTER up (execs into mongodb)
 bash scripts/testing/live_demo.sh   # 13-step end-to-end gate
 ```
+
+One-command cold start (≡ the three `make` steps above): `make bootstrap`.
+`make up` alone does **not** create the subscriber DBs or seed Open5GS — on a
+fresh box the SMS auth / balance-403 / HLR lookups and 5G UE registration would
+fail without `init-db` + `seed-mongo`.

@@ -5,6 +5,11 @@
 > live_demo = 13 items, gate = 2 gates). This reference documents *how* they
 > work; the contract doc defines *what* they certify.
 
+> **First-run prerequisite**: every flow below assumes the subscriber DBs and
+> Open5GS Mongo are populated. On a fresh box run `make bootstrap` (≡ `make
+> init-db` → `make up` → `make seed-mongo`; seed-mongo runs after `up` because
+> it execs into the running mongodb container) once before testing.
+
 > Abbreviations: **docs/GLOSSARY.md** — single source of truth
 A hands-on, terminal-by-terminal guide for verifying **every** active flow in the MVNO
 private-mobile-network core: **2G SMS, 5G/IMS SMS, 2G↔5G SMS bridging (IP-SM-GW),

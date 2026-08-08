@@ -131,6 +131,12 @@ else
   "$SCRIPT_DIR/up.sh" && ok "up.sh" || fail "up.sh"
 fi
 
+# ---- 6b. Seed Open5GS Mongo AFTER launch (order matters) --------------------------------
+# seed-mongo.sh execs into the RUNNING mvno-mongodb container, so it can only run once
+# the stack is up. Without it the 5G UEs cannot register (UDR hard-fails "No UE-AMBR").
+step "Seed Open5GS 5G subscribers"
+if make seed-mongo >/dev/null 2>&1; then ok "seed-mongo"; else fail "make seed-mongo"; fi
+
 # ---- 7. Wait for health + self-heal ------------------------------------------------------
 step "Health check & self-heal"
 api_up() { curl -sf -m 2 http://localhost:8080/actuator/health >/dev/null 2>&1; }

@@ -5,7 +5,7 @@
 # SQLite WAL database initialization, VTY control socket assertions, and REST API testing.
 # ==============================================================================
 
-.PHONY: up down logs ps init-db init-native-db up-native clean rebuild test test-sms test-call test-api test-vty gate check-pins graduation
+.PHONY: up down logs ps init-db init-native-db up-native clean rebuild bootstrap test test-sms test-call test-api test-vty gate check-pins graduation
 
 # Launches all rootless container services using scripts/up.sh
 up:
@@ -31,6 +31,13 @@ clean:
 # Rebuilds all custom images from source, initializes databases, and starts the stack
 rebuild: clean init-db
 	./scripts/up.sh --build
+
+# One-command cold start (fresh box or after `make clean`): SQLite DBs -> launch
+# stack -> seed Open5GS Mongo. Order matters: seed-mongo.sh execs into the RUNNING
+# mvno-mongodb container, so it must come after `up` (it is NOT the init-db->
+# seed-mongo->up order a reader might assume). Every step is an idempotent upsert,
+# so re-running is safe on a live box too.
+bootstrap: init-db up seed-mongo
 
 # Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
