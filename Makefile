@@ -5,7 +5,7 @@
 # SQLite WAL database initialization, VTY control socket assertions, and REST API testing.
 # ==============================================================================
 
-.PHONY: up down logs ps init-db init-native-db up-native clean rebuild test test-sms test-call test-api test-vty gate check-pins
+.PHONY: up down logs ps init-db init-native-db up-native clean rebuild test test-sms test-call test-api test-vty gate check-pins graduation
 
 # Launches all rootless container services using scripts/up.sh
 up:
@@ -126,3 +126,53 @@ gate:
 # runtime IPAM errors at container start). Run before committing compose changes.
 check-pins:
 	./scripts/testing/check_ip_pins.sh
+
+# ==============================================================================
+# GRADUATION — the fully-live, single-command demo oracle (no CI, by design).
+#
+#   [1/6] DB seed (idempotent; safe on warm lab — down does NOT wipe state/)
+#   [2/6] mic_probe — FAIL-FAST live-mic precondition (headline proof guard):
+#         if no audible mic, graduation refuses to run (no tone fallback).
+#   [3/6] deterministic teardown → cold state (scripts/up.sh down)
+#   [4/6] deterministic cold-start via scripts/up.sh (runtime auto-detect,
+#         PODMAN_USER_UID export, custom-image preflight, exact-tag gate) —
+#         NEVER bare `podman compose up`; it skips all of that.
+#   [5/6] make gate — the 8-cell oracle (5G preflight + NRF 9/9 + e2e incl.
+#         AI-BLOCK 403 + mvno_sms_blocked_total).
+#   [6/6] mic_verify — the HEADLINE proof: forces a GENUINE FRESH mic capture
+#         (mic_record.sh 4) and asserts a non-empty transcript for THIS run.
+#   [7/7] VictoriaLogs row assertion — fails the target if no
+#         "SMS BLOCKED BY MVNO INTERCEPTION" row landed for this run's block.
+#
+# Expected duration (2026-08-08, warm-recycle lab): ~4–7 min total (see
+# docs/evidence/GRADUATION.md §Timing). Stage markers print so it never looks
+# hung. Env: GRADUATION=1 is exported for the runbook caller-leg hardening.
+# ==============================================================================
+graduation: init-db seed-mongo
+	@echo "══════════════════════════════════════════════════════════════"
+	@echo "🎓 GRADUATION DEMO — fully-live, single-command (no CI)"
+	@echo "══════════════════════════════════════════════════════════════"
+	@echo "[1/6] DB seed (init-db + seed-mongo) — idempotent, done above"
+	@echo "[2/6] live-mic precondition probe (FATAL if no audible mic)..."
+	@bash scripts/demo/mic_probe.sh
+	@echo "[3/6] deterministic teardown → cold state..."
+	@./scripts/up.sh down
+	@echo "[4/6] deterministic cold-start (UID + image/tag gate)..."
+	@./scripts/up.sh
+	@echo "[5/6] 8-cell oracle gate (5G preflight + e2e + AI-BLOCK)..."
+	@GRADUATION=1 ./scripts/testing/gate.sh
+	@echo "[6/6] HEADLINE: forced fresh mic capture → non-empty this-run transcript..."
+	@bash scripts/demo/mic_verify.sh
+	@echo "[7/7] anti-theater: VictoriaLogs row assertion for this run's block..."
+	@if [ $$(curl -s "http://127.0.0.1:9428/select/logsql/query" \
+	    --data-urlencode '_time=now-30m' \
+	    --data-urlencode 'query="SMS BLOCKED BY MVNO INTERCEPTION"' \
+	    | grep -c _stream_id) -gt 0 ]; then \
+	    echo "  ✓ interception row landed in VictoriaLogs"; \
+	  else \
+	    echo "  ✗ no interception row in VictoriaLogs (gate block did not reach VL)" >&2; \
+	    exit 1; \
+	  fi
+	@echo ""
+	@echo "🎉 GRADUATION PASS — cold start + 8-cell gate + live-mic headline + VL proof, all green"
+

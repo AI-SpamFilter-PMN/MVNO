@@ -37,7 +37,11 @@ else
   arecord -f S16_LE -r 16000 -c 1 -d "${DURATION}" "${TARGET_PATH}" 2>/dev/null
 fi
 
-chmod 777 "${TARGET_PATH}"
+# The Vosk watcher may archive (move) the WAV during our own sleep — tolerate
+# the race: chmod only if the file is still in the spool root.
+if [ -f "${TARGET_PATH}" ]; then
+  chmod 777 "${TARGET_PATH}"
+fi
 echo "✓ Microphone recording captured successfully: ${TARGET_PATH}"
 echo ""
 echo "⏳ Waiting 4 seconds for Native Vosk ASR engine to process audio..."

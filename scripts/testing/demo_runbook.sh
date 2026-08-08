@@ -289,6 +289,17 @@ else
     CALLER_TXT_PATH=""
     CALLER_WAV_PATH=""
     echo "  [caller/you] leg: no speech archived (no mic or operator silent — tone fallback, honest label)"
+    # GRADUATION MODE (GRADUATION=1): the live-mic headline proof is MANDATORY.
+    # The demo cannot go green on the callee/synthetic verdict alone — the
+    # operator must actually speak into the mic and ASR must hear words. Fail
+    # hard with a clear message instead of the tolerant dev-run fallback.
+    if [ "${GRADUATION:-0}" = "1" ]; then
+        echo "[-] Error: GRADUATION mode requires a non-empty [caller/you] (operator live mic)" >&2
+        echo "    transcript — the caller leg archived no speech. Fix: speak during" >&2
+        echo "    demo_call.sh dial (SPEAK NOW prompt), unmute the mic, or verify" >&2
+        echo "    \$XDG_RUNTIME_DIR/pulse/native exists (scripts/demo/mic_probe.sh)." >&2
+        exit 1
+    fi
 fi
 echo -e "  --- playing recorded WAV via ALSA (aplay) ---"
 aplay -q "$WAV_PATH" || echo "  (warning: aplay playback failed — no ALSA sink on this host; evidence is the WAV + ffprobe)"
