@@ -66,19 +66,19 @@ init-db:
 		);" \
 		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
 			VALUES ('15551234567', 'localhost', 'testpass', '', '', '15551234567', 100) \
-			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
+			ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
 		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
 			VALUES ('15557654321', 'localhost', 'testpass', '', '', '15557654321', 0) \
-			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
+			ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
 		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
 			VALUES ('15559998888', 'localhost', 'testpass', '', '', '15559998888', 100) \
-			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
+			ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
 		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
 			VALUES ('15554443322', 'localhost', 'testpass', '', '', '15554443322', 100) \
-			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
+			ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
 		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
 			VALUES ('15553332211', 'localhost', 'testpass', '', '', '15553332211', 100) \
-			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
+			ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
 	@sqlite3 state/hlr/hlr.db \
