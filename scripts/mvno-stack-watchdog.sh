@@ -26,7 +26,10 @@
 # Recovery (bounded, always re-probes):
 #   UE fleet degraded  -> scripts/testing/preflight_5g.sh --auto-recover
 #   bridge AoRs lost   -> podman restart mvno-ip-sm-gw (re-REGISTERs at boot),
-#                        then a bounded poll (<=60s) until /health is 200 again
+#                        then a bounded poll (<=60s) until /health is 200 again.
+#                        Up to 2 restart rounds on transient podman/Kamailio
+#                        races; a Kamailio-down platform issue is diagnosed,
+#                        not retried.
 #
 # The bridge's own 30s retry loop already self-heals a transient REGISTER
 # failure; the watchdog adds the persistent, out-of-band restart for the case
@@ -127,23 +130,47 @@ recover() {
         fi
     fi
     if ! bridge_reg_ok; then
-        log "bridge /health degraded (2G AoR registrations dead) -> podman restart mvno-ip-sm-gw"
-        if podman restart mvno-ip-sm-gw; then
+        # Bridge recovery — bounded WITH retry. Audit catch (18:57): a transient
+        # `podman restart` failure was logged as ERROR while the bridge's own
+        # retry loop saved it; and a restart racing Kamailio readiness can exceed
+        # a single 60s poll. So: up to 2 restart rounds; a Kamailio-down platform
+        # issue is diagnosed (not retried) so the ERROR stays actionable.
+        local attempt=0 recovered=0 restart_ok=1
+        while [ "${attempt}" -lt 2 ]; do
+            attempt=$((attempt + 1))
+            log "bridge /health degraded (2G AoR registrations dead) -> podman restart mvno-ip-sm-gw (round ${attempt}/2)"
+            if ! podman restart mvno-ip-sm-gw 2>/dev/null; then
+                restart_ok=0
+                log "WARN: podman restart failed (transient?) — retrying in 10s"
+                sleep 10
+                continue
+            fi
             # Bounded poll: the container can take ~10s just to stop (SIGKILL
             # fallback) plus boot + REGISTER; a fixed sleep was provably too
             # short (observed false-negative in the induced-failure test).
             local waited=0
             while [ "${waited}" -lt 60 ]; do
                 if bridge_reg_ok; then
-                    log "bridge /health OK after restart (t=${waited}s)"
-                    break
+                    log "bridge /health OK after restart (round ${attempt}, t=${waited}s)"
+                    recovered=1
+                    break 2
                 fi
                 sleep 5
                 waited=$((waited + 5))
             done
-            bridge_reg_ok || { log "ERROR: bridge /health still not 200 after restart"; status=1; }
-        else
-            log "ERROR: bridge restart failed"
+            if ! stack_up; then
+                log "ERROR: Kamailio not Up — bridge cannot REGISTER (platform issue, not bridge)"
+                status=1
+                return $status
+            fi
+            log "WARN: /health not 200 within 60s poll (round ${attempt}/2) — one more round"
+        done
+        if [ "${recovered}" -ne 1 ]; then
+            if [ "${restart_ok}" -ne 1 ]; then
+                log "ERROR: bridge restart failed after 2 attempts (restart command itself failed — check podman)"
+            else
+                log "ERROR: bridge /health still not 200 after 2 restart rounds"
+            fi
             status=1
         fi
     fi

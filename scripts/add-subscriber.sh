@@ -136,7 +136,28 @@ OP="$(openssl rand -hex 16 | tr 'a-f' 'A-F')"
 PASSWORD=testpass
 UE_N="$((10#$(imsi_suffix "$IMSI")))"   # strip leading zeros: IMSI ...00000006 -> UE 6
 UE_FILE="configs/ueransim/ue-${UE_N}.yaml"
-UE_IP="10.89.0.$((30 + UE_N))"
+
+# Next-free UE IP (foot-gun guard): the operator attaches the generated UE
+# container with a STATIC ipv4_address pin. A naive "30+UE_N" can collide with
+# an existing pin (or a live container) — a duplicate pin surfaces only at
+# container start as a podman IPAM error, stranding the UE in Created state
+# (the exact F1-class check_ip_pins.sh guards against). Bump to the next free
+# 10.89.0.x across compose pins + the live mvno_net bridge.
+ip_pinned() {  # $1 = candidate IP; 0 = taken in compose or live
+    grep -qE "ipv4_address: ${1}([^0-9]|$)" docker-compose.yml 2>/dev/null && return 0
+    podman network inspect mvno_net --format '{{range .Containers}}{{.IPv4Address}} {{end}}' 2>/dev/null \
+        | grep -q "${1}/" && return 0
+    return 1
+}
+IP_BASE=$((30 + UE_N))
+while ip_pinned "10.89.0.${IP_BASE}"; do
+    IP_BASE=$((IP_BASE + 1))
+    [ "${IP_BASE}" -le 200 ] || die "no free 10.89.0.x in range 30..200"
+done
+UE_IP="10.89.0.${IP_BASE}"
+if [ "${IP_BASE}" -ne $((30 + UE_N)) ]; then
+    warn "default UE IP 10.89.0.$((30 + UE_N)) already taken — using ${UE_IP} instead"
+fi
 
 if [ "$TWO_G_ONLY" -eq 1 ]; then
     say "provisioning MSISDN ${MSISDN} / IMSI ${IMSI} (2G-only)"
@@ -236,6 +257,7 @@ MONGOEOF
 SNIPPET
         echo "  2. podman compose up -d ueransim-ue-${UE_N}"
         echo "     (SMS-only paths need stores 1-5 only — no UE attach required.)"
+        echo "     Before committing the compose edit: make check-pins (asserts all pins unique)"
     else
         warn "configs/ueransim/ue.yaml template not found — skipping UE yaml generation"
     fi
