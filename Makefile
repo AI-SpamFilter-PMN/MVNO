@@ -5,7 +5,7 @@
 # SQLite WAL database initialization, VTY control socket assertions, and REST API testing.
 # ==============================================================================
 
-.PHONY: up down logs ps init-db init-native-db up-native clean rebuild test test-sms test-call test-api test-vty gate
+.PHONY: up down logs ps init-db init-native-db up-native clean rebuild test test-sms test-call test-api test-vty gate check-pins
 
 # Launches all rootless container services using scripts/up.sh
 up:
@@ -121,3 +121,8 @@ test-call:
 # AI-block). Source of truth for stack verification — see docs/INTEGRATION_CONTRACT.md.
 gate:
 	./scripts/testing/gate.sh
+
+# Static IP pin uniqueness guard (F1-class: duplicate pins surface only as
+# runtime IPAM errors at container start). Run before committing compose changes.
+check-pins:
+	./scripts/testing/check_ip_pins.sh

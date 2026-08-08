@@ -667,7 +667,9 @@ services:
 
   # ─── VictoriaLogs Log Database (ROADMAP item 3: persistent log sink) ───
   victorialogs:
-    image: victoriametrics/victoria-logs:latest
+    # v1.52.0 pinned (2026-07-16 build, digest 8f2140dc...) per repo image-pinning
+    # convention (cb949e4: align VictoriaMetrics image pins) — :latest is drift.
+    image: victoriametrics/victoria-logs:v1.52.0
     container_name: mvno-victorialogs
     ports:
       - "9428:9428"
