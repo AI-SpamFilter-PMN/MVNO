@@ -72,8 +72,14 @@ fi
 echo ""
 echo "  📢 Recording 3 s of ambient audio to verify the mic is live..."
 rm -f "${PROBE_WAV}"
-if timeout 15 ffmpeg -y -loglevel error -f pulse -i default -ar 16000 -ac 1 \
-    -t 3 "${PROBE_WAV}" 2>/dev/null; then
+FFMPEG_ERR="$(mktemp)"
+capture_probe() {
+    # stderr is kept (not /dev/null) so a failure shows the REAL Pulse error;
+    # exit 124 = timeout kill (device busy hang) vs 1 = open/stream error.
+    timeout 15 ffmpeg -y -loglevel error -f pulse -i default -ar 16000 -ac 1 \
+        -t 3 "${PROBE_WAV}" 2>"${FFMPEG_ERR}"
+}
+if capture_probe; then
   chmod 777 "${PROBE_WAV}" 2>/dev/null || true
   MEAN_VOL="$(ffmpeg -i "${PROBE_WAV}" -af volumedetect -f null - 2>&1 \
     | awk -F': ' '/mean_volume/{gsub(/ dB/,"",$2); print $2}')"
@@ -92,12 +98,29 @@ if timeout 15 ffmpeg -y -loglevel error -f pulse -i default -ar 16000 -ac 1 \
     fatal "mic capture is silent (mean ${MEAN_VOL:-?} dB) — not audible"
   fi
 else
-  echo ""
-  echo "  REMEDIATION: ffmpeg could not open the Pulse capture stream."
-  echo "  Check 'pactl list sources short' and 'wpctl status' — the default"
-  echo "  source must be a live input, not a monitor."
-  fatal "3 s Pulse capture failed"
+  # Transient "device busy" race (another client briefly holding the source,
+  # PipeWire suspend/resume) is the common flake — retry ONCE before failing.
+  CAP_EXIT=$?
+  FF_ERR="$(tr -d '\n' < "${FFMPEG_ERR}" | head -c 300)"
+  echo "  ⚠  capture attempt 1 failed (exit ${CAP_EXIT}: ${FF_ERR:-no ffmpeg stderr}); retrying once..."
+  sleep 2
+  if capture_probe; then
+    chmod 777 "${PROBE_WAV}" 2>/dev/null || true
+    MEAN_VOL="$(ffmpeg -i "${PROBE_WAV}" -af volumedetect -f null - 2>&1 \
+      | awk -F': ' '/mean_volume/{gsub(/ dB/,"",$2); print $2}')"
+    pass "capture audible on retry (mean ${MEAN_VOL} dB > ${VOLUME_DB_THRESHOLD} dB)"
+  else
+    FF_ERR="$(tr -d '\n' < "${FFMPEG_ERR}" | head -c 300)"
+    echo ""
+    echo "  REMEDIATION: ffmpeg could not open the Pulse capture stream"
+    echo "  (real error: ${FF_ERR:-none captured}). Check 'pactl list sources"
+    echo "  short' and 'wpctl status' — the default source must be a live"
+    echo "  input, not a monitor, and not held by another client."
+    rm -f "${FFMPEG_ERR}"
+    fatal "3 s Pulse capture failed after retry"
+  fi
 fi
+rm -f "${FFMPEG_ERR}"
 
 # --- [4] SOFT: transcript lands via the Vosk spool watcher ---------------------
 echo ""
