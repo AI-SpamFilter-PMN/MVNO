@@ -234,8 +234,8 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   - Must classify within the 5s read window (target ≤ 500ms per the SLA contract).
   - Package as container image `mvno-ai-filter:1.0.0`; attach to `mvno_net` in `docker-compose.yml`.
   - Verify with `make test-sms` and `make test-call`.
-- **Deterministic fallback layer (REQUIRED for the demo and the gates):**
-  - The e2e Goal-7 AI-block cell asserts the `E2E-BLOCK` marker → `allow:false` and the demo's
+  - Full-stack regression oracle: `make gate` (`scripts/testing/gate.sh` — 5G preflight probe + e2e runbook, 8 cells incl. the AI-block cell asserting the live Kamailio block line and `mvno_sms_blocked_total`).
+- **Deterministic fallback layer (REQUIRED for the demo and the gates):**  - The e2e Goal-7 AI-block cell asserts the `E2E-BLOCK` marker → `allow:false` and the demo's
     post-call scam-block story asserts phishing-keyword blocking on `TRANSCRIPT` events
     (word-boundary, lowercase: `won`, `prize`, `claim`, `free`, `urgent`, `account`, `blocked`,
     `confirm` — tuned to Vosk small-model ASR output, e.g. the demo phrase

@@ -5,7 +5,7 @@
 # SQLite WAL database initialization, VTY control socket assertions, and REST API testing.
 # ==============================================================================
 
-.PHONY: up down logs ps init-db init-native-db up-native clean rebuild test test-sms test-call test-api test-vty
+.PHONY: up down logs ps init-db init-native-db up-native clean rebuild test test-sms test-call test-api test-vty gate
 
 # Launches all rootless container services using scripts/up.sh
 up:
@@ -116,3 +116,8 @@ test-call:
 		-H "Content-Type: application/json" \
 		-H "X-API-Key: mvno-demo-key-2026" \
 		-d '{"caller":"15551234567","callee":"15557654321","call_id":"test-123","imei":"356938035643809"}' | python3 -m json.tool
+
+# Deterministic oracle gate: 5G preflight probe + e2e runbook (8 cells incl.
+# AI-block). Source of truth for stack verification — see docs/INTEGRATION_CONTRACT.md.
+gate:
+	./scripts/testing/gate.sh
