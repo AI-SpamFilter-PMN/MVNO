@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Pre-push hook — local-only, zero-CI guard (MVNO repo)
+# ==============================================================================
+# Runs the FAST static guards before any push; the 2-min e2e gate stays
+# MANUAL (make gate) by design — no CI server, per the project constraint.
+#
+# Included checks (microseconds each, no stack required):
+#   • make check-pins — static IP pin uniqueness guard (F1-class: duplicate
+#     pins surface only as runtime IPAM errors at container start).
+#   • shell syntax on scripts/ (bash -n) — cheap local regression net.
+#
+# Deliberately EXCLUDED:
+#   • make test — hits live containers (vty/actuator) → order-dependent and
+#     stack-dependent; would block pushes in fresh checkouts. Gate stays manual.
+#
+# Install (portable, committed — not a hidden untracked file):
+#   git config core.hooksPath scripts/hooks
+# ==============================================================================
+
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "${ROOT}"
+
+echo "── pre-push: running fast static guards (check-pins + shell syntax) ──"
+
+FAILED=0
+
+if ! make check-pins >/dev/null 2>&1; then
+  echo "✗ pre-push FAILED: duplicate/conflicting static IP pins (make check-pins)."
+  echo "  Fix docker-compose.yml IP uniqueness before pushing."
+  FAILED=1
+else
+  echo "✓ check-pins OK (unique static IPs)"
+fi
+
+SYNTAX_ERR="$(find scripts -name '*.sh' -type f -print0 | xargs -0 -n1 bash -n 2>&1 || true)"
+if [ -n "${SYNTAX_ERR}" ]; then
+  echo "✗ pre-push FAILED: shell syntax error(s):"
+  echo "${SYNTAX_ERR}" | sed 's/^/    /'
+  FAILED=1
+else
+  echo "✓ shell syntax OK ($(find scripts -name '*.sh' | wc -l) scripts)"
+fi
+
+if [ "${FAILED}" -ne 0 ]; then
+  echo "── pre-push FAILED — fix and re-push ──"
+  exit 1
+fi
+
+echo "── pre-push OK (static guards clean; run 'make gate' manually for the e2e oracle) ──"
+exit 0
