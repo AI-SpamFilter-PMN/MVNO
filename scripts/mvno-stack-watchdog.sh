@@ -43,11 +43,13 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
 INTERVAL="${WATCHDOG_INTERVAL:-30}"
 LOG_FILE="${WATCHDOG_LOG:-state/logs/watchdog.log}"
-BRIDGE_AORS=(15554443322 15557778888)   # single source — the bridge's 2G AoRs
-DEMO_LOCKS=(mvno-live-demo.lock mvno-sms-matrix.lock mvno-gate.lock)
+# Single source (scripts/lib/common.sh): the bridge's 2G AoRs. Keep the local
+# copy for the --check-bridge interface; the truth lives in MVNO_MSISDN_2G.
+BRIDGE_AORS=("${MVNO_MSISDN_2G[@]}")
 
 mkdir -p "$(dirname "${LOG_FILE}")"
 touch "${LOG_FILE}"
@@ -58,19 +60,15 @@ log() { echo "[$(date '+%F %T')] $*" | tee -a "${LOG_FILE}"; }
 # guards
 # -----------------------------------------------------------------------------
 demo_running() {
-    local l f
-    for l in "${DEMO_LOCKS[@]}"; do
-        f="${TMPDIR:-/tmp}/${l}"
-        if [ -f "$f" ] && [ -s "$f" ] && kill -0 "$(cat "$f" 2>/dev/null)" 2>/dev/null; then
-            return 0
-        fi
-    done
-    tmux has-session -t mvno-live 2>/dev/null && return 0
-    # pgrep covers the gate/demo scripts AND the cockpit launcher: demo_live.sh
-    # runs preflight_5g.sh --auto-recover BEFORE the tmux session exists, so a
-    # live tmux check alone would miss that window (and two concurrent
-    # preflight runs would collide on the UAS AoR 15559998888).
-    pgrep -f 'scripts/(testing/(gate|sms_matrix|live_demo)|demo/demo_live)\.sh' >/dev/null 2>&1 && return 0
+    # Unified in-flight guard (scripts/lib/common.sh): the registry lock list
+    # + the mvno-live tmux cockpit. Every run holds a registry lock (gate,
+    # sms_matrix, live_demo, proofs) and the preflight probe holds
+    # mvno-preflight.lock — so the cockpit's preflight window (demo_live.sh
+    # runs preflight_5g.sh --auto-recover BEFORE the tmux session exists) is
+    # covered too, and two concurrent preflights can never collide on the
+    # shared UAS AoR ${MVNO_UAS_AOR}. The lock list lives in ONE place — a new
+    # orchestrator can never be forgotten here.
+    run_in_flight && return 0
     return 1
 }
 

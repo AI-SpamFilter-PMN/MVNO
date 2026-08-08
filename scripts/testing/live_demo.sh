@@ -20,17 +20,19 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
+source "${SCRIPT_DIR}/../lib/common.sh"
 
 # Re-entrancy guard (evidence race guard): refuse to start while another
 # instance is active, so two live_demo instances can never truncate/flush the same
-# clean-slate RUN_LOG concurrently. Lock is released on EXIT.
-LOCK_FILE="${TMPDIR:-/tmp}/mvno-live-demo.lock"
-if [ -f "${LOCK_FILE}" ] && kill -0 "$(cat "${LOCK_FILE}" 2>/dev/null)" 2>/dev/null; then
-    echo "[-] Error: another live_demo.sh instance is active (PID $(cat "${LOCK_FILE}")) — refusing to start to protect clean-slate evidence" >&2
+# clean-slate RUN_LOG concurrently. Unified registry lock (common.sh) — released
+# on EXIT. Also refuses while the tmux cockpit is up: BOTH hold the shared UAS
+# AoR ${MVNO_UAS_AOR} (baresip-rx rig / UAS blocks) — running them at once
+# forks its usrloc contact and breaks the [5b] 5G-path routing.
+acquire_run_lock mvno-live-demo.lock || exit 1
+if command -v tmux >/dev/null 2>&1 && tmux has-session -t mvno-live 2>/dev/null; then
+    echo "[-] Error: cockpit session 'mvno-live' is active — run 'bash scripts/demo/demo_live.sh --down' first (both use the shared UAS AoR ${MVNO_UAS_AOR})" >&2
     exit 1
 fi
-echo $$ > "${LOCK_FILE}"
-trap 'rm -f "${LOCK_FILE}"' EXIT
 
 # Evidence layer: clean-slate run log (Aug-8 convention) — the file is
 # truncated at run start and stamped with RUN:<ts>, so a green file contains
@@ -167,14 +169,14 @@ echo -e "${YELLOW}[5/13] 📞 Simulating Authorized IMS VoIP Call Interception F
 podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
 podman run -d --name ims-uas58 --network mvno_mvno_net --ip 10.89.0.58 \
   -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
-  python3 -u /scripts/sip_traffic_sim.py --uas 15559998888 --rtp 5 \
+  python3 -u /scripts/sip_traffic_sim.py --uas ${MVNO_UAS_AOR} --rtp 5 \
   --host 10.89.0.23 --port 5060 --bind-ip 10.89.0.58 --listen-port 5070 >/dev/null
 sleep 8
 BEFORE=$(curl -s http://localhost:9900/metrics | awk '/^rtpengine_bytes_total /{print $2}')
 OUT=$(podman run --rm --name ims-caller59 --network mvno_mvno_net --ip 10.89.0.59 \
   -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
   python3 -u /scripts/sip_traffic_sim.py --rtp 6 --caller 15551234567 \
-  --callee 15559998888 --host 10.89.0.23 --port 5060 \
+  --callee ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 \
   --bind-ip 10.89.0.59 --listen-port 5090 2>&1) || true
 echo "$OUT" | grep -q "call answered" || { echo "[-] Error: media call was not answered" >&2; exit 1; }
 echo "$OUT" | grep -q "RTP media sent" || { echo "[-] Error: caller did not send RTP media" >&2; exit 1; }
@@ -348,17 +350,17 @@ echo "  ue-1 5G IP (dynamic): $UE_IP"
 podman exec mvno-ueransim-ue-1 sh -c 'ip route replace 10.89.0.23/32 dev uesimtun0 2>/dev/null' || true
 podman cp "${SCRIPT_DIR}/sip_traffic_sim.py" mvno-ueransim-ue-1:/tmp/sip_traffic_sim.py >/dev/null
 podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
-podman exec mvno-ueransim-ue-1 sh -c "rm -f /tmp/uas.log; nohup python3 -u /tmp/sip_traffic_sim.py --uas 15559998888 --host 10.89.0.23 --port 5060 --bind-ip $UE_IP --listen-port 5070 > /tmp/uas.log 2>&1 &"
+podman exec mvno-ueransim-ue-1 sh -c "rm -f /tmp/uas.log; nohup python3 -u /tmp/sip_traffic_sim.py --uas ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 --bind-ip $UE_IP --listen-port 5070 > /tmp/uas.log 2>&1 &"
 sleep 4
 BEFORE=$(podman exec mvno-upf cat /sys/class/net/ogstun/statistics/tx_bytes 2>/dev/null || echo 0)
-OUT=$(podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py --rtp 3 --caller 15551234567 --callee 15559998888 --host 10.89.0.23 --port 5060 --bind-ip "$UE_IP" --listen-port 5072 2>&1) || true
+OUT=$(podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py --rtp 3 --caller ${MVNO_MSISDN_FUNDED} --callee ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 --bind-ip "$UE_IP" --listen-port 5072 2>&1) || true
 AFTER=$(podman exec mvno-upf cat /sys/class/net/ogstun/statistics/tx_bytes 2>/dev/null || echo 0)
 UAS_LOG=$(podman exec mvno-ueransim-ue-1 cat /tmp/uas.log 2>/dev/null || true)
 podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
 echo "$OUT"
 echo "--- UAS side (5G-path callee) ---"
 echo "$UAS_LOG"
-echo "$UAS_LOG" | grep -q "SIP REGISTER 200 OK for subscriber 15559998888" || { echo "[-] Error: 5G-path REGISTER did not succeed" >&2; exit 1; }
+echo "$UAS_LOG" | grep -q "SIP REGISTER 200 OK for subscriber ${MVNO_UAS_AOR}" || { echo "[-] Error: 5G-path REGISTER did not succeed" >&2; exit 1; }
 echo "$OUT" | grep -q "SIP/2.0 200 OK" || { echo "[-] Error: 5G-path INVITE not answered with 200 OK (got 100 trying / timeout)" >&2; exit 1; }
 echo "$OUT" | grep -q "RTP media sent" || { echo "[-] Error: 5G-path RTP media did not flow" >&2; exit 1; }
 [ "${AFTER:-0}" -gt "${BEFORE:-0}" ] || { echo "[-] Error: ogstun TX did not move (5G path dead)" >&2; exit 1; }
@@ -386,13 +388,13 @@ sleep 2
 podman ps --format "{{.Names}} {{.Status}}" | grep mvno-rtpengine | grep -q Up && { echo "[-] Error: mvno-rtpengine did not stop (podman stop timeout?)" >&2; exit 1; }
 podman run -d --name ims-uas58 --network mvno_mvno_net --ip 10.89.0.58 \
   -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
-  python3 -u /scripts/sip_traffic_sim.py --uas 15559998888 --rtp 5 \
+  python3 -u /scripts/sip_traffic_sim.py --uas ${MVNO_UAS_AOR} --rtp 5 \
   --host 10.89.0.23 --port 5060 --bind-ip 10.89.0.58 --listen-port 5070 >/dev/null
 sleep 8
 OUT=$(podman run --rm --name ims-caller59 --network mvno_mvno_net --ip 10.89.0.59 \
   -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
   python3 -u /scripts/sip_traffic_sim.py --rtp 6 --caller 15551234567 \
-  --callee 15559998888 --host 10.89.0.23 --port 5060 \
+  --callee ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 \
   --bind-ip 10.89.0.59 --listen-port 5090 2>&1) || true
 echo "$OUT" | grep -q "call answered" || { echo "[-] Error: fail-open broken — call NOT answered while RTPEngine was down" >&2; exit 1; }
 # Capture before grepping: under `set -o pipefail`, `grep -q` exiting early
@@ -423,13 +425,13 @@ podman stop mvno-api >/dev/null 2>&1
 sleep 2
 podman run -d --name ims-uas58 --network mvno_mvno_net --ip 10.89.0.58 \
   -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
-  python3 -u /scripts/sip_traffic_sim.py --uas 15559998888 --rtp 5 \
+  python3 -u /scripts/sip_traffic_sim.py --uas ${MVNO_UAS_AOR} --rtp 5 \
   --host 10.89.0.23 --port 5060 --bind-ip 10.89.0.58 --listen-port 5070 >/dev/null
 sleep 8
 OUT=$(podman run --rm --name ims-caller59 --network mvno_mvno_net --ip 10.89.0.59 \
   -v "${SCRIPT_DIR}:/scripts:z" python:3.11-alpine \
   python3 -u /scripts/sip_traffic_sim.py --rtp 6 --caller 15551234567 \
-  --callee 15559998888 --host 10.89.0.23 --port 5060 \
+  --callee ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 \
   --bind-ip 10.89.0.59 --listen-port 5090 2>&1) || true
 echo "$OUT" | grep -q "call answered" || { echo "[-] Error: fail-open broken — call NOT answered while mvno-api (ASR/interception) was down" >&2; exit 1; }
 echo -e "${GREEN}✓ Fail-open proven: call answered (200 OK) with mvno-api (Vosk ASR + interception) DOWN${NC}\n"
@@ -537,7 +539,7 @@ echo -e "${GREEN}✓ Call Blocked at SIP Protocol Level (SIP/2.0 403 Forbidden R
 # triggers fraud block: {"allow": false, "reason": "EIR: SIM swap detected"}.
 # ==============================================================================
 echo -e "${YELLOW}[7/13] 🛡️ Triggering EIR SIM-Swap Anomaly (>3 distinct SIMs on IMEI: 356938035643809)...${NC}"
-for CALLER in 15551234567 15559998888 15554443322 15553332211; do
+for CALLER in "${MVNO_EIR_SIMS[@]}"; do
   R=$(curl -s -X POST http://localhost:8080/api/v1/intercept/call \
     -H "Content-Type: application/json" -H "X-API-Key: mvno-demo-key-2026" \
     -d "{\"caller\": \"${CALLER}\", \"callee\": \"15557654321\", \"imei\": \"356938035643809\"}")

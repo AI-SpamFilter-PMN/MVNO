@@ -29,6 +29,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
+source "$REPO_ROOT/scripts/lib/common.sh"
 
 LOG="docs/evidence/demo-cockpit-$(date +%F).log"
 mkdir -p docs/evidence
@@ -39,8 +40,12 @@ PASS=1
 
 # Guaranteed teardown: even if an assertion aborts mid-proof (set -e), the
 # cockpit session + baresip rigs must not leak. demo_live.sh --down is
-# idempotent.
+# idempotent. Also releases the registry proof-lock (acquired in main — the
+# acquire helper's own EXIT trap is superseded by this one, so release here).
+# NOTE: main runs in a pipeline subshell (`main | tee`), so cleanup may fire
+# twice (subshell EXIT + top-level EXIT) — every step is idempotent by design.
 cleanup() {
+    release_run_lock mvno-cockpit.lock || true
     bash scripts/demo/demo_live.sh --down >/dev/null 2>&1 || true
     rm -f "$MARK"
 }
@@ -71,6 +76,12 @@ main() {
         echo "  pre-existing ${SESSION} found — tearing down first"
         bash scripts/demo/demo_live.sh --down >/dev/null 2>&1 || true
     fi
+    # Registry proof-lock: the watchdog's run_in_flight skips recovery while a
+    # proof holds it (the proof's own tmux session + pgrep already cover most of
+    # the window; the lock makes it explicit and covers the subscriber-proof
+    # phase too). Re-register the cleanup trap — acquire registered its own.
+    acquire_run_lock mvno-cockpit.lock || { echo "FATAL: another run is in flight"; return 1; }
+    trap cleanup EXIT
     touch "$MARK"   # freshness baseline: only evidence NEWER than this counts
 
     # --- Launch the cockpit (non-interactive: no tty -> no attach) ---

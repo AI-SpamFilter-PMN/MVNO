@@ -182,7 +182,7 @@ check-pins:
 #   make watchdog-log        tail the watchdog log
 #   make watchdog-status     systemd unit status
 # ─────────────────────────────────────────────────────────────────────────────
-.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test
+.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test check-subs
 
 watchdog-install:
 	@mkdir -p $(HOME)/.config/systemd/user
@@ -234,6 +234,12 @@ subscriber-proof:
 watchdog-self-test:
 	@bash scripts/mvno-stack-watchdog.sh --self-test 2>&1 \
 		| tee docs/evidence/watchdog-recovery-$(shell date +%F).log
+
+# Subscriber-topology drift guard (single source: scripts/lib/common.sh). Fails
+# if any script/Makefile references a non-canonical MSISDN or the balance seeds
+# drift from the zero/funded contract. Also runs inside the gate (gate 0/3).
+check-subs:
+	@bash scripts/check-subscribers.sh
 
 graduation: init-db seed-mongo
 	@echo "══════════════════════════════════════════════════════════════"

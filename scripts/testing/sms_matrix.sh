@@ -28,17 +28,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
+source "${SCRIPT_DIR}/../lib/common.sh"
 
 # Re-entrancy guard (evidence race guard): refuse to start while another
 # instance is active, so two sms_matrix instances can never truncate/flush the same
-# clean-slate RUN_LOG concurrently. Lock is released on EXIT.
-LOCK_FILE="${TMPDIR:-/tmp}/mvno-sms-matrix.lock"
-if [ -f "${LOCK_FILE}" ] && kill -0 "$(cat "${LOCK_FILE}" 2>/dev/null)" 2>/dev/null; then
-    echo "[-] Error: another sms_matrix.sh instance is active (PID $(cat "${LOCK_FILE}")) — refusing to start to protect clean-slate evidence" >&2
-    exit 1
-fi
-echo $$ > "${LOCK_FILE}"
-trap 'rm -f "${LOCK_FILE}"' EXIT
+# clean-slate RUN_LOG concurrently. Unified registry lock (common.sh) — released
+# on EXIT, and the watchdog's run_in_flight sees it so recovery never fights a
+# running sms_matrix.
+acquire_run_lock mvno-sms-matrix.lock || exit 1
 
 # Evidence layer: clean-slate e2e run log (Aug-8 convention) — the file is
 # truncated at run start and stamped with RUN:<ts>, so a green file contains

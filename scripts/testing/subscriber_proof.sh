@@ -20,11 +20,12 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
+source "$REPO_ROOT/scripts/lib/common.sh"
 
 LOG="docs/evidence/demo-subscriber-$(date +%F).log"
 mkdir -p docs/evidence
 MODE="${1:-}"
-THROWAWAY=15551234999
+THROWAWAY="${MVNO_THROWAWAY}"   # sanctioned throwaway (single source: common.sh)
 PASS=1
 
 fail() { echo "  ✗ $*"; PASS=0; }
@@ -34,6 +35,11 @@ main() {
     echo "================================================================"
     echo "SUBSCRIBER PROOF — add-subscriber.sh run-evidence ($(date '+%F %T'))"
     echo "================================================================"
+
+    # Registry proof-lock: the watchdog's run_in_flight skips recovery while
+    # this proof is provisioning a subscriber + registering a throwaway UAS
+    # (the pgrep set already covers the script; the lock makes it explicit).
+    acquire_run_lock mvno-subscriber-proof.lock || { echo "FATAL: another run is in flight"; return 1; }
 
     # --- Preconditions ---
     for c in mvno-osmo-hlr mvno-mongodb; do

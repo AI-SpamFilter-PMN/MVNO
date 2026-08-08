@@ -84,8 +84,12 @@ which both `gate.sh` and `live_demo.sh` delegate to the single
   failure (no curated mixing).
 - `sms_matrix.sh` → `docs/evidence/e2e-run-<date>.log`
 - `live_demo.sh` → `docs/evidence/demo-run-<date>.log`
-- Re-entrancy locks (`/tmp/mvno-sms-matrix.lock`, `/tmp/mvno-live-demo.lock`)
-  prevent two instances truncating the same evidence concurrently.
+- Re-entrancy locks are the UNIFIED registry in `scripts/lib/common.sh`
+  (`MVNO_RUN_LOCKS` + `acquire_run_lock`) — gate, sms_matrix, live_demo, the
+  cockpit and the proof harnesses all use the same helper, and the watchdog's
+  `run_in_flight` guard consults the same registry + tmux session + pgrep set.
+  A new orchestrator registers once in common.sh and is automatically guarded
+  everywhere (no per-script lock lists to keep in sync).
 - Historical evidence files are append-only snapshots — never edit old runs to
   match today's names.
 
@@ -98,3 +102,21 @@ which both `gate.sh` and `live_demo.sh` delegate to the single
 2. If the count changes, grep the repo for the old number in docs and update
    (`git grep -n "8 ok"`, `git grep -n "13 items"` …).
 3. Re-run the affected validator and commit its fresh evidence log.
+
+---
+
+## 6. Single source of truth (subscribers + run-guard)
+
+- The MVNO test-subscriber topology lives in **`scripts/lib/common.sh`**
+  (`MVNO_MSISDN_*`, `MVNO_UAS_AOR`, `MVNO_MSISDN_2G`, `MVNO_BARESIP_AORS`,
+  `MVNO_THROWAWAY`). Scripts reference the constants instead of hardcoding
+  MSISDNs — the shared UAS AoR (preflight probe, live_demo UAS blocks,
+  baresip-rx) and the bridge-owned 2G AoRs (which must NEVER be deregistered)
+  are the two historical collision points this settles.
+- **`make check-subs`** (`scripts/check-subscribers.sh`) enforces the set
+  against every script + the Makefile seeds (incl. the zero-balance 403 and
+  funded-100 contracts) and runs inside the gate as **gate 0/3** — a drifted
+  constant fails the gate before any live assertion can mislead.
+- The watchdog's `run_in_flight` guard, the cockpit/live_demo collision check
+  (both hold the UAS AoR), and the proof harness locks all share the same
+  registry — orchestrators are settled by construction, not by convention.

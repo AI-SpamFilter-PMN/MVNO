@@ -35,10 +35,20 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${REPO_ROOT}"
+source "${SCRIPT_DIR}/../lib/common.sh"
 
 KAM_IP=10.89.0.23
 KAM_PORT=5060
-AOR=15559998888
+# Shared UAS AoR (single source: scripts/lib/common.sh). This AoR is also used
+# by live_demo's UAS blocks and the baresip-rx rig — run_in_flight in the
+# watchdog prevents two holders from colliding on it.
+AOR="${MVNO_UAS_AOR}"
+
+# Registry preflight lock: the UAS AoR (${MVNO_UAS_AOR}) is a SHARED resource —
+# two concurrent preflights (e.g. the watchdog's recovery + a fresh gate) would
+# collide on it. run_in_flight sees this lock, so the gate refuses to start
+# while a recovery is mid-probe, and a second preflight refuses outright.
+acquire_run_lock mvno-preflight.lock || exit 2   # lock conflict = env/usage class per header
 
 say()  { echo -e "\033[0;36m[preflight-5g]\033[0m $*"; }
 fail() { echo -e "\033[0;31m[preflight-5g] FAIL: $*\033[0m" >&2; exit 1; }

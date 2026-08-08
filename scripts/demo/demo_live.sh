@@ -33,16 +33,17 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 
 SESSION=mvno-live
 LIVE_DEMO_LOCK="${TMPDIR:-/tmp}/mvno-live-demo.lock"   # live_demo.sh's lock (re-entrancy)
-# ONLY the AoRs this cockpit itself registers: baresip-rx (15559998888, the
-# preflight UAS AOR too), baresip-tx (15553332211). The bridge-owned 2G
-# registrations (15554443322 / 15557778888, held by mvno-ip-sm-gw for the
-# 5G->2G relay) MUST NOT be deregistered here — removing them breaks the
-# 5G->2G route until the bridge's 900s refresh (a real gate regression; see
+# ONLY the AoRs this cockpit itself registers: the baresip rigs (single source
+# MVNO_BARESIP_AORS — includes the shared UAS AoR ${MVNO_UAS_AOR}). The
+# bridge-owned 2G registrations (${MVNO_MSISDN_2G[*]}, held by mvno-ip-sm-gw
+# for the 5G->2G relay) MUST NOT be deregistered here — removing them breaks
+# the 5G->2G route until the bridge's 60s refresh (a real gate regression; see
 # Issue 8.38 family).
-AORS=(15559998888 15553332211)
+AORS=("${MVNO_BARESIP_AORS[@]}")
 
 say() { echo -e "\033[0;36m[demo-live]\033[0m $*"; }
 die() { echo -e "\033[0;31m[demo-live] FATAL: $*\033[0m" >&2; exit 1; }
@@ -81,6 +82,12 @@ fi
 if tmux has-session -t "$SESSION" 2>/dev/null; then
     die "cockpit session '${SESSION}' already exists — run 'bash scripts/demo/demo_live.sh --down' first"
 fi
+# Registry cockpit lock (single source: common.sh): a human-run cockpit holds a
+# lock from launch (before the tmux session exists — its preflight window would
+# otherwise be invisible to the watchdog's run_in_flight; the child
+# preflight_5g.sh holds mvno-preflight.lock during the probe, this covers the
+# whole launcher). Released on EXIT (incl. --down).
+acquire_run_lock mvno-demo-live.lock || die "another run is in flight — wait for it or clear stale locks in ${TMPDIR:-/tmp}"
 command -v tmux >/dev/null 2>&1 || die "tmux is required for the cockpit"
 for c in mvno-rtpengine mvno-api; do
     podman ps --format '{{.Names}}' | grep -qx "$c" || die "$c not running — run 'make up' first"
