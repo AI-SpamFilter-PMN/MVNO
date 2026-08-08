@@ -1,0 +1,23 @@
+✓ 5G SA Subscriber MongoDB seeding complete.
+🎓 GRADUATION DEMO — fully-live, single-command (no CI)
+[1/6] DB seed (init-db + seed-mongo) — idempotent, done above
+[2/6] live-mic precondition probe (FATAL if no audible mic)...
+[32m  ✓ audio socket /run/user/1000/pulse/native[0m
+[32m  ✓ capture source present: alsa_input.pci-0000_05_00.6.analog-stereo[0m
+[32m  ✓ capture is audible (mean -20.5 dB > -50 dB)[0m
+[32m  ✓ ASR pipeline live — probe transcript: ''[0m
+✅ MIC PROBE PASSED — live mic present, audible, ASR reachable.
+[3/6] deterministic teardown → cold state...
+[4/6] deterministic cold-start (UID + image/tag gate)...
+[5/6] 8-cell oracle gate (5G preflight + e2e + AI-BLOCK)...
+[0;36m[preflight-5g][0m GTP-U DL baseline (iptables OUTPUT 2152): 0 pkts
+[0;36m[preflight-5g][0m REGISTER 200 OK over 5G user plane (uesimtun0 10.45.0.3)
+[0;36m[preflight-5g][0m GTP-U downlink emitted: OUTPUT 2152 0->2 pkts
+[0;32m[preflight-5g] PASS — 5G user plane UP (REGISTER 200 OK + GTP-U DL 0->2 + NRF 9/9)[0m
+[0;32m  gate 1/2 PASS: 5G user plane UP[0m
+[0;32m==== E2E RUNBOOK: ALL CELLS PASS (8 ok) ====[0m
+[0;32m  gate 2/2 PASS: e2e 4-cell + AI-block green[0m
+[0;32m==== GATE PASS — MVNO stack deterministic-verified ====[0m
+[6/6] HEADLINE: forced fresh mic capture → non-empty this-run transcript...
+[32m  ✓ fresh capture: state/spool/archived/mic_call_1786181513.wav (129416 bytes)[0m
+[32m  ✓ transcript archived: state/spool/archived/mic_call_1786181513.txt[0m
