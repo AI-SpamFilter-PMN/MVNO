@@ -142,36 +142,58 @@ check_nrf() {
     return 0
 }
 
+# ues_attached — bounded poll for the FULL fleet at the AMF (ran_ue==3). Only
+# consulted in --auto-recover mode: the demo needs all 3 UEs for live_demo item
+# 2/13 (ran_ue==3), and a gNB event can leave ue-2/ue-3 dead while ue-1 (the
+# probe's REGISTER subject) recovers — the probe alone would wrongly PASS.
+# The strict gate path never evaluates this (byte-identical oracle).
+ues_attached() {
+    local N=0
+    for _try in $(seq 1 6); do
+        N=$(curl -s 'http://localhost:8428/api/v1/query?query=ran_ue' 2>/dev/null | jq -r '.data.result[0].value[1]' 2>/dev/null || true)
+        [ "${N:-}" = "3" ] && return 0
+        sleep 5
+    done
+    echo -e "\033[0;31m[preflight-5g] FAIL: UE fleet incomplete — ran_ue=${N:-?}/3 (ue-2/ue-3 not attached at AMF)\033[0m" >&2
+    return 1
+}
+
 pass_now() {
     echo -e "\033[0;32m[preflight-5g] PASS — 5G user plane UP (REGISTER 200 OK + GTP-U DL ${DL_SHOW_BEFORE}->${DL_SHOW_AFTER} + NRF 9/9)\033[0m"
     exit 0
 }
 
 # --- 7. First attempt ---------------------------------------------------------
+userplane_ok=0
 if userplane_up; then
-    if check_nrf; then pass_now; fi
-    exit 1   # NRF failure is never auto-recovered
+    userplane_ok=1
+    if check_nrf; then
+        if [ "$AUTO_RECOVER" -ne 1 ] || ues_attached; then pass_now; fi
+        say "user plane + NRF OK but UE fleet incomplete (ran_ue != 3) — engaging recovery ladder"
+    else
+        exit 1   # NRF failure is never auto-recovered
+    fi
 fi
 
-# User plane failed here.
-if [ "$AUTO_RECOVER" -ne 1 ]; then
-    exit 1   # failure already printed by userplane_up (gate oracle path)
-fi
+# Strict oracle path (make gate / GRADUATION): failure already printed, exit 1
+# with NO recovery — byte-identical to the pre-ladder behavior.
+[ "$AUTO_RECOVER" -ne 1 ] && exit 1
 
 # ==============================================================================
 # Auto-recovery ladder (demo path only — opt-in, bounded, always re-probes)
 # ==============================================================================
-say "probe failed — engaging auto-recovery ladder (--auto-recover)"
+if [ "$userplane_ok" -eq 0 ]; then
+    say "probe failed — engaging auto-recovery ladder (--auto-recover)"
 
-# --- Stage 1/2: restart ue-1 (Issue 5.9 / 7.3) --------------------------------
-say "recovery stage 1/2: podman restart mvno-ueransim-ue-1 (fresh PFCP session carries the gNB F-TEID)"
-if ! podman restart mvno-ueransim-ue-1; then
-    fail "podman restart mvno-ueransim-ue-1 failed — cannot auto-recover"
-fi
-say "re-probing after ue-1 restart (the IP poll bounds the re-attach wait)..."
-if userplane_up; then
-    if check_nrf; then pass_now; fi
-    exit 1
+    # --- Stage 1/2: restart ue-1 (Issue 5.9 / 7.3) ------------------------------
+    say "recovery stage 1/2: podman restart mvno-ueransim-ue-1 (fresh PFCP session carries the gNB F-TEID)"
+    if ! podman restart mvno-ueransim-ue-1; then
+        fail "podman restart mvno-ueransim-ue-1 failed — cannot auto-recover"
+    fi
+    say "re-probing after ue-1 restart (the IP poll bounds the re-attach wait)..."
+    if userplane_up && check_nrf && ues_attached; then pass_now; fi
+else
+    say "ue-1 user plane already OK — skipping stage 1, escalating to the full fleet stage 2"
 fi
 
 # --- Stage 2/2: atomic UERANSIM trio recreate (Issue 7.4) ---------------------
@@ -189,9 +211,6 @@ for _try in $(seq 1 50); do
     sleep 3
 done
 say "re-probing after trio recreate..."
-if userplane_up; then
-    if check_nrf; then pass_now; fi
-    exit 1
-fi
+if userplane_up && check_nrf && ues_attached; then pass_now; fi
 
 fail "5G user plane still DOWN after auto-recovery (stages 1+2). Manual remedies: podman restart mvno-ueransim-ue-1 (5.9), or full trio recreate (7.4): podman compose up -d --force-recreate ueransim-gnb ueransim-ue-1 ueransim-ue-2 ueransim-ue-3"
