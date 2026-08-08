@@ -22,6 +22,23 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
+# shellcheck source=lib/common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+detect_runtime
+ENGINE="$RUNTIME"
+
+# Directed preflight errors (fail-fast philosophy): name the missing tool, not
+# a confusing downstream false-FAIL.
+for tool in sqlite3 curl jq; do
+    command -v "${tool}" >/dev/null 2>&1 || {
+        echo -e "\033[0;31m  ✗ missing tool: ${tool} (host prerequisite — see docs/deployment_guide.md §2)\033[0m" >&2
+        exit 1
+    }
+done
+command -v "${ENGINE}" >/dev/null 2>&1 || {
+    echo -e "\033[0;31m  ✗ container engine '${ENGINE}' not found\033[0m" >&2
+    exit 1
+}
 
 PASS=0
 FAIL=0
@@ -65,7 +82,7 @@ else bad "hlr.db missing/fewer than 5 rows — run: make init-db"; fi
 # --- 3. Open5GS Mongo 5G subscribers -------------------------------------------
 mongo_ues() {
     local n
-    n=$(podman exec -i mvno-mongodb mongosh --quiet open5gs \
+    n=$(${ENGINE} exec -i mvno-mongodb mongosh --quiet open5gs \
         --eval 'db.subscribers.countDocuments()' 2>/dev/null | tail -1)
     [ "${n:-0}" = "3" ]
 }
