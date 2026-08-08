@@ -374,15 +374,10 @@ class BridgeSip:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((SIP_BIND, SIP_PORT))
         self.sock.settimeout(POLL_INTERVAL)
-        # Dedicated socket for REGISTER traffic (5G->2G leg refresh). With the
-        # refresh at 60s, a blocking recv on the shared listener socket would
-        # open a ~16s window per minute where an inbound 5G->2G MESSAGE could
-        # be consumed as a REGISTER response and silently dropped. Kamailio
-        # replies to the REGISTER's source port, so an ephemeral socket keeps
-        # the listener free for MESSAGEs — no relay-loss race.
-        self.reg_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.reg_sock.bind((SIP_BIND, 0))
-        self.reg_sock.settimeout(3)
+        # Inbound 5G->2G MESSAGEs captured during a refresh/relay recv window
+        # (see _recv_classified) are deferred here and relayed by the main loop
+        # on the next iteration — a recv window can never silently drop an SMS.
+        self.deferred = []
         self.etag = int(time.time())
         log("SIP", f"bound {SIP_BIND}:{SIP_PORT}, ip={self.ip} kamailio={KAMAILIO_HOST}:{KAMAILIO_PORT}")
 
@@ -405,18 +400,39 @@ class BridgeSip:
         except socket.timeout:
             return None
 
-    def reg_recv(self, timeout=3):
-        """recv on the dedicated REGISTER socket (never starves the listener)."""
-        try:
-            self.reg_sock.settimeout(timeout)
-            data, _ = self.reg_sock.recvfrom(65535)
-            return data.decode("utf-8", errors="ignore")
-        except socket.timeout:
-            return None
+    def _recv_classified(self, timeout, match_any):
+        """Recv a datagram that belongs to OUR transaction.
 
-    def _recv_expect_ok(self, timeout=8):
-        resp = self.recv(timeout=timeout)
-        return resp if resp and ("200 OK" in resp) else None
+        The single listener socket carries BOTH our REGISTER/relay responses
+        AND inbound 5G->2G MESSAGEs. A plain recv during a refresh (60s
+        cadence) or a relay round-trip would consume an inbound MESSAGE as a
+        response and silently drop the SMS (observed live: 'no challenge:
+        MESSAGE sip:...' with the 5G->2G cell failing). So: inbound MESSAGEs
+        are deferred to self.deferred (the main loop relays them); only a
+        datagram containing one of match_any (our Call-ID / branch) is
+        returned as this transaction's response; anything else is dropped.
+        """
+        deadline = time.time() + timeout
+        if not match_any:  # defensive: empty matcher would wait out the timeout
+            return None
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return None
+            try:
+                self.sock.settimeout(max(remaining, 0.05))
+                data, _ = self.sock.recvfrom(65535)
+            except socket.timeout:
+                return None
+            text = data.decode("utf-8", errors="ignore")
+            if text.startswith("MESSAGE "):
+                self.deferred.append(text)
+                continue
+            if any(m in text for m in match_any):
+                return text
+            # A response for a transaction we don't track (e.g. the other
+            # AoR's refresh, or a stale retransmission) — benign, drop.
+
 
     def register(self, msisdn):
         # Fresh Call-ID + branch per attempt: Kamailio's registrar rejects a
@@ -438,8 +454,14 @@ class BridgeSip:
             f"Expires: 1800\r\n"
             f"Content-Length: 0\r\n\r\n"
         )
-        self.reg_sock.sendto(req.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
-        resp1 = self.reg_recv()
+        # REGISTERs go out on the SHARED listener socket, not an ephemeral
+        # one: Kamailio's fix_nated_contact() rewrites the Contact to the
+        # REGISTER's source address and usrloc stores it — an ephemeral source
+        # port made Kamailio relay 5G->2G MESSAGEs to that socket, where they
+        # were eaten as REGISTER responses (observed live, e2e Cell 3 fail).
+        # _recv_classified defers any inbound MESSAGE instead of dropping it.
+        self.sock.sendto(req.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
+        resp1 = self._recv_classified(8, [call_id])
         nonce = parse_nonce(resp1 or "", "www-authenticate")
         if not nonce:
             if resp1 and "200 OK" in resp1:
@@ -467,8 +489,8 @@ class BridgeSip:
             f"Expires: 1800\r\n"
             f"Content-Length: 0\r\n\r\n"
         )
-        self.reg_sock.sendto(req2.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
-        resp2 = self.reg_recv()
+        self.sock.sendto(req2.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
+        resp2 = self._recv_classified(8, [call_id])
         if resp2 and "200 OK" in resp2:
             log("REGISTER", f"{msisdn} REGISTER 200 OK")
             _mark_registered(msisdn)
@@ -479,6 +501,7 @@ class BridgeSip:
     def send_message(self, msisdn, peer, body):
         uri = f"sip:{peer}@{REALM}:{KAMAILIO_PORT}"
         via = f"SIP/2.0/UDP {self.ip}:{SIP_PORT};branch=z9hG4bK-msg-{msisdn}-{int(time.time())}"
+        via_branch = via.split("branch=")[1]  # exact branch: never matches a stale tx
         req1 = (
             f"MESSAGE {uri} SIP/2.0\r\n"
             f"Via: {via}\r\n"
@@ -492,7 +515,7 @@ class BridgeSip:
             f"{body}"
         )
         self.sock.sendto(req1.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
-        resp1 = self.recv(timeout=8)
+        resp1 = self._recv_classified(8, [via_branch])
         if not resp1:
             log("SEND", f"{msisdn}->{peer} no response")
             return False
@@ -522,7 +545,7 @@ class BridgeSip:
             f"{body}"
         )
         self.sock.sendto(req2.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
-        resp2 = self.recv(timeout=8)
+        resp2 = self._recv_classified(8, [via_branch])
         ok = bool(resp2 and "200 OK" in resp2)
         log("SEND", f"{msisdn}->{peer} {'OK' if ok else 'FAIL: ' + (resp2.split(chr(13)+chr(10))[0] if resp2 else 'no resp')}")
         return ok
@@ -535,6 +558,25 @@ class Gateway:
     def __init__(self):
         self.sip = BridgeSip()
         self.sc = connect(SMSC_DB)
+
+    def handle_inbound(self, data):
+        """Relay an inbound 5G->2G SIP MESSAGE (to a registered 2G AoR) into
+        OsmoSMSC via SMPP and reply 200 to Kamailio so the sender sees
+        delivery. Called for every MESSAGE — whether it arrived on the main
+        listener recv or was deferred during a refresh/relay recv window."""
+        if not data or not data.startswith("MESSAGE "):
+            return
+        sender, recipient, body = parse_sip_message(data)
+        if recipient in MSISDN_2G:
+            log("RELAY", f"5G->2G {sender}->{recipient} body='{body[:80]}'")
+            reply_ok(data, self.sip.sock, KAMAILIO_HOST, KAMAILIO_PORT)
+            incr("mvno_bridge_sms_attempts_total")
+            try:
+                smpp_submit_sm(SMPP_HOST, SMPP_PORT, sender, recipient, body)
+                incr("mvno_bridge_sms_5g_to_2g_total")
+            except (OSError, RuntimeError) as e:
+                incr("mvno_bridge_sms_failures_total")
+                log("SMPP_ERR", str(e))
 
     def run(self):
         log("BOOT", f"SMPP={SMPP_HOST}:{SMPP_PORT} poll={POLL_INTERVAL}s 2G={sorted(MSISDN_2G)} 5G={sorted(MSISDN_5G)}")
@@ -557,6 +599,10 @@ class Gateway:
                     if not self.sip.register(msisdn):
                         reg_ok = False
                 last_reg = time.time()
+            # Drain MESSAGEs deferred during the refresh's recv windows — a
+            # refresh must never eat an inbound 5G->2G SMS.
+            while self.sip.deferred:
+                self.handle_inbound(self.sip.deferred.pop(0))
 
             # 2G->5G leg: drain store-and-forward queue
             try:
@@ -590,21 +636,8 @@ class Gateway:
             # a failing 2G->5G delivery is not re-attempted in a tight 0.2s spin (which
             # trips Kamailio's pike anti-flood → 429). Backoff is handled via MAX_ATTEMPTS.
             data = self.sip.recv(timeout=POLL_INTERVAL)
-            if not data:
-                continue
-            if not data.startswith("MESSAGE "):
-                continue
-            sender, recipient, body = parse_sip_message(data)
-            if recipient in MSISDN_2G:
-                log("RELAY", f"5G->2G {sender}->{recipient} body='{body[:80]}'")
-                reply_ok(data, self.sip.sock, KAMAILIO_HOST, KAMAILIO_PORT)
-                incr("mvno_bridge_sms_attempts_total")
-                try:
-                    smpp_submit_sm(SMPP_HOST, SMPP_PORT, sender, recipient, body)
-                    incr("mvno_bridge_sms_5g_to_2g_total")
-                except (OSError, RuntimeError) as e:
-                    incr("mvno_bridge_sms_failures_total")
-                    log("SMPP_ERR", str(e))
+            if data:
+                self.handle_inbound(data)
 
 
 def main():
