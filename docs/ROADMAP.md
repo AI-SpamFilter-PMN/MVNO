@@ -9,7 +9,7 @@ This document outlines upcoming architectural enhancements, operational backlog 
 
 ### 1. SIP INVITE Digest Authentication (407 Challenge) — ✅ IMPLEMENTED
 - **Current State**: Kamailio challenges both `REGISTER` and `INVITE` via `auth_check()` (commit `7b33ac1`). Unauthenticated `INVITE` → `407 Proxy Authentication Required`; authenticated zero-balance callers still receive `403 Call Intercepted / Blocked` from `route(INTERCEPT)`. Digest realm `localhost`, credentials from the SQLite `subscriber` table.
-- **Verification**: `scripts/testing/sip_traffic_sim.py` (REGISTER + digest-authenticated INVITE) and runbook step 6 (407 → digest → 403 handshake) both green.
+- **Verification**: `scripts/testing/sip_traffic_sim.py` (REGISTER + digest-authenticated INVITE) and live_demo item 6 (407 → digest → 403 handshake) both green.
 - **Interop Client**: Compatible with `SipClient`'s `InviteAuthenticator` module (see `docs/INTEGRATION_CONTRACT.md` Section 5 SipClient — 407 digest handling).
 
 ### 2. Gateway API Key Authentication — ✅ IMPLEMENTED

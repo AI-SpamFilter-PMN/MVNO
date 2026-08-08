@@ -218,7 +218,7 @@ never stalls the spool loop.
 |------|------------|
 | **Vosk ASR** | English-only small model (50MB). Post-call only. ~10-15% WER. No Arabic. |
 | **AI Filter Mock** | Returns `allow:false` on the `E2E-BLOCK` marker (deterministic), else `allow:true`. Swap in the real `AI-Filteration-System` model for live spam detection. |
-| **SIP Testing** | `make test-call` uses HTTP POST; real SIP covered by `scripts/testing/sip_traffic_sim.py` (REGISTER + 407 digest challenge → INVITE handshake, used by runbook steps 5-6). No SIPp scenario included. |
+| **SIP Testing** | `make test-call` uses HTTP POST; real SIP covered by `scripts/testing/sip_traffic_sim.py` (REGISTER + 407 digest challenge → INVITE handshake, used by live_demo items 5/6). No SIPp scenario included. |
 | **5G Radio Path** | 3 UERANSIM UEs registered on the AMF with a **verified UL+DL user-plane data path** (UE tun → N3 GTP-U → UPF ogstun). After any UERANSIM UE recreate, re-add the UE route (`ip route add 10.45.0.1 dev uesimtun0`) and recreate the trio atomically (see `docs/ISSUES.md` S7.4). **No SMS-over-NAS / VoNR over radio** — voice and SMS are external-path demos (SipClient / sms-client); SMS-over-NAS is on the roadmap. |
 | **SCTP Kernel** | `modprobe sctp` required on host. Fails silently if missing (gNB↔AMF never connects). |
 | **RTPEngine (rtpengine media proxy) Kernel** | Runs in userspace mode (kernel module not required). |

@@ -494,6 +494,11 @@ details: `docs/TESTING_REFERENCE.md` Flow J.
 **PURPOSE** — the automated proof: the e2e SMS matrix (5 cells / 8 ok) then the
 full 13-item demo, both exiting 0, both teed to `docs/evidence/` logs.
 
+> **Automated equivalent**: `make gate` (`scripts/testing/gate.sh` = 5G
+> preflight + sms_matrix, exit-only, no mic) is the deterministic oracle — run
+> it for CI-style certification. S10 runs the two scripts directly so the
+> narrated demo shows each layer's evidence live.
+
 **COMMANDS** (T-B)
 
 ```bash
