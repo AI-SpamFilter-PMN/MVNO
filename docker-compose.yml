@@ -389,8 +389,12 @@ services:
     ports:
       - "5066:5060/udp"
     volumes:
-      - ./configs/kamailio:/etc/kamailio:z
-      - ./state/kamailio/kamailio.db:/etc/kamailio/kamailio.db:z
+      - ./configs/kamailio/kamailio.cfg:/etc/kamailio/kamailio.cfg:z
+      # Whole state/kamailio dir, NOT a single-file bind of kamailio.db:
+      # sqlite's -wal/-shm must be shared with the host or host-side writes
+      # (make init-db, provision-subscribers.sh) stay invisible to the running
+      # kamailio until checkpoint+restart (caused 401 REGISTER failures).
+      - ./state/kamailio:/etc/kamailio/db:z
     depends_on:
       victoria-metrics:
         condition: service_started
