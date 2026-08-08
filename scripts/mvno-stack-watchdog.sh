@@ -209,10 +209,15 @@ case "${MODE}" in
         # the outage confirm checks CONTAINER STATE (podman ps absent), which
         # the racing unit can no longer restore.
         WD_RESUME=0
-        if systemctl --user --no-pager is-active mvno-stack-watchdog.service >/dev/null 2>&1; then
+        if ! command -v systemctl >/dev/null 2>&1; then
+            log "WARN: systemctl absent — self-test cannot pause the live watchdog"
+        elif systemctl --user --no-pager is-active mvno-stack-watchdog.service >/dev/null 2>&1; then
             systemctl --user stop mvno-stack-watchdog.service >/dev/null 2>&1 \
                 && WD_RESUME=1 \
                 || log "WARN: could not pause live watchdog — self-test may race it"
+            # Resume guard: if THIS self-test is killed/aborted mid-flight, the
+            # paused 24/7 watchdog must come back — never leave it silently off.
+            trap '[ "${WD_RESUME:-0}" = "1" ] && systemctl --user start mvno-stack-watchdog.service >/dev/null 2>&1 || true' EXIT
         fi
         log "self-test: injecting bridge outage (podman stop mvno-ip-sm-gw)"
         podman stop mvno-ip-sm-gw >/dev/null 2>&1
