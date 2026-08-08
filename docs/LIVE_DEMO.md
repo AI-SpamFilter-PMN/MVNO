@@ -227,6 +227,14 @@ echo "fresh pcap: $NEW"
 curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_total' \
   | jq -r '.data.result[0].value[1]'
 ```
+
+Want to **inspect the capture in the Wireshark GUI** (not just the CLI tail)?
+The cockpit's `--wireshark` flag opens it live (P8); post-hoc, open the fresh
+pcap above directly:
+
+```bash
+wireshark -r "$NEW" -d udp.port==30000-30100,rtp   # GUI decode of the RTP relay
+```
 **EXPECT** — `200 Answering` = 1; Kamailio shows the INVITE/ACK/BYE dialog plus
 the `INTERCEPT QUERY: caller=15553332211 callee=15559998888` callout; `NEW` is a
 pcap newer than S4 started; the RTPEngine counter is present.
@@ -562,7 +570,8 @@ is still up), **live capture** of the RTP/SIP traffic, plus log/metrics/receipt
 watches — all in one session, with an auto-recovering 5G preflight.
 
 ```bash
-bash scripts/demo/demo_live.sh          # preflight -> tmux session mvno-live
+bash scripts/demo/demo_live.sh          # preflight -> tmux session mvno-live (8 panes)
+bash scripts/demo/demo_live.sh --wireshark  # same, + P8 = live Wireshark GUI capture
 # ... run the call from P0 (SPEAK NOW ~12 s), watch the daemon + capture ...
 bash scripts/demo/demo_live.sh --down   # teardown (idempotent; evidence kept)
 ```
@@ -579,6 +588,7 @@ bash scripts/demo/demo_live.sh --down   # teardown (idempotent; evidence kept)
 | **P5** | metrics — `mvno_vosk_blocked_total` + rtpengine counters | S9 |
 | **P6** | 2G MS receipts — `sms.txt` tail on `mvno-2g-ms` | S6a/6c |
 | **P7** | evidence — newest `state/spool` WAVs + archived transcripts | S5 |
+| **P8** (opt-in) | **Wireshark GUI** live capture — RTP `30000-30100` + SIP `5066` on loopback | S4 |
 
 **What the preflight does before the panes open** (all audited against
 `docs/ISSUES.md`):
@@ -602,13 +612,25 @@ bash scripts/demo/demo_live.sh --down   # teardown (idempotent; evidence kept)
   are deliberately **not** deregistered — removing them breaks the 5G→2G
   route until the bridge's 900 s refresh (a real gate regression caught live).
 
-**Wireshark pane note (P2)**: rootless podman publishes the RTP relay on host
-loopback, so the pane captures `lo` (Issue 8.20 — host has no route to the
-bridge IPs) with a forced RTP decode. The plan's `udp.portrange` decode field
-is **not** valid in tshark 4.x; the working form (verified on this host) is
-`-d udp.port==30000-30100,rtp` (range as value). If live capture lacks dumpcap
-permissions the pane falls back to tailing the newest relay pcap with the same
-decode.
+**Packet-analysis panes**: rootless podman publishes the RTP relay on host
+loopback, so capture targets `lo` (Issue 8.20 — host has no route to the bridge
+IPs) with a forced RTP decode. The plan's `udp.portrange` decode field is
+**not** valid in tshark 4.x; the working form (verified on this host) is
+`-d udp.port==30000-30100,rtp` (range as value). Two live views exist:
+
+- **P2 — CLI (default, headless-safe)**: live `tshark` tail of the loopback
+  capture; if live capture lacks dumpcap permissions it falls back to tailing
+  the newest relay pcap with the same decode.
+- **P8 — Wireshark GUI (opt-in, needs a display)**: `demo_live.sh --wireshark`
+  opens the **live Wireshark GUI** on the same capture (`wireshark -k -i lo`
+  with the RTP decode). It is never part of the deterministic cockpit/proof
+  path — headless runs print the post-hoc one-liner instead:
+
+```bash
+# open the newest saved relay pcap in the Wireshark GUI (post-hoc, any time):
+wireshark -r "$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')" \
+  -d udp.port==30000-30100,rtp
+```
 
 **Teardown** keeps the evidence (pcaps, `live-*.wav`, archived transcripts),
 removes the rigs, deregisters the AoRs, and drains `smsc.db` `sent IS NULL`

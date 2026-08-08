@@ -11,6 +11,8 @@
 #   P5  metrics — mvno_vosk_blocked_total (+ rtpengine relay counters)
 #   P6  2G MS receipts — mvno-2g-ms sms.txt tail (T-A equivalent)
 #   P7  evidence — newest state/spool WAVs + archived transcripts
+#   P8  (--wireshark) live Wireshark GUI capture — RTP/SIP on host loopback
+#       (needs DISPLAY + wireshark binary; headless -> graceful message)
 #
 # Preflight is fail-fast on the deterministic blockers and SOFT on the mic:
 #   - refuses to collide with a running live_demo.sh (re-entrancy lock)
@@ -22,8 +24,9 @@
 #   - clean slate (Issue 8.37): removes baresip rigs + deregisters stale AoRs
 #
 # Usage:
-#   bash scripts/demo/demo_live.sh            # build the cockpit
-#   bash scripts/demo/demo_live.sh --down     # teardown (idempotent)
+#   bash scripts/demo/demo_live.sh             # build the cockpit (8 panes)
+#   bash scripts/demo/demo_live.sh --wireshark # + P8 live Wireshark GUI pane
+#   bash scripts/demo/demo_live.sh --down      # teardown (idempotent)
 #
 # Teardown keeps the evidence (pcaps, live-*.wav chunks, archived transcripts)
 # in state/spool/ and drains smsc.db / SIP registrations so sms_matrix and
@@ -72,6 +75,12 @@ down() {
 }
 
 [ "${1:-}" = "--down" ] && down
+
+# Opt-in Wireshark GUI pane (P8). Never part of the deterministic cockpit /
+# proof harness: requires a display + the wireshark binary; headless runs get a
+# graceful message with the post-hoc one-liner instead.
+GUI_CAP=0
+[ "${1:-}" = "--wireshark" ] && GUI_CAP=1
 
 # ------------------------------------------------------------------------------
 # Preflight (fail-fast on deterministic blockers)
@@ -137,6 +146,11 @@ P4="cd ${REPO_ROOT} && watch -n2 'podman logs --since 5m mvno-api 2>&1 | grep -E
 P5="cd ${REPO_ROOT} && watch -n2 'printf \"vosk_blocked=\"; curl -s \"http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total\" | jq -r .data.result[0].value[1]; curl -s \"http://localhost:9900/metrics\" 2>/dev/null | grep -E \"^rtpengine_[a-z_]+_total\" | head -3'"
 P6="cd ${REPO_ROOT} && podman exec mvno-2g-ms sh -c 'tail -n +1 -f /root/.osmocom/bb/sms.txt'; exec bash"
 P7="cd ${REPO_ROOT} && watch -n2 'scripts/testing/newest.sh \"state/spool/live-*.wav\" 2>/dev/null; scripts/testing/newest.sh \"state/spool/archived/*.txt\" 2>/dev/null'"
+# P8 (opt-in --wireshark): live Wireshark GUI capture on the host loopback —
+# RTP relay 30000-30100 + SIP 5066 (rootless pasta forwards host loopback, so
+# `lo` is the right interface, Issue 8.20) with the forced RTP decode (Issue
+# 4.2). Guarded: no display / no binary -> prints the post-hoc GUI one-liner.
+PW="cd ${REPO_ROOT} && bash -c 'if command -v wireshark >/dev/null 2>&1 && [ -n \"\${DISPLAY:-}\${WAYLAND_DISPLAY:-}\" ]; then exec wireshark -k -i lo -f \"udp portrange 30000-30100 or port 5066\" -d \"udp.port==30000-30100,rtp\" -Y \"sip || rtp\"; fi; echo \"[wireshark GUI unavailable (headless or missing binary) — post-hoc: wireshark -r \$(scripts/testing/newest.sh state/spool/pcaps/*.pcap) -d udp.port==30000-30100,rtp]\"; exec bash'"
 
 # pane-id targeting: tmux pane ids are NOT creation-sequential across
 # relaunches (ids get reused out of order once sessions are killed/recreated),
@@ -165,6 +179,10 @@ P6_PANE="$(tmux split-window -P -F '#{pane_id}' -t "$P5_PANE" -v -p 50)"
 tmux send-keys -t "$P6_PANE" "$P6" Enter
 P7_PANE="$(tmux split-window -P -F '#{pane_id}' -t "$P3_PANE" -h -p 50)"
 tmux send-keys -t "$P7_PANE" "$P7" Enter
+if [ "${GUI_CAP}" -eq 1 ]; then
+    P8_PANE="$(tmux split-window -P -F '#{pane_id}' -t "$P7_PANE" -v -p 50)"
+    tmux send-keys -t "$P8_PANE" "$PW" Enter
+fi
 
 tmux select-window -t "$SESSION:0"
 tmux select-pane -t "$SESSION:0.0"
@@ -173,7 +191,7 @@ NPANES=$(tmux list-panes -s -t "$SESSION" | wc -l)
 say "cockpit '${SESSION}' ready — ${NPANES} panes across 2 windows"
 echo ""
 echo "  Window 'call'     P0 caller (SPEAK NOW) | P1 live_tap daemon | P2 RTP/SIP capture"
-echo "  Window 'monitors' P3 kamailio | P4 Vosk verdicts | P5 metrics | P6 2G receipts | P7 evidence"
+echo "  Window 'monitors' P3 kamailio | P4 Vosk verdicts | P5 metrics | P6 2G receipts | P7 evidence${GUI_CAP:+ | P8 Wireshark GUI}"
 echo "  Attach:   tmux attach -t ${SESSION}        (or tmux a -t ${SESSION})"
 echo "  Teardown: bash scripts/demo/demo_live.sh --down"
 echo ""
