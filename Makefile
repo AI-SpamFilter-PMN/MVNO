@@ -182,7 +182,7 @@ check-pins:
 #   make watchdog-log        tail the watchdog log
 #   make watchdog-status     systemd unit status
 # ─────────────────────────────────────────────────────────────────────────────
-.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status
+.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test
 
 watchdog-install:
 	@mkdir -p $(HOME)/.config/systemd/user
@@ -209,6 +209,31 @@ watchdog-log:
 watchdog-status:
 	@systemctl --user --no-pager status mvno-stack-watchdog.service 2>/dev/null \
 		| head -n 10 || echo "(watchdog not installed — make watchdog-install)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Proof harness — repeatable run-evidence (LIVE_DEMO "Evidence squares").
+# Additive + opt-in: never touches make gate / the oracle. Each proof tees to
+# docs/evidence/ and exits non-zero on failure, so make stops at the first red.
+#   make proof               all three proofs, one command
+#   make cockpit-proof       demo_live.sh 8-pane evidence (non-interactive)
+#   make subscriber-proof    add-subscriber.sh 5-store + SIP REGISTER evidence
+#   make watchdog-self-test  fault-injection recovery evidence (bridge outage)
+# ─────────────────────────────────────────────────────────────────────────────
+proof: cockpit-proof subscriber-proof watchdog-self-test
+	@echo "══════════════════════════════════════════════════════════════"
+	@echo "✅ PROOF PASS — all three evidence logs written to docs/evidence/"
+	@echo "   (demo-cockpit-$(shell date +%F).log, demo-subscriber-$(shell date +%F).log,"
+	@echo "    watchdog-recovery-$(shell date +%F).log)"
+
+cockpit-proof:
+	@bash scripts/testing/cockpit_proof.sh
+
+subscriber-proof:
+	@bash scripts/testing/subscriber_proof.sh
+
+watchdog-self-test:
+	@bash scripts/mvno-stack-watchdog.sh --self-test 2>&1 \
+		| tee docs/evidence/watchdog-recovery-$(shell date +%F).log
 
 graduation: init-db seed-mongo
 	@echo "══════════════════════════════════════════════════════════════"

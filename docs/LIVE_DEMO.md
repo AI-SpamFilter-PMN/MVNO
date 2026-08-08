@@ -646,6 +646,29 @@ presence. `podman ps` shows `(healthy)`/`(unhealthy)` accordingly.
 > **24/7 across logout**: `loginctl enable-linger $(USER)` lets the systemd
 > --user unit keep running without a login session.
 
+## S14 — Evidence Squares (`make proof`) · repeatable
+
+**PURPOSE** — turn "the cockpit works" / "add-subscriber works" / "the
+watchdog recovers" from code-verified claims into **captured, repeatable
+run-evidence** (same spirit as `sms_matrix.sh`). One command, three
+self-asserting proofs, each tee'd to `docs/evidence/`:
+
+```bash
+make proof
+# → cockpit-proof → subscriber-proof → watchdog-self-test (stops at first red)
+```
+
+| Proof | Evidence log | Must contain to be green |
+|---|---|---|
+| `cockpit-proof` (deterministic, tone caller) | `demo-cockpit-<date>.log` | 8 panes up; live_tap daemon polling; a **fresh** pcap + `live-*.wav` chunk + `archived/*.txt` within the REALTIME_AUDIO budget; `tshark -r` decodes **>0 RTP frames** on the 30000 range (Issue 4.2); teardown clean |
+| `cockpit-proof --live-mic` (opt-in) | same log | genuine fresh mic capture; **non-empty transcript = real-voice headline proven**. Empty transcript (quiet room / unmuted mic) does **NOT** fail — `silence_mark.sh` annotates it as `[caller/you · recorded Ns · SILENCE "···" N symbols]` and the run is PASS-with-note. The raw WAV + empty `.txt` remain the honest evidence. (`mic_verify.sh` — the graduation anti-theater gate — is **unchanged** and still hard-fails on silence.) |
+| `subscriber-proof` | `demo-subscriber-<date>.log` | throwaway MSISDN provisioned via `add-subscriber.sh`; **all 5 stores** contain the row (osmo-hlr VTY, hlr.db, Kamailio sqlite auth_db, Kamailio Mongo, Open5GS Mongo); a **real SIP REGISTER 200 OK** for that MSISDN (the testpass/auth_db path SipClient uses); throwaway row cleaned up |
+| `watchdog-self-test` (fault injection) | `watchdog-recovery-<date>.log` | bridge stopped → watchdog detects → 2-round restart recovery → `/health` 200 again |
+
+> **Anti-theater contract**: these proofs are additive and opt-in. `make gate`
+> / the 8-cell oracle is untouched; `mic_verify.sh` stays strict; the proofs
+> only make "it works" *provable on demand* instead of asserted from memory.
+
 ---
 
 ## Partner-Repo Integration (read-only references)

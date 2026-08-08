@@ -22,6 +22,8 @@
 #   bash scripts/mvno-stack-watchdog.sh --once           # one check + recover; exit 0 healthy
 #   bash scripts/mvno-stack-watchdog.sh --loop           # persistent loop (systemd unit)
 #   bash scripts/mvno-stack-watchdog.sh --check-bridge   # bridge AoRs only (preflight reuse)
+#   bash scripts/mvno-stack-watchdog.sh --self-test      # fault-injection evidence: stop the
+#                                                          bridge, run one recovery, assert heal
 #
 # Recovery (bounded, always re-probes):
 #   UE fleet degraded  -> scripts/testing/preflight_5g.sh --auto-recover
@@ -193,6 +195,30 @@ case "${MODE}" in
         log "degraded — entering recovery"
         recover
         exit $? ;;
+    --self-test)
+        # Deterministic fault-injection evidence (proves the committed 2-round
+        # retry actually recovers — the "not exercised" audit gap). Stops the
+        # bridge, runs one recovery, asserts /health is 200 again. Tee the
+        # output to docs/evidence/watchdog-recovery-<date>.log when run via
+        # `make watchdog-self-test`. Safe: recovery skips when a demo is in
+        # flight, and the bridge re-registers at boot either way.
+        log "self-test: injecting bridge outage (podman stop mvno-ip-sm-gw)"
+        podman stop mvno-ip-sm-gw >/dev/null 2>&1
+        sleep 2
+        if bridge_reg_ok; then
+            log "self-test FAIL: bridge still healthy after stop — inject did not take"
+            exit 1
+        fi
+        log "self-test: outage confirmed — running one recovery"
+        recover
+        rc=$?
+        if [ "${rc}" -eq 0 ] && bridge_reg_ok; then
+            log "self-test PASS: bridge outage recovered (restart -> /health 200)"
+            exit 0
+        fi
+        log "self-test FAIL: recovery did not restore bridge /health (rc=${rc})"
+        exit 1
+        ;;
     --loop)
         log "watchdog loop starting (interval=${INTERVAL}s, log=${LOG_FILE})"
         LAST="unknown"
@@ -217,6 +243,6 @@ case "${MODE}" in
             sleep "${INTERVAL}"
         done ;;
     *)
-        echo "usage: $0 [--loop|--once|--check-bridge]" >&2
+        echo "usage: $0 [--loop|--once|--check-bridge|--self-test]" >&2
         exit 2 ;;
 esac
