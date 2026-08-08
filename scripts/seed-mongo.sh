@@ -4,6 +4,21 @@
 # ==============================================================================
 # Upserts 3 UERANSIM 5G SA UE subscribers into MongoDB collection `open5gs.subscribers`.
 #
+# REQUIRED v2.8.0 LEGACY-SCHEMA FIELDS (lib/dbi/subscription.c, src/udr/nudr-handler.c):
+#   The Open5GS 2.x DBI layer parses the FLAT legacy document ONLY (there is no
+#   schema_version gate and no OpenAPI `accessAndMobilitySubscriptionData`
+#   parsing in lib/dbi) and uses strict BSON_ITER_HOLDS_INT32 accessors, so:
+#   - TOP-LEVEL `ambr` (UE-AMBR) is MANDATORY: UDR hard-fails
+#     `[supi] No UE-AMBR` (nudr-handler.c:1321) -> UDM -> Registration reject
+#     [7] if missing. Value must fit int32 (use NumberInt/explicit small ints).
+#   - TOP-LEVEL `msisdn` array is MANDATORY for GPSI (AccessAndMobility
+#     SubscriptionData.gpsis); without it UDM returns no gpsis.
+#   - slice[].sst / session[].type / qos.index / qos.arp.* / session ambr
+#     value+unit must be int32-typed (HOLDS_INT32 guards silently skip doubles).
+#   This document shape was reverse-engineered from the working warm-state
+#   subscriber doc (see docs/ISSUES.md true-cold UDR UE-AMBR writeup) and
+#   matches `open5gs-dbctl add` defaults (1 Gbps AMBR, unit 0).
+#
 # Subscriber Credentials & Security Stanzes:
 # - UE-1 (imsi-001010000000001 / MSISDN 15551234567): K=465B...8A6BC, OP=E8ED...83CA
 # - UE-2 (imsi-001010000000002 / MSISDN 15557654321): K=465B...8A6BD, OP=E8ED...83CB
@@ -38,10 +53,15 @@ subscribers.forEach(sub => {
     {
       $set: {
         imsi: sub.imsi,
+        msisdn: [sub.msisdn],
         subscribed_rau_tau_timer: 12,
         network_access_mode: 2,
         subscriber_status: 0,
         access_restriction_data: 32,
+        ambr: {
+          downlink: { value: 1000000000, unit: 0 },
+          uplink: { value: 1000000000, unit: 0 }
+        },
         slice: [{
           sst: 1,
           sd: "000001",
