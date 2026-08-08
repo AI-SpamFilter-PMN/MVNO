@@ -54,7 +54,10 @@ die() { echo -e "\033[0;31m[demo-live] FATAL: $*\033[0m" >&2; exit 1; }
 # ------------------------------------------------------------------------------
 down() {
     tmux kill-session -t "$SESSION" 2>/dev/null || true
-    pkill -f 'live_tap.sh daemon' 2>/dev/null || true   # stray daemon hygiene
+    # Stray-daemon hygiene: kills the daemon a crashed tmux left behind. Note
+    # this also matches a daemon started manually outside the cockpit — accept-
+    # ed lab behavior (the daemon is stateless and restarts trivially).
+    pkill -f 'live_tap.sh daemon' 2>/dev/null || true
     podman rm -f baresip-rx baresip-tx 2>/dev/null || true
     for u in "${AORS[@]}"; do
         python3 scripts/testing/sip_traffic_sim.py --callee "$u" --deregister >/dev/null 2>&1 || true

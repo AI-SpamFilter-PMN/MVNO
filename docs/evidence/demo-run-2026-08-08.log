@@ -1,4 +1,4 @@
-RUN:2026-08-08T17:41:38+0300 — clean-slate evidence (previous contents discarded)
+RUN:2026-08-08T18:19:31+0300 — clean-slate evidence (previous contents discarded)
 [0;36m==== live demo log: /home/zkhattab/AI-SpamFilter-PMN/MVNO/docs/evidence/demo-run-2026-08-08.log ====[0m
 [0;36m[1m========================================================================[0m
 [0;36m[1m  🎓 MVNO 5G SA Core & Interception Gateway — Live Demo                    [0m
@@ -19,18 +19,18 @@ RUN:2026-08-08T17:41:38+0300 — clean-slate evidence (previous contents discard
 
 [1;33m[5/13] 📞 Simulating Authorized IMS VoIP Call Interception Flow (full RTP media dialog via RTPEngine)...[0m
 ./scripts/testing/live_demo.sh: line 178: warning: command substitution: ignored null byte in input
-[0;32m✓ 2G/IMS path: full RTP media dialog relayed through RTPEngine (+93912 bytes)[0m
+[0;32m✓ 2G/IMS path: full RTP media dialog relayed through RTPEngine (+93740 bytes)[0m
 
 [1;33m[5c/13] 🎙️ Verifying Call Recording Pipeline (pcap -> WAV -> Vosk ASR)...[0m
   (baresip rig: demo_call.sh setup + dial — callee streams the scam phrase)
-[;m[31m[000000005] main: fd_listen err: fd=0 flags=0x01 (Operation not permitted [1])
+[;m[31m[000000008] main: fd_listen err: fd=0 flags=0x01 (Operation not permitted [1])
   rx answers (expect 1): 1
-  fresh pcap: state/spool/pcaps/8001aa4c95c056c0-c42fbcb6ff3f024c.pcap
-[0;32m✓ Recording pipeline proven: transcript archived at state/spool/archived/8001aa4c95c056c0-c42fbcb6ff3f024c-10.89.0.60.txt[0m
+  fresh pcap: state/spool/pcaps/283d2757b6d99c89-90d12e80ebb0fb9f.pcap
+[0;32m✓ Recording pipeline proven: transcript archived at state/spool/archived/283d2757b6d99c89-90d12e80ebb0fb9f-10.89.0.60.txt[0m
   --- transcript of [callee/synthetic scam rig] leg (canned phrase through the real call) ---
 {
   "text" : "your bank account have been like please confirm your detail now"
-}  --- real recorded WAV: state/spool/archived/8001aa4c95c056c0-c42fbcb6ff3f024c-10.89.0.60.wav (4.140000s) ---
+}  --- real recorded WAV: state/spool/archived/283d2757b6d99c89-90d12e80ebb0fb9f-10.89.0.60.wav (4.140000s) ---
   ✓ recorded WAV duration 4.140000s >= 3s (scripted-leg floor)
   --- transcript of [caller/you] leg (operator live voice) ---
 {
@@ -40,25 +40,26 @@ RUN:2026-08-08T17:41:38+0300 — clean-slate evidence (previous contents discard
 
 [1;33m[5b/13] 📡 Simulating SIP over the 5G SA User Plane (UE tun → N3 GTP-U → UPF ogstun → Kamailio)...[0m
 [0;36m[preflight-5g][0m ue-1 live 5G IP: 10.45.0.3
-[0;36m[preflight-5g][0m GTP-U DL baseline (iptables OUTPUT 2152): 17 pkts
+[0;36m[preflight-5g][0m GTP-U DL baseline (iptables OUTPUT 2152): 49 pkts
 [0;36m[preflight-5g][0m REGISTER 200 OK over 5G user plane (uesimtun0 10.45.0.3)
-[0;36m[preflight-5g][0m GTP-U downlink emitted: OUTPUT 2152 17->19 pkts
+[0;36m[preflight-5g][0m GTP-U downlink emitted: OUTPUT 2152 49->51 pkts
 [0;36m[preflight-5g][0m NRF registrations OK (9 NFs): AMF AUSF BSF NRF NSSF PCF SMF UDM UDR — UPF via static PFCP peer (smf.yaml), not NRF-advertised
-[0;32m[preflight-5g] PASS — 5G user plane UP (REGISTER 200 OK + GTP-U DL 17->19 + NRF 9/9)[0m
+[0;32m[preflight-5g] PASS — 5G user plane UP (REGISTER 200 OK + GTP-U DL 49->51 + NRF 9/9)[0m
   ue-1 5G IP (dynamic): 10.45.0.3
 === Full IMS call with RTP media (15551234567 -> 15559998888, 3s) ===
     <- SIP/2.0 407 Proxy Authentication Required
     <- SIP/2.0 100 trying -- your call is important to us
+    <- SIP/2.0 180 Ringing
     <- SIP/2.0 200 OK
-[+] call answered; media -> 10.89.0.48:30026
-[+] RTP media sent: 149 packets to 10.89.0.48:30026
+[+] call answered; media -> 10.89.0.48:30032
+[+] RTP media sent: 149 packets to 10.89.0.48:30032
     (no BYE response within 3s — session will close via timer)
 --- UAS side (5G-path callee) ---
 [+] SIP REGISTER 200 OK for subscriber 15559998888
 [UAS] registered 15559998888, listening 10.45.0.3:5070 (media 10.45.0.3:5071)
 [UAS] <- INVITE sip:15559998888@10.89.0.14:5070 SIP/2.0
-[UAS] outgoing RTP sent: 0 packets to ('10.89.0.48', 30014)
-[0;32m✓ 5G SA path: REGISTER 200 OK + INVITE answered 200 OK + RTP media over the 5G user plane (ogstun TX +2421 bytes)[0m
+[UAS] outgoing RTP sent: 0 packets to ('10.89.0.48', 30012)
+[0;32m✓ 5G SA path: REGISTER 200 OK + INVITE answered 200 OK + RTP media over the 5G user plane (ogstun TX +2804 bytes)[0m
 
 [1;33m[5d/13] 🛡️ Fail-Open Proof: RTPEngine DOWN -> call still answered + visible RECORDING UNAVAILABLE...[0m
 [0;32m✓ Fail-open proven: call answered (200 OK) with RTPEngine DOWN + Kamailio logged 'RECORDING UNAVAILABLE'[0m
@@ -86,27 +87,27 @@ RUN:2026-08-08T17:41:38+0300 — clean-slate evidence (previous contents discard
   ✓ 4th distinct SIM blocked: {'allow': False, 'reason': 'EIR: SIM swap detected'}
 [0;32m  ✓ EIR SIM-Swap fraud trigger verified (4 distinct SIMs on 1 IMEI)[0m
 [1;33m[8/13] 💬 Authorized 5G SMS Interception — real MO SMS via SMPP -> OsmoSMSC -> REST...[0m
-  user SMS text: Award-winning offer, reply now MVNO5G-1786200333
+  user SMS text: Award-winning offer, reply now MVNO5G-1786202607
   --- real MO leg: SUBMIT_SM -> OsmoSMSC (SMPP 3.4) ---
   ✓ real MO SMS stored: 1 fresh row(s) in smsc.db (OsmoSMSC store-and-forward)
   --- REST intercept evaluates the same content ---
-  ✓ user SMS (nonce MVNO5G-1786200333) confirmed in smsc.db via GSM-7 decode
+  ✓ user SMS (nonce MVNO5G-1786202607) confirmed in smsc.db via GSM-7 decode
   {"allow":true,"reason":"Clean content"}
   ✓ SMS allowed: allow=true, reason=Clean content
-[0;32m  ✓ User SMS allowed (real SMPP MO -> OsmoSMSC GSM-7, nonce MVNO5G-1786200333 decoded) + REST verdict Clean[0m
+[0;32m  ✓ User SMS allowed (real SMPP MO -> OsmoSMSC GSM-7, nonce MVNO5G-1786202607 decoded) + REST verdict Clean[0m
   ✓ cleaned up [8] MO row(s) from smsc.db (bridge poll hygiene)
 [1;33m[9/13] 🎙️ Demonstrating Native Vosk Java 21 ASR on the REAL Recorded Call...[0m
-  ✓ seeded real recorded call leg from [5c]: demo-vosk-live-1786200333.wav
-    source pcap: state/spool/pcaps/8001aa4c95c056c0-c42fbcb6ff3f024c.pcap
+  ✓ seeded real recorded call leg from [5c]: demo-vosk-live-1786202607.wav
+    source pcap: state/spool/pcaps/283d2757b6d99c89-90d12e80ebb0fb9f.pcap
     seeded duration: 4.140000s
-  ✓ Native Vosk ASR engine archived a transcript: state/spool/archived/demo-vosk-live-1786200333.txt
+  ✓ Native Vosk ASR engine archived a transcript: state/spool/archived/demo-vosk-live-1786202607.txt
   --- [callee/synthetic scam rig] transcript (canned phrase re-arched from the real call) ---
 {
   "text" : "your bank account have been like please confirm your detail now"
 }[0;32m✓ Native Vosk Java 21 ASR Pipeline Proven on the REAL Recorded Call (canned rig phrase, labeled)[0m
 
 [1;33m[9b/13] 🚨 Real Scam Call -> AI Blocked Verdict (real recording -> Vosk -> TRANSCRIPT -> blocked)...[0m
-  ✓ re-arching the REAL [5c] scam-call recording: 8001aa4c95c056c0-c42fbcb6ff3f024c-10.89.0.60.wav
+  ✓ re-arching the REAL [5c] scam-call recording: 283d2757b6d99c89-90d12e80ebb0fb9f-10.89.0.60.wav
     recorded duration: 4.140000s
   --- [callee/synthetic scam rig] transcript of this run's call (canned phrase — NOT operator speech) ---
 {
@@ -139,7 +140,7 @@ RUN:2026-08-08T17:41:38+0300 — clean-slate evidence (previous contents discard
   --- real stored SMS rows in state/hlr/smsc.db (terminal evidence) ---
 id   src_addr     dest_addr   content        created        sent
 --  -----------  -----------  -------  -------------------  ----
-49  15551234567  15557654321           2026-08-08 14:46:30
+57  15551234567  15557654321           2026-08-08 15:24:29
   ✓ 1 stored SMS row(s) for 15551234567 -> 15557654321 verified in smsc.db
   (drained 1 pending demo SMS row(s) from smsc.db so the bridge does not retry them during a subsequent e2e run)
 

@@ -66,6 +66,16 @@ done
 # --- Validate MSISDN -----------------------------------------------------------
 [[ "$MSISDN" =~ ^155[0-9]{8}$ ]] || die "MSISDN must be 11 digits starting 155 (got: $MSISDN)"
 
+# --- Container preflight (fail-fast: no partial provisioning) -------------------
+# Without these, a cold/partial stack writes sqlite+hlr.db then dies at the
+# mongo step under set -e — a half-provisioned subscriber with a misleading
+# "✓" summary. Check the containers the stores live in before any write.
+for c in mvno-osmo-hlr mvno-mongodb; do
+    podman ps --format '{{.Names}}' | grep -qx "$c" \
+        || die "$c not running — start the stack (make up) before provisioning"
+done
+command -v sqlite3 >/dev/null 2>&1 || die "sqlite3 required on the host"
+
 # --- Store helpers -------------------------------------------------------------
 # NB: mongosh in this build does NOT exit after a script on stdin (it stays in
 # the REPL), so all provisioning uses --eval with a JS string instead of heredoc
@@ -156,8 +166,12 @@ sqlite3 state/kamailio/kamailio.db \
     || die "sqlite auth_db upsert failed"
 
 # --- 4. Kamailio MongoDB (parallel store, provision-subscribers convention) -----
-say "[4/5] Kamailio MongoDB — parallel store"
-KAM_JS=$(cat <<KAMEOF
+if [ "$TWO_G_ONLY" -eq 0 ]; then
+    # Kamailio MongoDB parallel store — provision-subscribers.sh scopes this to
+    # the 5G/IMS users only; 2G-only subscribers skip it (store is inert: the
+    # authoritative SIP-auth store is the sqlite auth_db written in step 3).
+    say "[4/5] Kamailio MongoDB — parallel store"
+    KAM_JS=$(cat <<KAMEOF
 db.subscriber.updateOne(
   { username: "${MSISDN}", domain: "localhost" },
   { \$set: { username: "${MSISDN}", domain: "localhost", password: "${PASSWORD}", ha1: "unused", ha1b: "unused" } },
@@ -165,7 +179,8 @@ db.subscriber.updateOne(
 );
 KAMEOF
 )
-mongosh_eval kamailio "${KAM_JS}"
+    mongosh_eval kamailio "${KAM_JS}"
+fi
 
 # --- 5. Open5GS MongoDB (5G SA) -------------------------------------------------
 if [ "$TWO_G_ONLY" -eq 0 ]; then
@@ -232,10 +247,11 @@ echo "  MSISDN ${MSISDN} / IMSI ${IMSI} provisioned:"
 echo "    - OsmoHLR VTY (2G/3G)          ✓"
 echo "    - state/hlr/hlr.db mirror      ✓"
 echo "    - Kamailio sqlite auth_db      ✓ (SIP digest auth, password ${PASSWORD})"
-echo "    - Kamailio MongoDB             ✓"
 if [ "$TWO_G_ONLY" -eq 0 ]; then
+    echo "    - Kamailio MongoDB             ✓ (parallel store)"
     echo "    - Open5GS MongoDB (5G SA)     ✓  K=${K} OP=${OP}"
     echo "    - UERANSIM UE yaml            ✓ ${UE_FILE} (attach optional, see above)"
 else
+    echo "    - Kamailio MongoDB             skipped (--2g-only; sqlite auth_db is authoritative)"
     echo "    - Open5GS MongoDB / UE yaml   skipped (--2g-only)"
 fi

@@ -64,7 +64,11 @@ podman ps --format '{{.Names}}' | grep -qx mvno-upf          || fail "mvno-upf n
 # ==============================================================================
 # userplane_up — steps 2-6 of the probe, as a re-probeable unit.
 # Returns 0 when the 5G user plane is UP, 1 when it failed (reason printed).
+# Records the last DL delta in globals so the final PASS line carries the
+# same counters the pre-refactor evidence logs show (evidence consistency).
 # ==============================================================================
+DL_SHOW_BEFORE=0
+DL_SHOW_AFTER=0
 userplane_up() {
     # --- 2. Live UE IP (dynamic across re-attaches — never hardcode) ----------
     # Poll: after a cold start / UE restart the attach + PDU session establish
@@ -119,6 +123,7 @@ userplane_up() {
         echo -e "\033[0;31m[preflight-5g] FAIL: GTP-U downlink did NOT emit: OUTPUT 2152 ${DL_BEFORE}->${DL_AFTER} (Issue 5.9 signature — uplink OK, DL buffered). Fix: podman restart mvno-ueransim-ue-1 (fresh PFCP session carries the gNB F-TEID)\033[0m" >&2
         return 1
     fi
+    DL_SHOW_BEFORE="${DL_BEFORE}"; DL_SHOW_AFTER="${DL_AFTER}"
     say "GTP-U downlink emitted: OUTPUT 2152 ${DL_BEFORE}->${DL_AFTER} pkts"
     return 0
 }
@@ -138,7 +143,7 @@ check_nrf() {
 }
 
 pass_now() {
-    echo -e "\033[0;32m[preflight-5g] PASS — 5G user plane UP (REGISTER 200 OK + GTP-U DL + NRF 9/9)\033[0m"
+    echo -e "\033[0;32m[preflight-5g] PASS — 5G user plane UP (REGISTER 200 OK + GTP-U DL ${DL_SHOW_BEFORE}->${DL_SHOW_AFTER} + NRF 9/9)\033[0m"
     exit 0
 }
 

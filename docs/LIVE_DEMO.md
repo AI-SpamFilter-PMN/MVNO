@@ -567,8 +567,12 @@ bash scripts/demo/demo_live.sh --down   # teardown (idempotent; evidence kept)
   stage 2: atomic UERANSIM trio recreate — never a single UERANSIM container,
   Issue 7.4) before the call. This is the **demo path only**: `make gate`
   keeps `--no-recover` and stays the deterministic oracle.
-- **Clean slate** (Issue 8.37): removes `baresip-rx/tx` and deregisters the
-  four demo AoRs so routing is unambiguous.
+- **Clean slate** (Issue 8.37): removes `baresip-rx/tx` and deregisters only
+  the cockpit's own rig AoRs (`15559998888` baresip-rx/preflight UAS,
+  `15553332211` baresip-tx). The bridge-owned 2G registrations
+  (`15554443322` / `15557778888`, held by `mvno-ip-sm-gw` for the 5G→2G relay)
+  are deliberately **not** deregistered — removing them breaks the 5G→2G
+  route until the bridge's 900 s refresh (a real gate regression caught live).
 
 **Wireshark pane note (P2)**: rootless podman publishes the RTP relay on host
 loopback, so the pane captures `lo` (Issue 8.20 — host has no route to the

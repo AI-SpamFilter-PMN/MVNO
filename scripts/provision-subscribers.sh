@@ -100,6 +100,11 @@ done
 
 # --- 3. Kamailio MongoDB (SIP auth) -----------------------------------------
 echo "[3/3] Provisioning Kamailio MongoDB (SIP auth)..."
+# NOTE: the authoritative SIP-auth store is the sqlite auth_db seeded by
+# `make init-db` (kamailio.cfg auth_db reads state/kamailio/kamailio.db). This
+# MongoDB collection is a parallel store only — kamailio.cfg has zero mongo
+# refs. Keep the two seed paths in sync: the sqlite auth set includes the
+# bridge-owned 2G AoRs (15554443322, 15557778888) that ip_sm_gw registers.
 KAM_JS=$(cat <<'KAMEOF'
 const subscribers = [
   { msisdn: "15551234567", password: "testpass" },
