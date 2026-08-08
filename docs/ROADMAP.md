@@ -29,6 +29,7 @@ This document outlines upcoming architectural enhancements, operational backlog 
 ### 4. Container Native Healthcheck Endpoints
 - **Current State**: Container healthchecks use CLI tools (`mongosh`, `curl`).
 - **Roadmap Item**: Expose `/actuator/health` and `/healthz` HTTP healthcheck endpoints across all custom microservices.
+- **Implemented (Aug 8 2026)**: `ai-filter` (wget `/health`, IPv4-explicit — busybox wget resolves `localhost`→`::1` first, mock binds IPv4 only), `kamailio` (SIP REGISTER→401 round-trip via socat — curl to SIP TCP is answered with close/empty-reply, OPTIONS is silently dropped by the real config; unauthenticated REGISTER guarantees a challenge reply with no DB write), `grafana` (curl `/api/health`). All verified `healthy` via `podman inspect`. Remaining without healthchecks: `open5gs-webui`, `mongodb`, `ue-1/2/3`, `ueransim`, `ip-sm-gw` (auxiliary/demo rigs — documented fallback: process/port checks in `scripts/up.sh`).
 
 ### 5. Open5GS SBI Advertisement Evaluation
 - **Current State**: Service advertisement parameters (`advertise: <hostname>`) in Open5GS NF YAML configs are maintained in committed `main`.

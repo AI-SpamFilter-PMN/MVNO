@@ -398,6 +398,14 @@ services:
       mvno_net:
         ipv4_address: 10.89.0.23
     restart: unless-stopped
+    healthcheck:
+      # SIP liveness: unauthenticated REGISTER -> 401 challenge (any SIP/2.0
+      # reply proves the UDP listener is responsive; no DB write pre-auth).
+      test: ["CMD", "sh", "-c", "printf 'REGISTER sip:mvno.local SIP/2.0\\r\\nVia: SIP/2.0/UDP 127.0.0.1:5060;branch=z9hG4bKhc\\r\\nFrom: <sip:15551234567@mvno.local>;tag=hc\\r\\nTo: <sip:15551234567@mvno.local>\\r\\nCall-ID: hc@mvno.local\\r\\nCSeq: 1 REGISTER\\r\\nContact: <sip:15551234567@127.0.0.1:5060>\\r\\nExpires: 30\\r\\nContent-Length: 0\\r\\n\\r\\n' | socat -T3 - UDP4:127.0.0.1:5060 | grep -q 'SIP/2.0' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ─── Osmocom Home Location Register (HLR) Core ───
   osmo-hlr:
@@ -545,6 +553,14 @@ services:
     container_name: mvno-ai-filter
     ports:
       - "8008:8000"
+    healthcheck:
+      # 127.0.0.1 explicit: busybox wget resolves localhost -> ::1 (IPv6) first,
+      # and the mock binds IPv4 0.0.0.0 only (connection refused, no fallback).
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     command:
       - python3
       - -c
@@ -671,6 +687,12 @@ services:
     container_name: mvno-grafana
     ports:
       - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
