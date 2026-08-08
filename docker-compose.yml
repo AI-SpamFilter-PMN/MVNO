@@ -411,7 +411,7 @@ services:
   osmo-hlr:
     image: mvno-osmo-smsc:1.0.0
     container_name: mvno-osmo-hlr
-    command: osmo-hlr -c /etc/osmocom/osmo-hlr.cfg
+    command: osmo-hlr -c /etc/osmocom/osmo-hlr.cfg --db-upgrade
     volumes:
       - ./configs/osmocom:/etc/osmocom:z
       - ./state/hlr:/var/lib/osmocom:z
@@ -721,7 +721,7 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - ./configs/grafana/provisioning:/etc/grafana/provisioning:z
-      - ./state/grafana:/var/lib/grafana:z
+      - ./state/grafana:/var/lib/grafana:U
     depends_on:
       victoria-metrics:
         condition: service_started
