@@ -322,6 +322,16 @@ services:
       mvno_net:
         ipv4_address: 10.89.0.31
     restart: unless-stopped
+    # Functional healthcheck (Issue 5.8/5.9 family): the uesimtun0 interface
+    # exists only while the PDU session is live — a UE that is "Up" but whose
+    # session dropped shows Unhealthy here (watchdog uses the same probe to
+    # trigger the auto-recover ladder). start_period covers cold-start attach.
+    healthcheck:
+      test: ["CMD", "sh", "-c", "ip -4 addr show uesimtun0 2>/dev/null | grep -q 'inet '"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
 
   # ─── UERANSIM UE-2 (Spam Subscriber IMSI 001010000000002) ───
   ueransim-ue-2:
@@ -342,6 +352,12 @@ services:
       mvno_net:
         ipv4_address: 10.89.0.32
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "ip -4 addr show uesimtun0 2>/dev/null | grep -q 'inet '"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
 
   # ─── UERANSIM UE-3 (Zero Balance Subscriber IMSI 001010000000003) ───
   ueransim-ue-3:
@@ -362,6 +378,12 @@ services:
       mvno_net:
         ipv4_address: 10.89.0.33
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "ip -4 addr show uesimtun0 2>/dev/null | grep -q 'inet '"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
 
   # ─── RTPEngine In-Kernel Media Proxy & Audio Forker ───
   rtpengine:
@@ -521,6 +543,7 @@ services:
       - SIP_PORT=5090
       - METRICS_PORT=9100
       - POLL_INTERVAL=3
+      - REGISTER_REFRESH=60   # 2G-AoR usrloc refresh (60s bounds the silent 5G->2G window)
     depends_on:
       - kamailio
       - osmo-hlr
@@ -529,6 +552,17 @@ services:
       mvno_net:
         ipv4_address: 10.89.0.53
     restart: unless-stopped
+    # Functional healthcheck: /health reflects the LIVE 2G-AoR registration
+    # state (ip_sm_gw.py tracks the last successful REGISTER per AoR). The
+    # bridge's own 30s retry loop self-heals, and the watchdog restarts the
+    # bridge if registrations are lost — this check makes that state visible
+    # instead of "Up but 5G->2G dead" (Issue 8.38 family).
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
 
   # ─── Spring Boot Interception Gateway & Vosk ASR JNI Runtime ───
   telecom-api:

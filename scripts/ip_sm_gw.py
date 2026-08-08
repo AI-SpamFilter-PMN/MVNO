@@ -16,6 +16,7 @@ All configuration is environment-overridable.
 """
 
 import hashlib
+import json
 import os
 import re
 import socket
@@ -68,6 +69,61 @@ _METRICS = {
 
 _START = time.time()
 
+# -----------------------------------------------------------------------------
+# Functional health: per-AoR registration state (the 5G->2G leg). /health and
+# the mvno_bridge_2g_aor_registered gauge reflect the LAST successful REGISTER,
+# so a bridge that is alive but whose 2G registrations have died (the "silent
+# Up" hole) is visible to a healthcheck / watchdog instead of masquerading as
+# healthy. The health threshold tracks the REFRESH cadence (not the SIP
+# Expires window) so a persistent REGISTER failure turns /health 503 within
+# ~2.5 min instead of the 35 min the Expires would otherwise allow.
+# -----------------------------------------------------------------------------
+REG_EXPIRES = int(os.environ.get("REGISTER_EXPIRES", "1800"))
+# Unconditional registration refresh cadence. The registrations live in
+# Kamailio usrloc MEMORY (the sqlite location mirror runs db_mode=2 write-back
+# and is not a live signal). A Kamailio restart or an external deregister
+# (Expires:0, e.g. the cockpit's stale-AoR cleanup) silently kills the 5G->2G
+# route in usrloc while this bridge's /health would still say OK. Refreshing
+# every 60s bounds that silent window to ~1 min (vs 15 min at the old 900s)
+# and re-REGISTERing self-heals usrloc — so /health stays an honest signal.
+REGISTER_REFRESH = float(os.environ.get("REGISTER_REFRESH", "60"))
+# Health threshold: healthy iff refreshed within a small multiple of the
+# cadence (default 2.5x = 150s) — a failing REGISTER shows 503 quickly.
+REG_HEALTH_MAX_AGE = float(os.environ.get("REGISTER_HEALTH_MAX_AGE", str(REGISTER_REFRESH * 2.5)))
+# Per-AoR last-REGISTER timestamps, written by the main loop and read by the
+# HTTP thread. Float assignment/read is atomic under the CPython GIL, so no
+# lock is needed (same rationale as the plain _METRICS reads).
+_REG_LAST = {m: 0.0 for m in MSISDN_2G}
+
+
+def _mark_registered(msisdn):
+    _REG_LAST[msisdn] = time.time()
+
+
+def _aor_healthy(msisdn):
+    t = _REG_LAST.get(msisdn, 0.0)
+    return bool(t) and (time.time() - t) <= REG_HEALTH_MAX_AGE
+
+
+def _render_health():
+    now = time.time()
+    ages = {
+        m: (round(now - _REG_LAST[m], 1) if _REG_LAST[m] else None)
+        for m in sorted(MSISDN_2G)
+    }
+    stale = {m: a for m, a in ages.items() if a is None or a > REG_HEALTH_MAX_AGE}
+    body = json.dumps(
+        {
+            "status": "ok" if not stale else "degraded",
+            "registered": {m: a is not None for m, a in ages.items()},
+            "age_seconds": ages,
+            "threshold_seconds": REG_HEALTH_MAX_AGE,
+            "uptime_seconds": round(now - _START, 1),
+        },
+        indent=2,
+    ).encode()
+    return (200 if not stale else 503), body
+
 
 def incr(name, by=1):
     with _METRICS_LOCK:
@@ -81,6 +137,9 @@ def _render_metrics():
             val = _METRICS[name]
         lines.append(f"# TYPE {name} counter")
         lines.append(f"{name} {val}")
+    for m in sorted(MSISDN_2G):
+        lines.append("# TYPE mvno_bridge_2g_aor_registered gauge")
+        lines.append(f'mvno_bridge_2g_aor_registered{{msisdn="{m}"}} {1 if _aor_healthy(m) else 0}')
     lines.append("# TYPE mvno_bridge_uptime_seconds gauge")
     lines.append(f"mvno_bridge_uptime_seconds {time.time() - _START:.3f}")
     return "\n".join(lines) + "\n"
@@ -88,10 +147,18 @@ def _render_metrics():
 
 class _MetricsHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path.rstrip("/") in ("/metrics", ""):
+        path = self.path.rstrip("/") or "/"
+        if path in ("/metrics", "/"):
             body = _render_metrics().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; version=0.0.4")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif path == "/health":
+            code, body = _render_health()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -307,6 +374,15 @@ class BridgeSip:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((SIP_BIND, SIP_PORT))
         self.sock.settimeout(POLL_INTERVAL)
+        # Dedicated socket for REGISTER traffic (5G->2G leg refresh). With the
+        # refresh at 60s, a blocking recv on the shared listener socket would
+        # open a ~16s window per minute where an inbound 5G->2G MESSAGE could
+        # be consumed as a REGISTER response and silently dropped. Kamailio
+        # replies to the REGISTER's source port, so an ephemeral socket keeps
+        # the listener free for MESSAGEs — no relay-loss race.
+        self.reg_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.reg_sock.bind((SIP_BIND, 0))
+        self.reg_sock.settimeout(3)
         self.etag = int(time.time())
         log("SIP", f"bound {SIP_BIND}:{SIP_PORT}, ip={self.ip} kamailio={KAMAILIO_HOST}:{KAMAILIO_PORT}")
 
@@ -325,6 +401,15 @@ class BridgeSip:
         try:
             self.sock.settimeout(timeout if timeout is not None else POLL_INTERVAL)
             data, _ = self.sock.recvfrom(65535)
+            return data.decode("utf-8", errors="ignore")
+        except socket.timeout:
+            return None
+
+    def reg_recv(self, timeout=3):
+        """recv on the dedicated REGISTER socket (never starves the listener)."""
+        try:
+            self.reg_sock.settimeout(timeout)
+            data, _ = self.reg_sock.recvfrom(65535)
             return data.decode("utf-8", errors="ignore")
         except socket.timeout:
             return None
@@ -353,12 +438,13 @@ class BridgeSip:
             f"Expires: 1800\r\n"
             f"Content-Length: 0\r\n\r\n"
         )
-        self.sock.sendto(req.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
-        resp1 = self.recv(timeout=8)
+        self.reg_sock.sendto(req.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
+        resp1 = self.reg_recv()
         nonce = parse_nonce(resp1 or "", "www-authenticate")
         if not nonce:
             if resp1 and "200 OK" in resp1:
                 log("REGISTER", f"{msisdn} OK (no auth challenge)")
+                _mark_registered(msisdn)
                 return True
             log("REGISTER", f"{msisdn} no challenge: {resp1.split(chr(13)+chr(10))[0] if resp1 else 'no resp'}")
             return False
@@ -381,10 +467,11 @@ class BridgeSip:
             f"Expires: 1800\r\n"
             f"Content-Length: 0\r\n\r\n"
         )
-        self.sock.sendto(req2.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
-        resp2 = self.recv(timeout=8)
+        self.reg_sock.sendto(req2.encode(), (KAMAILIO_HOST, KAMAILIO_PORT))
+        resp2 = self.reg_recv()
         if resp2 and "200 OK" in resp2:
             log("REGISTER", f"{msisdn} REGISTER 200 OK")
+            _mark_registered(msisdn)
             return True
         log("REGISTER", f"{msisdn} REGISTER rejected: {resp2.split(chr(13)+chr(10))[0] if resp2 else 'no resp'}")
         return False
@@ -458,11 +545,13 @@ class Gateway:
 
         while True:
             # 5G->2G leg: keep the bridge's 2G-MSISDN registrations live
-            # (Expires: 1800). Refresh every 15 min (2x margin); if a refresh
-            # fails (e.g. lost challenge/response on the shared UDP socket)
-            # retry after 30 s instead of waiting a full interval, so the 2G
-            # leg cannot stay dead for extended periods.
-            if time.time() - last_reg > (900 if reg_ok else 30):
+            # (Expires: 1800). Refresh every REGISTER_REFRESH (default 60s —
+            # ~1 min is the bounded silent window after a usrloc wipe; see the
+            # REGISTER_REFRESH note). If a refresh fails (e.g. lost
+            # challenge/response on the shared UDP socket) retry after 30 s
+            # instead of waiting a full interval, so the 2G leg cannot stay
+            # dead for extended periods.
+            if time.time() - last_reg > (REGISTER_REFRESH if reg_ok else 30):
                 reg_ok = True
                 for msisdn in sorted(MSISDN_2G):
                     if not self.sip.register(msisdn):
