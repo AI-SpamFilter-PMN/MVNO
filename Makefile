@@ -91,13 +91,45 @@ init-db:
 			ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
+	@# osmo-hlr 1.9.3 (--db-upgrade) reads PRAGMA user_version (NOT a meta table)
+	@# and expects the FULL v7 schema: subscriber with msc_number (hlr_number was
+	@# renamed in v3), NOT NULL DEFAULT nam_cs/nam_ps/ms_purged_*, plus
+	@# subscriber_apn / subscriber_multi_msisdn / auc_2g / auc_3g / ind and
+	@# user_version=7. A minimal (id,imsi,msisdn) table reads as user_version 0
+	@# and the v1->v7 upgrade path fails ("no such column: imeisv", then "NOT
+	@# NULL constraint failed: subscriber_backup.nam_cs"), crash-looping the
+	@# container on true cold start (found by the 2026-08-08 cold-state
+	@# verification). Rebuild the schema only when hlr is not running
+	@# (WAL-shared with the live process otherwise).
+	@if ! podman ps --format '{{.Names}}' 2>/dev/null | grep -q '^mvno-osmo-hlr$$'; then \
+		sqlite3 state/hlr/hlr.db "DROP TABLE IF EXISTS subscriber_backup; DROP TABLE IF EXISTS meta;"; \
+		if ! sqlite3 state/hlr/hlr.db "SELECT 1 FROM pragma_table_info('subscriber') WHERE name='msc_number';" 2>/dev/null | grep -q 1; then \
+			sqlite3 state/hlr/hlr.db "DROP TABLE IF EXISTS subscriber; DROP TABLE IF EXISTS subscriber_apn; DROP TABLE IF EXISTS subscriber_multi_msisdn; DROP TABLE IF EXISTS auc_2g; DROP TABLE IF EXISTS auc_3g; DROP TABLE IF EXISTS ind;"; \
+		fi; \
+	fi
 	@sqlite3 state/hlr/hlr.db \
-		"CREATE TABLE IF NOT EXISTS subscriber (id INTEGER PRIMARY KEY AUTOINCREMENT, imsi VARCHAR(15) UNIQUE, msisdn VARCHAR(15));" \
+		"CREATE TABLE IF NOT EXISTS subscriber ( \
+			id INTEGER PRIMARY KEY, imsi VARCHAR(15) UNIQUE NOT NULL, msisdn VARCHAR(15) UNIQUE, \
+			imeisv VARCHAR, imei VARCHAR(14), vlr_number VARCHAR(15), msc_number VARCHAR(15), \
+			sgsn_number VARCHAR(15), sgsn_address VARCHAR, ggsn_number VARCHAR(15), \
+			gmlc_number VARCHAR(15), smsc_number VARCHAR(15), periodic_lu_tmr INTEGER, \
+			periodic_rau_tau_tmr INTEGER, nam_cs BOOLEAN NOT NULL DEFAULT 1, \
+			nam_ps BOOLEAN NOT NULL DEFAULT 1, lmsi INTEGER, \
+			ms_purged_cs BOOLEAN NOT NULL DEFAULT 0, ms_purged_ps BOOLEAN NOT NULL DEFAULT 0, \
+			last_lu_seen TIMESTAMP default NULL, last_lu_seen_ps TIMESTAMP default NULL, \
+			vlr_via_proxy VARCHAR, sgsn_via_proxy VARCHAR);" \
+		"CREATE TABLE IF NOT EXISTS subscriber_apn (subscriber_id INTEGER, apn VARCHAR(256) NOT NULL);" \
+		"CREATE TABLE IF NOT EXISTS subscriber_multi_msisdn (subscriber_id INTEGER, msisdn VARCHAR(15) NOT NULL);" \
+		"CREATE TABLE IF NOT EXISTS auc_2g (subscriber_id INTEGER PRIMARY KEY, algo_id_2g INTEGER NOT NULL, ki VARCHAR(32) NOT NULL);" \
+		"CREATE TABLE IF NOT EXISTS auc_3g (subscriber_id INTEGER PRIMARY KEY, algo_id_3g INTEGER NOT NULL, k VARCHAR(64) NOT NULL, op VARCHAR(64), opc VARCHAR(64), sqn INTEGER NOT NULL DEFAULT 0, ind_bitlen INTEGER NOT NULL DEFAULT 5);" \
+		"CREATE TABLE IF NOT EXISTS ind (ind INTEGER PRIMARY KEY, vlr TEXT NOT NULL, UNIQUE (vlr));" \
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_subscr_imsi ON subscriber (imsi);" \
 		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (1, '001010000000001', '15551234567');" \
 		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (2, '001010000000002', '15557654321');" \
 		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (3, '001010000000003', '15559998888');" \
 		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (4, '001010000000004', '15554443322');" \
 		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (5, '001010000000005', '15557778888');" \
+		"PRAGMA user_version = 7;" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
 

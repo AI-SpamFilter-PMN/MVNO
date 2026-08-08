@@ -1,5 +1,5 @@
 ================================================================
-COCKPIT PROOF — demo_live.sh run-evidence (2026-08-08 20:56:40)
+COCKPIT PROOF — demo_live.sh run-evidence (2026-08-08 23:26:49)
   mode: deterministic (tone caller)
 ================================================================
   pre-cleaned stale cockpit evidence (deterministic mode)
@@ -14,13 +14,13 @@ COCKPIT PROOF — demo_live.sh run-evidence (2026-08-08 20:56:40)
   ✓ P4 Vosk verdict watch
   ✓ P5 metrics watch
   ~ P6 receipts marker not visible yet
-  ~ P7 evidence marker not visible yet
-  ✓ pane markers: 6/8 core matched
+  ✓ P7 evidence watch
+  ✓ pane markers: 7/8 core matched
 [4/5] waiting for mid-call evidence (≤180s, REALTIME_AUDIO budget)…
-  ✓ live-*.wav chunk: live-9657ca897ea6b849-3373959922e93b57-10.89.0.60-0.wav
-  ✓ archived transcript: mic_probe_1786211801.txt
-  ✓ fresh pcap: 9657ca897ea6b849-3373959922e93b57.pcap
-  ✓ tshark decoded 661 RTP frames (30000 range)
+  ✓ live-*.wav chunk: live-96a187e53458d53a-54bd7a6367d6a706-10.89.0.60-0.wav
+  ✓ archived transcript: mic_probe_1786220810.txt
+  ✓ fresh pcap: 96a187e53458d53a-54bd7a6367d6a706.pcap
+  ✓ tshark decoded 509 RTP frames (30000 range)
 [5/5] teardown…
   ✓ session torn down
   ✓ baresip rigs removed

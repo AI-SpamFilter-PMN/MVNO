@@ -1,7 +1,7 @@
-[2026-08-08 20:57:58] self-test: injecting bridge outage (podman stop mvno-ip-sm-gw)
-[2026-08-08 20:58:10] self-test: outage confirmed (container stopped) — running one recovery
-[2026-08-08 20:58:11] bridge /health degraded (2G AoR registrations dead) -> podman restart mvno-ip-sm-gw (round 1/2)
+[2026-08-08 23:27:56] self-test: injecting bridge outage (podman stop mvno-ip-sm-gw)
+[2026-08-08 23:28:09] self-test: outage confirmed (container stopped) — running one recovery
+[2026-08-08 23:28:09] bridge /health degraded (2G AoR registrations dead) -> podman restart mvno-ip-sm-gw (round 1/2)
 mvno-ip-sm-gw
-[2026-08-08 20:58:11] bridge /health OK after restart (round 1, t=0s)
-[2026-08-08 20:58:11] self-test PASS: bridge outage recovered (restart -> /health 200)
-[2026-08-08 20:58:11] self-test: live watchdog resumed
+[2026-08-08 23:28:10] bridge /health OK after restart (round 1, t=0s)
+[2026-08-08 23:28:10] self-test PASS: bridge outage recovered (restart -> /health 200)
+[2026-08-08 23:28:10] self-test: live watchdog resumed
