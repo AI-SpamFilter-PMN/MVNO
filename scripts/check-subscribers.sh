@@ -30,11 +30,17 @@ PASS=0; FAIL=0
 ok()   { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 
-# Canonical set (from common.sh) + the sanctioned throwaway.
-CANON="$(printf '%s\n' "${MVNO_MSISDN_ALL[@]}" "${MVNO_THROWAWAY}")"
+# Canonical set (from common.sh) + the sanctioned throwaway + the SMSC
+# short-code (which is NOT a subscriber but appears in scripts as the guard
+# against provisioning it — e.g. subscriber_proof's re-roll check).
+# TRADEOFF: admitting the shortcode into CANON means a future accidental use
+# of 15550000000 as a subscriber literal in scripts/ will NOT be flagged.
+# That is intentional — the guard's job is subscriber drift, and the shortcode
+# is a legal, non-subscriber literal; flagging it would be a false positive.
+CANON="$(printf '%s\n' "${MVNO_MSISDN_ALL[@]}" "${MVNO_THROWAWAY}" "${MVNO_SMSC_SHORTCODE}")"
 
 echo "==== SUBSCRIBER TOPOLOGY DRIFT GUARD (single source: scripts/lib/common.sh) ===="
-echo "  canonical MSISDNs: ${MVNO_MSISDN_ALL[*]}  (throwaway: ${MVNO_THROWAWAY})"
+echo "  canonical MSISDNs: ${MVNO_MSISDN_ALL[*]}  (throwaway: ${MVNO_THROWAWAY}, smsc: ${MVNO_SMSC_SHORTCODE})"
 
 # --- [1] stray literals ------------------------------------------------------
 STRAY="$(grep -rhoE '1555[0-9]{7}' scripts/ Makefile 2>/dev/null | sort -u \

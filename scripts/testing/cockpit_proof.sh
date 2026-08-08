@@ -76,12 +76,25 @@ main() {
         echo "  pre-existing ${SESSION} found — tearing down first"
         bash scripts/demo/demo_live.sh --down >/dev/null 2>&1 || true
     fi
-    # Registry proof-lock: the watchdog's run_in_flight skips recovery while a
-    # proof holds it (the proof's own tmux session + pgrep already cover most of
-    # the window; the lock makes it explicit and covers the subscriber-proof
-    # phase too). Re-register the cleanup trap — acquire registered its own.
+    # Registry proof-lock FIRST (so no concurrent producer can be mid-write
+    # when the pre-clean runs below). The watchdog's run_in_flight skips
+    # recovery while a proof holds it. Re-register the cleanup trap — acquire
+    # registered its own.
     acquire_run_lock mvno-cockpit.lock || { echo "FATAL: another run is in flight"; return 1; }
     trap cleanup EXIT
+    # Risk-1 fix (stale-evidence false-PASS): in deterministic mode we own the
+    # spool, so delete the artifacts THIS cockpit produces (live chunks, their
+    # archived transcripts, pcaps) left by a previous untorn-down demo — then
+    # anything NEWER than MARK can only have been produced by THIS proof.
+    # Scope is deliberately tight: only the cockpit's own stems are removed.
+    # mic_call_* (prior --live-mic recordings) and non-live archived evidence
+    # are PRESERVED (the -newer "$MARK" check guards this mode regardless:
+    # MARK is touched after teardown, so pre-proof files never match).
+    if [ "${MODE}" != "--live-mic" ]; then
+        rm -f state/spool/live-*.wav state/spool/archived/live-*.txt \
+              state/spool/pcaps/*.pcap
+        echo "  pre-cleaned stale cockpit evidence (deterministic mode)"
+    fi
     touch "$MARK"   # freshness baseline: only evidence NEWER than this counts
 
     # --- Launch the cockpit (non-interactive: no tty -> no attach) ---

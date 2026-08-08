@@ -108,7 +108,12 @@ MVNO_MSISDN_5G=(15551234567 15557654321 15559998888)
 MVNO_BARESIP_AORS=(15559998888 15553332211)       # cockpit rig AoRs
 MVNO_EIR_SIMS=(15551234567 15559998888 15554443322 15553332211)  # live_demo [7/13]
 MVNO_MSISDN_ALL=(15551234567 15557654321 15559998888 15554443322 15557778888 15553332211)
-MVNO_THROWAWAY="15551234999"         # sanctioned throwaway (subscriber_proof only)
+MVNO_SMSC_SHORTCODE="15550000000"    # SMSC short-code (2G MS sms-service-center) —
+                                      # NOT a subscriber; must never be provisioned
+MVNO_THROWAWAY="15551234999"         # DOCUMENTED EXEMPLAR only — subscriber_proof.sh
+                                      # derives a TIME-UNIQUE variant (1555000+epoch)
+                                      # so runs/archives can never collide on one
+                                      # number; this literal is what docs/README show
 
 # ==============================================================================
 # UNIFIED RUN-LOCK REGISTRY — settle the orchestrators so they can never fight

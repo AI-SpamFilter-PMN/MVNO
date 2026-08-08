@@ -1,8 +1,9 @@
 ================================================================
-SUBSCRIBER PROOF — add-subscriber.sh run-evidence (2026-08-08 20:06:48)
+SUBSCRIBER PROOF — add-subscriber.sh run-evidence (2026-08-08 20:26:37)
 ================================================================
-[1/4] provisioning 15551234999 via add-subscriber.sh…
-  ✓ provisioned 15551234999
+  ✓ post-purge: throwaway absent from all stores
+[1/4] provisioning 15550009997 via add-subscriber.sh…
+  ✓ provisioned 15550009997
     IMSI: 001010000000006
 [2/4] asserting all 5 stores…
   ✓ Kamailio sqlite auth_db (SIP digest)
@@ -10,8 +11,8 @@ SUBSCRIBER PROOF — add-subscriber.sh run-evidence (2026-08-08 20:06:48)
   ✓ Open5GS Mongo (5G SA doc)
   ✓ Kamailio Mongo (parallel store)
   ✓ OsmoHLR VTY (2G/3G store)
-[3/4] asserting real SIP REGISTER 200 OK for 15551234999…
+[3/4] asserting real SIP REGISTER 200 OK for 15550009997…
   ✓ SIP REGISTER 200 OK (auth_db testpass path)
-[4/4] cleanup of throwaway 15551234999…
+[4/4] cleanup of throwaway 15550009997…
   ✓ throwaway row removed from all stores (evidence log retained)
 ✅ SUBSCRIBER PROOF PASS — evidence: docs/evidence/demo-subscriber-2026-08-08.log
