@@ -223,6 +223,29 @@ try_log "vosk-model" "
     unzip -o -q '$VENDOR_DIR/vosk/vosk-model-small-en-us-0.15.zip' -d '$VENDOR_DIR/vosk/'
 "
 
+# ─── Step 3b: Download VictoriaLogs Grafana datasource plugin ──
+# Official victoriametrics-logs-datasource (v0.31.0), extracted into
+# vendor/grafana-plugins/ and mounted read-only into the grafana container
+# (docker-compose.yml). GF_INSTALL_PLUGINS is NOT used — it needs grafana.com
+# at boot, which breaks offline-first. Keep version in sync with compose
+# expectation (grafana service volume mount).
+VICTORIALOGS_DATASOURCE_VERSION="0.31.0"
+# Skip-if-present: offline-first — a re-run on an air-gapped host must not
+# waste time (or fail) fetching from GitHub when the plugin is already vendored.
+PLUGIN_DIR='$VENDOR_DIR/grafana-plugins/victoriametrics-logs-datasource'
+if [ -f "$PLUGIN_DIR/plugin.json" ]; then
+    echo "  ✓ grafana-vl-datasource already vendored ($PLUGIN_DIR)"
+else
+    try_log "grafana-vl-datasource" "
+        mkdir -p '$VENDOR_DIR/grafana-plugins' &&
+        wget -q --show-progress -O '$VENDOR_DIR/grafana-plugins/victoriametrics-logs-datasource-v${VICTORIALOGS_DATASOURCE_VERSION}.zip' 'https://github.com/VictoriaMetrics/victorialogs-datasource/releases/download/v${VICTORIALOGS_DATASOURCE_VERSION}/victoriametrics-logs-datasource-v${VICTORIALOGS_DATASOURCE_VERSION}.zip' &&
+        cd '$VENDOR_DIR/grafana-plugins' &&
+        unzip -o -q 'victoriametrics-logs-datasource-v${VICTORIALOGS_DATASOURCE_VERSION}.zip' &&
+        rm 'victoriametrics-logs-datasource-v${VICTORIALOGS_DATASOURCE_VERSION}.zip' &&
+        cd '$PROJECT_DIR'
+    "
+fi
+
 # ─── Step 4: Download UERANSIM source ───────────────────
 try_log "ueransim-source" "wget -q --show-progress -O '$VENDOR_DIR/ueransim/UERANSIM-${UERANSIM_VERSION}.tar.gz' 'https://github.com/aligungr/UERANSIM/archive/refs/tags/v${UERANSIM_VERSION}.tar.gz'"
 

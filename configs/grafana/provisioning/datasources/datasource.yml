@@ -8,3 +8,21 @@ datasources:
     url: http://victoria-metrics:8428
     isDefault: true
     editable: true
+
+  # VictoriaLogs log database (ROADMAP item 3)
+  # Uses the official victoriametrics-logs-datasource plugin (v0.31.0), vendored
+  # offline into ./vendor/grafana-plugins and mounted read-only into the grafana
+  # container at /var/lib/grafana/plugins (docker-compose.yml). GF_INSTALL_PLUGINS
+  # is NOT used: it needs grafana.com network at boot, which breaks offline-first.
+  # NOTE: VictoriaLogs v1.52.0 does NOT implement the Loki query API — a Grafana
+  # datasource of type "loki" pointed at victorialogs:9428 can never work
+  # ("unsupported path requested"). The plugin speaks LogsQL (/select/logsql/*).
+  - name: VictoriaLogs
+    uid: victorialogs
+    type: victoriametrics-logs-datasource
+    access: proxy
+    url: http://victorialogs:9428
+    isDefault: false
+    editable: true
+    jsonData:
+      maxLines: 1000

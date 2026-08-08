@@ -722,6 +722,10 @@ services:
     volumes:
       - ./configs/grafana/provisioning:/etc/grafana/provisioning:z
       - ./state/grafana:/var/lib/grafana:U
+      # Official VictoriaLogs datasource plugin (v0.31.0), vendored offline by
+      # bootstrap.sh into vendor/grafana-plugins — GF_INSTALL_PLUGINS would need
+      # grafana.com network at boot and is intentionally NOT used.
+      - ./vendor/grafana-plugins/victoriametrics-logs-datasource:/var/lib/grafana/plugins/victoriametrics-logs-datasource:ro,z
     depends_on:
       victoria-metrics:
         condition: service_started
