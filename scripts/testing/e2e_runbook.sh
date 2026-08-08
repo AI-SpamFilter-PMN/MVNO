@@ -29,12 +29,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
-# Evidence layer: durable e2e run log (Aug-6 convention) — tee the whole run.
+# Evidence layer: clean-slate e2e run log (Aug-8 convention) — the file is
+# truncated at run start and stamped with RUN:<ts>, so a green file contains
+# exactly ONE clean pass and a red file exactly ONE honest failure. Re-runs
+# never curate a mix of old failures and new passes into the same file.
 EVIDENCE_DIR="${REPO_ROOT}/docs/evidence"
 mkdir -p "${EVIDENCE_DIR}"
 RUN_LOG="${EVIDENCE_DIR}/e2e-run-$(date +%F).log"
+: > "${RUN_LOG}"
 exec > >(tee -a "${RUN_LOG}") 2>&1
-echo "==== e2e runbook log: ${RUN_LOG} ===="
+echo "RUN:$(date +%Y-%m-%dT%H:%M:%S%z) — clean-slate evidence (previous contents discarded)"
 
 CYAN='\033[0;36m'; GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 PASS=0; FAIL=0
@@ -113,7 +117,7 @@ python3 "${SCRIPT_DIR}/send_smpp_sms.py" --sender 15557778888 --recipient 155544
 sleep 8
 a_25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; a_25="${a_25:-0}"
 a_52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; a_52="${a_52:-0}"
-RECEIPTS="$(podman exec mvno-2g-ms grep -cF "${BODY1}" /root/.osmocom/bb/sms.txt 2>/dev/null || true)"
+RECEIPTS="$(podman exec mvno-2g-ms grep -cF "${BODY1}" /root/.osmocom/bb/sms.txt 2>/dev/null || true)"; RECEIPTS="${RECEIPTS:-0}"
 if [ "$a_25" = "$b_25" ] && [ "$a_52" = "$b_52" ]; then
   ok "delivered via 2G SMSC; bridge counters unchanged (2g5g=$a_25,5g2g=$a_52)"
 else
@@ -136,7 +140,7 @@ sleep 4
 python3 "${SCRIPT_DIR}/inject_smsc_row.py" 15554443322 15551234567 "${BODY2}" >/dev/null
 sleep 10
 a_25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; a_25="${a_25:-0}"
-RX2="$(podman logs ims_rx54 2>&1 | grep -cF "${BODY2}" || true)"
+RX2="$(podman logs ims_rx54 2>&1 | grep -cF "${BODY2}" || true)"; RX2="${RX2:-0}"
 if [ "$((a_25 - b_25))" -ge 1 ] && [ "${RX2}" -ge 1 ]; then
   ok "delivered 2G->5G via bridge+Kamailio (2g5g +$((a_25 - b_25))); terminal got '${BODY2}'"
 else
@@ -153,7 +157,7 @@ BODY3="E2E 5G2G ${TS}"
 start_send ims_tx55 15551234567 15554443322 "${BODY3}" 10.89.0.55
 sleep 12
 a_52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; a_52="${a_52:-0}"
-MS1_HITS="$(podman exec mvno-2g-ms grep -cF "${BODY3}" /root/.osmocom/bb/sms.txt 2>/dev/null || true)"
+MS1_HITS="$(podman exec mvno-2g-ms grep -cF "${BODY3}" /root/.osmocom/bb/sms.txt 2>/dev/null || true)"; MS1_HITS="${MS1_HITS:-0}"
 if [ "$((a_52 - b_52))" -ge 1 ] && [ "${MS1_HITS}" -ge 1 ]; then
   ok "delivered 5G->2G via bridge+SMPP (5g2g +$((a_52 - b_52))); MS1 sms.txt has '${BODY3}'"
 else
@@ -173,7 +177,7 @@ start_send ims_tx55 15551234567 15557654321 "${BODY4}" 10.89.0.55
 sleep 8
 a_25="$(bridge_counter mvno_bridge_sms_2g_to_5g_total || true)"; a_25="${a_25:-0}"
 a_52="$(bridge_counter mvno_bridge_sms_5g_to_2g_total || true)"; a_52="${a_52:-0}"
-RX4="$(podman logs ims_rx56 2>&1 | grep -cF "${BODY4}" || true)"
+RX4="$(podman logs ims_rx56 2>&1 | grep -cF "${BODY4}" || true)"; RX4="${RX4:-0}"
 if [ "${RX4}" -ge 1 ] && [ "$a_25" = "$b_25" ] && [ "$a_52" = "$b_52" ]; then
   ok "relayed 5G->5G via Kamailio; terminal got '${BODY4}'; bridge untouched (2g5g=$a_25,5g2g=$a_52)"
 else
@@ -189,9 +193,9 @@ BODY5="E2E-BLOCK 5G5G ${TS}"
 start_send ims_tx55 15551234567 15557654321 "${BODY5}" 10.89.0.55
 sleep 8
 A_BLK="$(api_counter mvno_sms_blocked_total)"; A_BLK="${A_BLK:-0}"
-SEND403="$(podman logs ims_tx55 2>&1 | grep -c '403' || true)"
-RX_NO="$(podman logs ims_rx56 2>&1 | grep -cF "${BODY5}" || true)"
-K_BLOCK="$(podman logs mvno-kamailio --since 2m 2>&1 | grep -c 'SMS BLOCKED BY MVNO INTERCEPTION CORE' || true)"
+SEND403="$(podman logs ims_tx55 2>&1 | grep -c '403' || true)"; SEND403="${SEND403:-0}"
+RX_NO="$(podman logs ims_rx56 2>&1 | grep -cF "${BODY5}" || true)"; RX_NO="${RX_NO:-0}"
+K_BLOCK="$(podman logs mvno-kamailio --since 2m 2>&1 | grep -c 'SMS BLOCKED BY MVNO INTERCEPTION CORE' || true)"; K_BLOCK="${K_BLOCK:-0}"
 if [ "$A_BLK" -gt "$B_BLK" ] && [ "${SEND403}" -ge 1 ] && [ "${RX_NO}" -eq 0 ] && [ "${K_BLOCK}" -ge 1 ]; then
   ok "blocked by AI core (blocked $B_BLK->$A_BLK, sender saw 403, receiver untouched, kamailio logged block)"
 else
