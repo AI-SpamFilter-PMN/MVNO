@@ -256,6 +256,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   No core/upf restart is needed; sessions created outside the SBI error window are healthy.
 * **Verification**: after the UE restart, `iptables -L OUTPUT -nv | grep 2152` on `mvno-upf` moves from `0` to `>0` packets, `ogstun` TX increments, and the full 5b dialog (UAS REGISTER 200 OK → INVITE 407→100→180→200 OK → RTP) completes over the 5G user plane.
 * **Runbook robustness fix (2026-08-08)**: `demo_runbook.sh` [5b] previously hardcoded ue-1's UE IP (`--bind-ip 10.45.0.8`), which went stale as UE IPs are re-allocated from the SMF pool on every attach. The runbook now reads ue-1's current `uesimtun0` IPv4 at runtime and fails fast with a clear message if the 5G session is down.
+* **Measurement-rule amendment (2026-08-08 cold-start regression)**: the `OUTPUT dport 2152` counter used by `preflight_5g.sh` / the [5b] probe was a **manual debug insertion**, never part of the deployment — a cold start (UPF container recreate) wipes it, so the preflight read an empty chain and FAILed (`0->0`) even with a healthy user plane. Both documented fixes (ue-1 restart, full trio recreate) were ineffective because the data plane was fine all along. Fix: `preflight_5g.sh` now inserts the counting rule idempotently (`iptables -C ... || iptables -I OUTPUT 1 -p udp --dport 2152 -j ACCEPT`, policy ACCEPT, pure measurement) before baselining. Verified: rule removed → preflight self-inserts → REGISTER 200 OK + `OUTPUT 2152 0->2 pkts` → PASS.
 
 ---
 

@@ -42,7 +42,12 @@ say "ue-1 live 5G IP: $UE_IP"
 # --- 3. Route the Kamailio edge through the 5G user plane --------------------
 podman exec mvno-ueransim-ue-1 sh -c 'ip route replace 10.89.0.23/32 dev uesimtun0 2>/dev/null' || true
 
-# --- 4. Baseline GTP-U downlink counter (iptables OUTPUT dport 2152) ---------
+# --- 4. Ensure the GTP-U DL counting rule exists, then baseline --------------
+# The OUTPUT dport 2152 rule is a pure measurement counter (policy ACCEPT);
+# it is NOT part of the Open5GS deployment, so a cold start (container
+# recreate) wipes it. Insert idempotently or dl_count reads an empty chain
+# and the delta assertion fails even when the user plane is healthy.
+podman exec mvno-upf sh -c 'iptables -C OUTPUT -p udp --dport 2152 -j ACCEPT 2>/dev/null || iptables -I OUTPUT 1 -p udp --dport 2152 -j ACCEPT'
 dl_count() {
     podman exec mvno-upf sh -c 'iptables -L OUTPUT -nv 2>/dev/null | awk "/dpt:2152/{print \$1; exit}"' 2>/dev/null | tr -d '[:space:]'
 }
