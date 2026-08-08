@@ -335,6 +335,11 @@ echo -e "${YELLOW}[5b/13] 📡 Simulating SIP over the 5G SA User Plane (UE tun 
 # fail fast with the actionable fix instead of a silent stale-IP/buffered-DL.
 bash "${SCRIPT_DIR}/preflight_5g.sh" || {
     echo "[-] Error: 5G user-plane preflight failed (see [preflight-5g] above)" >&2; exit 1; }
+# Bridge 2G-AoR assert (Issue 8.38 class): the 5G->2G SMS relay (S6 cell C)
+# depends on the bridge's registrations (15554443322/15557778888) being live in
+# usrloc. Fail fast with the fix message instead of a confusing 404 mid-demo.
+bash "${SCRIPT_DIR}/../mvno-stack-watchdog.sh" --check-bridge || {
+    echo "[-] Error: bridge 2G AoRs not registered in usrloc — restart mvno-ip-sm-gw (re-REGISTERs at boot) or run scripts/mvno-stack-watchdog.sh --once" >&2; exit 1; }
 # UE 5G IPs are dynamic (allocated from the SMF pool on each attach), so read
 # ue-1's current uesimtun0 address instead of hardcoding a stale value.
 UE_IP=$(podman exec mvno-ueransim-ue-1 sh -c 'ip -4 addr show uesimtun0 2>/dev/null | awk "/inet /{print \$2}" | cut -d/ -f1' | tr -d '[:space:]')

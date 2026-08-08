@@ -612,6 +612,40 @@ snippet for an optional real attach (`podman compose up -d ueransim-ue-<N>`).
 > REGISTER is impossible without K/OP/AMF on **both** the core and the UE;
 > 2G/3G authentication is IMSI-based, so a 2G user needs only IMSI+MSISDN.
 
+## S13 — Stack Watchdog & Functional Health · continuous
+
+**PURPOSE** — close the "silent-but-Up" holes that `restart: unless-stopped`
+cannot catch (it only fires on process exit): a UE whose PDU session dropped
+or a bridge whose 5G→2G registrations died can stay "Up" while the function
+is dead. The watchdog detects those continuously and recovers automatically.
+
+```bash
+make watchdog-install   # systemd --user service, 30s cadence (24/7)
+make watchdog-once      # one check (+recovery if needed); exit 0 healthy
+make watchdog-log       # state/logs/watchdog.log
+make watchdog-uninstall
+```
+
+**What it watches** (all live, no restart needed):
+
+| Signal | Healthy iff | Failure recovery |
+|---|---|---|
+| UE fleet | `ran_ue == 3` (AMF gauge) **and** every UE has a live `uesimtun0` | `preflight_5g.sh --auto-recover` (bounded ladder: ue-1 restart → atomic trio) |
+| Bridge 5G→2G leg | `15554443322` + `15557778888` present in Kamailio `usrloc` | `podman restart mvno-ip-sm-gw` (re-REGISTERs both AoRs at boot) |
+
+**Never fights a run** — recovery is skipped while `live_demo.sh`,
+`sms_matrix.sh`, `gate.sh`, or the `mvno-live` cockpit is in flight (lock
+files + tmux session + pgrep), and the **gate oracle is untouched** (recovery
+is the opt-in `--auto-recover` ladder; `make gate` still strict).
+
+**Compose healthchecks** (visibility; the watchdog is the recovery actor):
+`mvno-ip-sm-gw` probes its `/health` endpoint (live registration state —
+HTTP 200 ok / 503 degraded), and `ueransim-ue-1/2/3` probe `uesimtun0`
+presence. `podman ps` shows `(healthy)`/`(unhealthy)` accordingly.
+
+> **24/7 across logout**: `loginctl enable-linger $(USER)` lets the systemd
+> --user unit keep running without a login session.
+
 ---
 
 ## Partner-Repo Integration (read-only references)

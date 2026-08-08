@@ -104,6 +104,15 @@ say "running preflight_5g.sh --auto-recover (5.8/5.9/7.x UE-drop ladder)..."
 bash scripts/testing/preflight_5g.sh --auto-recover \
     || die "5G user plane not UP after auto-recovery — fix before the call"
 
+# Bridge 2G-AoR assert (Issue 8.38 class): the 5G->2G SMS relay depends on the
+# bridge's registrations (15554443322/15557778888) being live in usrloc. Fail
+# fast with the fix message instead of a confusing 404 mid-demo. Single source
+# of truth for the AoR list lives in scripts/mvno-stack-watchdog.sh --check-bridge.
+say "asserting bridge 2G-AoR registrations (5G->2G relay path)..."
+bash scripts/mvno-stack-watchdog.sh --check-bridge \
+    || die "bridge 2G AoRs not registered in usrloc — restart mvno-ip-sm-gw (it re-REGISTERs at boot) or run: bash scripts/mvno-stack-watchdog.sh --once"
+say "✓ bridge 2G AoRs registered — 5G->2G relay path live"
+
 # Clean slate (Issue 8.37): stale registrations mask flows.
 podman rm -f baresip-rx baresip-tx 2>/dev/null || true
 for u in "${AORS[@]}"; do
