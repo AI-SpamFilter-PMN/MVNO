@@ -35,8 +35,16 @@ podman ps --format '{{.Names}}' | grep -qx mvno-ueransim-ue-1 || fail "mvno-uera
 podman ps --format '{{.Names}}' | grep -qx mvno-upf          || fail "mvno-upf not running"
 
 # --- 2. Live UE IP (dynamic across re-attaches — never hardcode) ------------
-UE_IP=$(podman exec mvno-ueransim-ue-1 sh -c 'ip -4 addr show uesimtun0 2>/dev/null | awk "/inet /{print \$2}" | cut -d/ -f1' | tr -d '[:space:]')
-[ -n "$UE_IP" ] || fail "cannot read ue-1 uesimtun0 IPv4 (5G session down — podman restart mvno-ueransim-ue-1)"
+# Poll: after a cold start the UE attach + PDU session establish is async
+# (~10-40 s; Issue 7.3 can add a spurious-second-establishment retry cycle),
+# so fail only after a bounded wait instead of racing the gate.
+UE_IP=""
+for _try in $(seq 1 24); do
+    UE_IP=$(podman exec mvno-ueransim-ue-1 sh -c 'ip -4 addr show uesimtun0 2>/dev/null | awk "/inet /{print \$2}" | cut -d/ -f1' | tr -d '[:space:]')
+    [ -n "$UE_IP" ] && break
+    sleep 5
+done
+[ -n "$UE_IP" ] || fail "cannot read ue-1 uesimtun0 IPv4 after 120s (5G session down — podman restart mvno-ueransim-ue-1)"
 say "ue-1 live 5G IP: $UE_IP"
 
 # --- 3. Route the Kamailio edge through the 5G user plane --------------------
