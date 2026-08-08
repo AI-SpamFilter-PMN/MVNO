@@ -24,6 +24,12 @@ CALLEE=15559998888
 SIP_HOST=10.89.0.23
 IMAGE="${BARESIP_IMAGE:-mvno-baresip:1.0.0}"
 NET=("--network" "mvno_mvno_net")
+# Realistic scam phrase, Vosk-small-model vetted (2026-08-08: transcribes as
+# "your bank account has been blocked please confirm your detail now" — the
+# keyword anchors account/blocked/confirm survive ASR, so the ai-filter
+# TRANSCRIPT rule blocks deterministically). Override for a custom demo:
+#   SCAM_PHRASE="Your card was charged, call us now" bash demo_call.sh setup
+SCAM_PHRASE="${SCAM_PHRASE:-Your bank account has been blocked, please confirm your details now}"
 
 # Portable host PulseAudio socket (XDG runtime dir; fall back to uid-based path).
 PULSE_OK=0
@@ -39,10 +45,11 @@ module_path() {
 
 setup() {
   echo "=== demo_call.sh setup: speech file + baresip rig ==="
-  espeak-ng -v en-us "You have won a prize, call us now or your account will be closed" -w /tmp/speech.wav
+  espeak-ng -v en-us "$SCAM_PHRASE" -w /tmp/speech.wav
   mkdir -p state/baresip/rx state/baresip/tx
   ffmpeg -y -loglevel error -i /tmp/speech.wav -ar 8000 -ac 1 -c:a pcm_s16le \
     state/baresip/speech8k.wav
+  echo "  callee phrase: ${SCAM_PHRASE}"
 
   cat > state/baresip/rx/config <<EOF
 $(module_path)
@@ -121,7 +128,7 @@ dial() {
   if [ "$PULSE_OK" -eq 1 ] && [ -t 0 ]; then
     echo "  ⏳ The caller leg is LIVE on your microphone. In ~3s SPEAK THE SCAM PHRASE"
     echo "     into the mic for ~12s — Vosk transcribes YOUR voice:"
-    echo "        \"You have won a prize, call us now or your account will be closed\""
+    echo "        \"${SCAM_PHRASE}\""
     sleep 3
     for s in 12 9 6 3; do
       printf "  >>> SPEAK NOW (%ss window) ...\r" "$s"

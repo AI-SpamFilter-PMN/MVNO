@@ -1,258 +1,396 @@
-# MVNO Telecom Core — LIVE DEMO (Presentation Script)
+# MVNO Core — LIVE DEMO (Presentation Script)
 
-> Abbreviations: **docs/GLOSSARY.md** — single source of truth
-**This is the demo.** Every block below was verified live (2026-08-06 audit +
-evidence-layer runs in `docs/evidence/demo-run-2026-08-07.log` /
-`e2e-run-2026-08-07.log`). One terminal (T-B) at the repo root does almost
-everything; T-A holds the 2G Mobile Station (MS) for receipts; optional extra terminals are
-listed per step. Paste each block **verbatim** and read the EXPECT line.
+> **Abbreviations**: `docs/GLOSSARY.md` is the single source of truth. Every
+> block below was **verified live against the running stack** (2026-08-08);
+> automated proof = `demo_runbook.sh` (13 items) + `e2e_runbook.sh` (8 cells)
+> — S10. One terminal (T-B) at the repo root does almost everything; T-A holds
+> the 2G Mobile Station (MS) for receipts. Paste each block **verbatim** and read
+> the EXPECT line.
 
-> **Fallback convention**: every step's FALLBACK points at a seeded fixture in
-> `docs/evidence/fixtures/` or a section of `docs/TESTING_REFERENCE.md` (the
-> renamed reference) — the demo stays non-empty even if a live component is
-> silent. If the **automated** proof is what you need, run `demo_runbook.sh`
-> (13 items) + `e2e_runbook.sh` (8 cells) — S10.
-
-Terminal map:
+**Terminal map** (open as many as useful — live evidence shows in them):
 
 | Terminal | Role | Steps |
 |---|---|---|
-| **T-A** | 2G MS (`podman exec -it mvno-2g-ms /bin/bash` + `mctest`) | S2, S6 |
+| **T-A** | 2G MS (`podman exec -it mvno-2g-ms /bin/bash` + `mctest`) | S3, S6 |
 | **T-B** | main — host shell at repo root | all others |
-| **T-C** | live view: `watch` on spool transcripts + verdicts | S4 |
-| **T-G** | playback: `aplay` the archived legs | S4 |
+| **T-C** | live view: `watch` transcripts + verdicts + container logs | S2, S5 |
+| **T-G** | playback: `aplay` the archived legs | S5 |
+| **T-M** | metrics: `watch` the PromQL counters | S7, S9 |
+
+> **Portable `find` newest-file idiom**: this host (and many dev shells) alias
+> `ls` to `eza`, which breaks `ls -t | head` (icons/ANSI, no GNU sort). Everywhere
+> the demo needs "the newest file" it uses
+> `scripts/testing/newest.sh 'glob'` (GNU `find -printf`, `\ls`-and-`eza`-safe).
+> No `ls` is invoked, so the same snippet works on Ubuntu/GNU too.
 
 ---
 
-## S1 — Stack & Health  ·  ~1 min
+## S1 — Bring-Up & Clean Slate  ·  ~2 min
 
-**PURPOSE** — prove the stack is up and the host has the demo toolchain.
+**PURPOSE** — start the stack from cold, configure the host toolchain, and reset
+state so every repeat run starts identical.
 
-**CLEAN SLATE (run before every demo re-run)** — prior runs leave baresip
-terminals running and live Session Initiation Protocol (SIP) registrations in Kamailio's usrloc (Issue 8.37)
-that mask the bounded-retry and 404 flows. Reset first:
+**BRING-UP** (T-B, once per session — mostly "already Up" on a live box):
+
+```bash
+make up                # builds images + `podman compose up -d` (idempotent)
+```
+If `make` isn't available, the compose path is:
+```bash
+podman compose up -d   # or `docker compose up -d`
+```
+
+**EXPECT** — `Started`/`Up` lines; `podman compose ps | grep -c Up` eventually
+returns **31** (the core stack; `baresip-rx`/`baresip-tx` are demo-only and are
+added by S4). Health can take ~30 s — poll:
+```bash
+until [ "$(podman compose ps 2>/dev/null | grep -c Up)" -ge 31 ]; do
+  sleep 3; printf '.'
+done; echo " UP"
+```
+
+**HOST TOOLCHAIN** — the demo needs these on the host (probe them):
+
+```bash
+cd /home/zkhattab/AI-SpamFilter-PMN/MVNO
+for t in sqlite3 curl espeak-ng ffmpeg nc tshark xxd md5sum aplay ffprobe jq; do
+  command -v $t >/dev/null || echo "MISSING: $t"
+done
+```
+**EXPECT** — no `MISSING` lines. `espeak-ng` only matters if you want to
+re-synthesize the scam script yourself; the canned fixture ships in the repo.
+
+**CLEAN SLATE** — prior runs leave baresip terminals running and live SIP
+registrations in Kamailio's usrloc (Issue 8.37) that mask the bounded-retry and
+404 flows. Reset first (idempotent — safe to run already-clean):
 
 ```bash
 podman rm -f baresip-rx baresip-tx 2>/dev/null
 for u in 15559998888 15557654321 15554443322 15557778888; do
-  python3 scripts/testing/sip_traffic_sim.py --callee $u --deregister
+  python3 scripts/testing/sip_traffic_sim.py --callee "$u" --deregister
 done
-sqlite3 state/kamailio/kamailio.db "DELETE FROM location WHERE expires < julianday('now');"
+sqlite3 state/kamailio/kamailio.db \
+  "DELETE FROM location WHERE expires < julianday('now');"
 ```
-
-**EXPECT** — `SIP DEREGISTER 200 OK` per user; `location` holds only the rigs
-you registered this session.
-
-**COMMANDS**
-
-```bash
-cd /home/zkhattab/AI-SpamFilter-PMN/MVNO
-for t in sqlite3 curl espeak-ng ffmpeg nc tshark xxd md5sum aplay ffprobe; do
-  command -v $t >/dev/null || echo "MISSING: $t"
-done
-podman compose ps | grep -c Up          # expect 31 (containers of the stack)
-curl -s http://localhost:8080/actuator/health | head -c 80
-```
-
-**EXPECT** — no `MISSING` lines; 31 `Up`; actuator health JSON contains `"UP"`.
-
-**MIC SELF-TEST (2 s)** — proves the full live-speech path (mic → 16 kHz WAV →
-`NativeVoskService` → transcript) before the scam-call demo depends on it:
-
-```bash
-bash scripts/testing/mic_record.sh 2
-sleep 4
-ls -la state/spool/archived/mic_call_*.txt | tail -1
-cat $(\ls -t state/spool/archived/mic_call_*.txt | head -1)
-```
-
-**EXPECT** — a non-empty transcript line (what you just spoke; English words are
-most reliable). If the Vosk offline speech engine is unavailable the demo still proceeds — transcripts
-are demo-grade, the AI verdicts come from the REST/Short Message Service (SMS) paths.
-
-**FALLBACK** — fixtures: `docs/evidence/fixtures/MANIFEST.md` (45/45 checksummed
-reference transcripts/verdicts, no mic required).
-
-**FALLBACK** — stack gates: `docs/TESTING_REFERENCE.md` §Prerequisites;
-`./scripts/preflight.sh` auto-verifies the host.
+**EXPECT** — `SIP DEREGISTER 200 OK` per user (or "not registered", fine);
+`location` holds only the rigs you register this session.
 
 ---
 
-## S2 — Attach the 2G MS (keep this terminal)  ·  ~1 min
+## S2 — Stack Health & 2G MS Attach  ·  ~1 min
 
-**PURPOSE** — the 2G receipt reader (MS1 / `15554443322`, IMSI
-`001010000000004`); every 2G-received SMS lands in
+**PURPOSE** — prove the whole interception core answers, then attach the 2G
+receipt terminal.
+
+**COMMANDS** (T-B) — actuator + the AI filter + a metrics heartbeat:
+
+```bash
+curl -s http://localhost:8080/actuator/health | head -c 120; echo
+podman logs --latest mvno-api 2>&1 | tail -2 || podman logs mvno-api 2>&1 | tail -2
+curl -s http://localhost:8008/ | head -c 20; echo " <- ai-filter alive"
+curl -s 'http://localhost:8428/api/v1/query?query=up' | jq -r '.data.result[0].value[1]'
+```
+**EXPECT** — actuator JSON contains `"UP"`; `ai-filter` returns `OK`; the
+`up` metric returns `1`.
+
+> **T-M optional live view** (second terminal): watch interception counters tick
+> as the demo runs —
+> ```bash
+> watch -n2 'curl -s "http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total" | jq -r .data.result[0].value[1]'
+> ```
+
+**ATTACH THE 2G MS** (T-A — keep this terminal): the receipt reader
+(MS1 / `15554443322`, IMSI `001010000000004`); every 2G-received SMS lands in
 `/root/.osmocom/bb/sms.txt`.
-
-**COMMANDS** (T-A)
 
 ```bash
 podman exec -it mvno-2g-ms /bin/bash
 cd /tmp && ./mctest -l /tmp/osmocom_l2 -P mm    # bring up MM layer toward MSC
 ```
+**EXPECT** — `mctest` shows MM-layer bring-up toward the MSC (idle `MM`/`CM`
+attach). Leave this terminal attached for the whole demo (S6a/6c receipts). Steps
+S4+ run on **T-B**.
 
-**EXPECT** — `mctest` shows MM-layer bring-up toward the MSC; leave this
-terminal attached for the whole demo (S6a/6c receipts). Drop back with `exit`
-after S2 — Steps S3+ run on the **host** (T-B).
-
-**FALLBACK** — 2G path details: `docs/TESTING_REFERENCE.md` Flow A.
+**FALLBACK** — stack gates: `./scripts/preflight.sh` auto-verifies the host;
+2G details: `docs/TESTING_REFERENCE.md` §Prerequisites & Flow A.
 
 ---
 
-## S3 — Real Call + Speak the Scam Script + RTPEngine (media proxy) Bytes  ·  ~3 min
+## S3 — 2G Receipt Sanity  ·  ~30 s
 
-**PURPOSE** — a real `baresip` voice call, auto-answered, media through
-RTPEngine; the **callee streams a canned scam phrase**, the **caller can speak
-live** (pulse). RTPEngine records a pcap per call.
+**PURPOSE** — confirm an SMS actually lands on the 2G MS before the four-path
+SMS demo depends on it. This is the rawest possible messaging path
+(2G→2G native).
+
+> **FLOW**: `MO 15557778888 (2G-MS2) → SMPP SUBMIT_SM → OSMO-SMSC
+> (mvno-osmosmsc @10.89.0.49:2775) → 2G radio (mvno-2g-core) → MT 15554443322
+> (2G-MS1 → T-A sms.txt)` — no 5G, no bridge.
+
+**COMMANDS** (T-B; T-A still attached)
+
+```bash
+python3 scripts/testing/send_raw_smpp.py 15557778888 15554443322 "Hello 2G sanity"
+sleep 8
+podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt | tail -3
+```
+**EXPECT** — `SMPP BIND_TRANSCEIVER Successful` + `SUBMIT_SM accepted
+(ESME_ROK)`; on T-A, `[SMS from +15557778888]` / `Hello 2G sanity` appears in
+`sms.txt`.
+
+**FALLBACK** — path mechanics: `docs/TESTING_REFERENCE.md` Flow A; scripted
+SMPP variant: S7.
+
+---
+
+## S4 — Real Call: baresip → RTPEngine → Vosk  ·  ~4 min
+
+**PURPOSE** — the heart of the demo: a **real `baresip` voice call** (containerized
+`mvno-baresip:1.0.0` rig), auto-answered, media anchored by RTPEngine which
+records a pcap per call; then the `live_tap.sh` zero-Python extraction and the
+Vosk transcript.
+
+> **FLOW (this is the call path, live)**:
+> ```
+> CALLER (baresip-tx @10.89.0.61 — YOUR MIC when Pulse is up)
+>   │ SIP INVITE 407→digest→100→180→200  [Kamailio mvno-kamailio @10.89.0.23:5060]
+>   │  ├─ INTERCEPT REST callout → mvno-api:8080 (allow)
+>   │  └─ rtpengine_manage → RTPEngine @10.89.0.48 (UDP 30000-30100)
+>   ▼
+> CALLEE (baresip-rx @10.89.0.60 — streams the scam phrase via aufile)
+>   └─ every RTP packet → RTPEngine pcap → state/spool/pcaps/ → live_tap → Vosk
+> ```
+
+> **The rig**: `demo_call.sh` builds the `mvno-baresip:1.0.0` container (libre
+> v4.9.0 + baresip v4.10.0, stdio + aufile + pulse + g711 modules) and runs two
+> UAs: `baresip-tx` (caller `15553332211`) and `baresip-rx` (callee
+> `15559998888`). The **callee streams the scam phrase**; the **caller leg is
+> YOUR LIVE MIC** when the host Pulse socket exists and the terminal is a TTY —
+> `demo_call.sh` then prompts **"SPEAK NOW"** for ~12 s and Vosk transcribes
+> *your* voice. No mic → canned tone caller (deterministic guard).
+>
+> **Phrase** (realistic, ASR-vetted): *"Your bank account has been blocked,
+> please confirm your details now"* — Vosk hears it almost verbatim, so the
+> `account`/`blocked`/`confirm` keyword anchors always survive. Customize with
+> `SCAM_PHRASE="..." bash scripts/testing/demo_call.sh setup` (see `demo_call.sh`).
 
 **COMMANDS** (T-B)
 
 ```bash
-bash scripts/testing/demo_call.sh setup    # speech file + baresip UAs, both register (~15 s)
-bash scripts/testing/demo_call.sh dial     # real call: callee streams the scam phrase; TALK NOW for ~12 s
-podman logs baresip-rx | grep -c "200 Answering"   # expect 1
-\ls -t state/spool/pcaps/*.pcap | head -1           # the fresh recording (~450 KB)
-curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_total'
+bash scripts/testing/demo_call.sh setup   # speech file + both UAs register (~15 s)
+bash scripts/testing/demo_call.sh dial    # real call; callee streams the phrase; SPEAK NOW for ~12 s
 ```
+**EXPECT** — `setup` prints `rx registrations (expect >= 2)`/`tx registrations (expect >= 2)`
+and the phrase; `dial` prints
+`CALL_OUTGOING → CALL_RINGING → CALL_ANSWERED → CALL_ESTABLISHED →
+CALL_RTPESTAB → CALL_CLOSED`, then `rx answers (expect 1): 1` and the fresh pcap.
 
-**EXPECT** — `dial` prints `CALL_OUTGOING → CALL_RINGING → CALL_ANSWERED →
-CALL_ESTABLISHED → CALL_RTPESTAB → CALL_CLOSED`; `200 Answering` = 1; a new
-pcap (~450 KB) in `state/spool/pcaps/`; RTPEngine counters present.
+Confirm the call answered and media flowed (**watch the hops live**):
 
-**FALLBACK** — mic silent? `docs/TESTING_REFERENCE.md` §Mic pre-flight + canned
-`ausine` fallback (replace `pulse` lines); sim-based call variant:
-`docs/TESTING_REFERENCE.md` Flow E (T6/T7/T8); rig mechanics (baresip configs,
-mounts, ctrl-socket framing): `docs/TESTING_REFERENCE.md` §Raw mechanics.
+```bash
+podman logs baresip-rx | grep -c "200 Answering"    # expect 1
+podman logs mvno-kamailio --since 3m 2>&1 | grep -iE "INVITE|ACK|BYE|INTERCEPT" | tail -6
+NEW=$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')
+echo "fresh pcap: $NEW"
+curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_total' \
+  | jq -r '.data.result[0].value[1]'
+```
+**EXPECT** — `200 Answering` = 1; Kamailio shows the INVITE/ACK/BYE dialog plus
+the `INTERCEPT QUERY: caller=15553332211 callee=15559998888` callout; `NEW` is a
+pcap newer than S4 started; the RTPEngine counter is present.
+
+> **Why the pcap "has no RTP" with `tshark -Y rtp`** — RTPEngine records pcaps on
+> its **relay ports UDP 30000-30100**, which Wireshark does not auto-decode as
+> RTP, so `-Y rtp` matches 0 and frames show as raw `data` (172-byte G.711).
+> Force-decode to see the ~700+ RTP packets:
+> ```bash
+> tshark -r "$NEW" -d udp.port==30000,rtp -Y rtp 2>/dev/null | wc -l
+> ```
+> The `live_tap.sh` pipeline reads `data.data` (protocol-agnostic), so it is
+> unaffected by this decode quirk.
+
+**FALLBACK** — quieter room / no mic: `demo_call.sh` falls back to a canned
+`ausine` tone caller; the callee scam leg still transcribes. Rig internals +
+baresip ctrl-socket framing: `docs/TESTING_REFERENCE.md` §Raw mechanics &
+Flow E.
 
 ---
 
-## S4 — live_tap → WAV → ffprobe → aplay → Vosk Transcript  ·  ~2 min
+## S5 — Extract → Vosk Transcript → BLOCK verdict  ·  ~2 min
 
-**PURPOSE** — extract the recorded call with the zero-Python pipeline
-(`live_tap.sh --once`: per-src-IP legs, RTCP dropped, 16 kHz out) and show the
-Vosk transcript + AI verdict land in the spool.
+**PURPOSE** — turn the recorded call into an audible/readable transcript (T-G
+playback, T-C live), classify it via the AI filter, and show the **blocked**
+verdict — first the **deterministic** rule, then the live record.
 
-**COMMANDS** (T-B; optional T-C live view)
-
-```bash
-# T-C (optional, recommended): watch transcripts + verdicts appear live
-watch -n2 'cat state/spool/archived/live-caller.txt state/spool/archived/live-callee.txt 2>/dev/null; podman logs --since 5m mvno-api 2>/dev/null | grep "AI transcript verdict" | tail -2'
-```
+**COMMANDS** (T-B) — extract the newest recorded call:
 
 ```bash
-# T-B — extract the newest recorded call (Tier-3, --once)
-NEW=$(\ls -t state/spool/pcaps/*.pcap | head -1)
+NEW=$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')
 bash scripts/testing/live_tap.sh --once "$NEW"
-ffprobe -v error -show_entries format=duration -of csv=p=0 \
-  state/spool/archived/live-caller.wav        # >= 3s (scripted-leg floor)
-aplay state/spool/archived/live-caller.wav    # hear the caller leg
-sleep 12                                      # Vosk watcher (~3s poll) does its work
-cat state/spool/archived/live-caller.txt state/spool/archived/live-callee.txt
-podman logs mvno-api 2>&1 | grep "AI transcript verdict" | tail -4
+sleep 3
+legs=$(scripts/testing/newest.sh "state/spool/${NEW##*/}"* 2>/dev/null \
+        || printf '%s\n' state/spool/"${NEW##*/}"*)
+ls -1 state/spool/"${NEW##*/}"*.wav 2>/dev/null
 ```
 
-**EXPECT** — `WAV extracted` per leg; ffprobe ≥ 3 s; `aplay` plays the archived
-leg; transcripts = callee `"you have won a prime target now"` (canned phrase
-fuzz) + caller = your distinct spoken words; verdicts
-`[live-caller]: allow=true, 'Clean content'` and
-`[live-callee]: allow=false, 'Spam (phishing phrase detected)'`.
+**EXPECT** — `WAV extracted: state/spool/<pcap-stem>-<srcip>.wav` per leg
+(e.g. `…-10.89.0.60.wav` callee, `…-10.89.0.61.wav` caller). The naming is
+**`<pcap-stem>-<src-ip>[.wav]`** — not a fixed `live-caller.wav`.
 
-**FALLBACK** — fixtures guarantee non-empty evidence regardless of live audio:
-`docs/evidence/fixtures/archived/live-385288b…-10.89.0.60-0.{wav,txt}` (callee,
-"you have won a prize called target now") and `live-caller.{wav,txt}` (17.9 s
-real voice); extraction details: `docs/TESTING_REFERENCE.md` Flow M.
-
----
-
-## S5 — Real-Speech BLOCKED Verdict  ·  ~1 min
-
-**PURPOSE** — the recorded scam phrase is classified as spam and **blocked** by
-the AI interception core; the counter proves it.
-
-**COMMANDS** (T-B)
+**PLAY THE CALLEE LEG** (T-G optional): hear what Vosk will read —
 
 ```bash
-curl -s 'http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total'
-# -> "value":[<epoch>,"<N>"] — note N BEFORE, then replay the fixture below
-cp docs/evidence/fixtures/archived/live-385288b878ffcf5e-d60dcbeab13dbc0c-10.89.0.60-0.wav \
-  "state/spool/demo-real-$(date +%s).wav"
-sleep 12
-cat state/spool/archived/demo-real-*.txt                 # "you have won a prize called target now"
-podman logs mvno-api --since 2m | grep "AI transcript verdict" | tail -2
-curl -s 'http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total'
+callee=$(scripts/testing/newest.sh 'state/spool/*10.89.0.60.wav')
+ffprobe -v error -show_entries format=duration -of csv=p=0 "$callee"  # >= 3 s
+aplay "$callee"                                                        # hear the scam phrase
 ```
 
-**EXPECT** — the fixture transcript contains "won"/"prize" → verdict
-`allow=false, reason='Spam (phishing phrase detected)'` and
-`mvno_vosk_blocked_total` **increments** (the same 1→2 delta the certified
-`demo_runbook.sh` [9b] asserts).
+**VOSK TRANSCRIPT** (T-B) — wait for the container-side Vosk service to
+transcribe the dropped WAVs, then read them:
 
-**FALLBACK** — deterministic SIP-side block (E2E-BLOCK → 403):
-`docs/TESTING_REFERENCE.md` Flow K; automated variant: `demo_runbook.sh` item 9b
-(re-arches the **live** recorded call from its own S3/S4 S5 pipeline, echoes the
-real Vosk transcript, and asserts the block counter climbs).
+```bash
+sleep 12                                 # Vosk watcher poll ~3 s
+callee_txt="${callee%.wav}.txt"
+echo "CALLEE: $(cat "$callee_txt" 2>/dev/null)"
+podman logs mvno-api --since 2m 2>&1 | grep "AI transcript verdict" | tail -4
+```
+
+**EXPECT** — the callee leg transcribes the **bank-phishing phrase** (the canned
+script; near-verbatim for this phrase, e.g.
+`"your bank account has been blocked please confirm your detail now"`). If you
+spoke the caller leg (S4 SPEAK NOW), that transcript is YOUR voice. The caller
+tone leg is usually empty.
+
+> **T-C optional live view** —
+> ```bash
+> watch -n2 'podman logs --since 5m mvno-api 2>&1 | grep "AI transcript verdict" | tail -3'
+> ```
+
+**BLOCK VERDICT — DETERMINISTIC proof (T-B)**: the ai-filter's TRANSCRIPT rule
+blocks on any of `won prize claim free urgent account blocked confirm`. Call it
+directly to prove the rule itself is correct (this always works, independent of
+Vosk):
+
+```bash
+curl -s -X POST http://localhost:8008/ -H "Content-Type: application/json" \
+  -d '{"event_type":"TRANSCRIPT","transcript":"your bank account has been blocked please confirm your detail now"}'
+# -> {"allow": false, "reason": "Spam (phishing phrase detected)"}
+```
+
+**BLOCK VERDICT — assisted by the recorded phrase (T-B)**: seal the live record
+in as the archive and confirm the counter:
+
+```bash
+before=$(curl -s 'http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total' \
+  | jq -r '.data.result[0].value[1]'); echo "blocked BEFORE=$before"
+cp "$callee" "state/spool/demo-scam-$(date +%s).wav"      # re-seed for the AI filter
+sleep 12
+after=$(curl -s 'http://localhost:8428/api/v1/query?query=mvno_vosk_blocked_total' \
+  | jq -r '.data.result[0].value[1]'); echo "blocked AFTER=$after"
+```
+
+**EXPECT / CAVEAT — read this honestly**: the block is **deterministic at the
+rule layer** (the direct TRANSCRIPT call above always returns `allow:false`) but
+the **live re-arch is WER-dependent**: if Vosk mangles the phrase so no keyword
+survives (e.g. `"you have one a prime target"` → contains no keyword →
+`allow:true`), the counter does not move. This is inherent to ASR, not a fault.
+**The default phrase was chosen to make this work**: its anchors
+`account` / `blocked` / `confirm` transcribe near-verbatim (verified live
+2026-08-08). **If you need the counter to move on the spot, run the
+deterministic proof (it cannot fail) and say so.** To make the live arch
+reliably block, speak the phrase slowly — `account` and `blocked` are the most
+ASR-stable anchors.
+
+**FALLBACK** — fixtures (no mic, no call): `docs/evidence/fixtures/archived/
+live-385288b…-10.89.0.60-0.{wav,txt}` (certified scam transcript) + Flow M in
+`docs/TESTING_REFERENCE.md`; deterministic SIP-side block: Flow K.
 
 ---
 
 ## S6 — The Four SMS Paths (A: 2G→2G, B: 2G→5G, C: 5G→2G, D: 5G→5G)  ·  ~5 min
 
 **PURPOSE** — every messaging path the core implements, raw and observable.
-Keep T-A attached (S6a/6c receipts land in its `sms.txt`).
+Keep T-A attached (S6a/6c receipts land in its `sms.txt`). Each block below
+states its **FLOW** first (MO → nodes → MT, with container + port), then sends
+**a message of YOUR choice** — replace the quoted text with anything.
 
-**S6a — 2G→2G (raw binary Short Message Peer-to-Peer (SMPP) over nc, port 2775)**
+> **T-C live hop trace** — while S6 runs, watch every node light up in one
+> terminal:
+> ```bash
+> watch -n2 'podman logs --since 30s mvno-ip-sm-gw 2>&1 | grep -E "POLL|RELAY|DELIVERED|SMPP" | tail -2; \
+>   podman logs --since 30s mvno-kamailio 2>&1 | grep -E "SMS INTERCEPT|MESSAGE" | tail -2'
+> ```
 
-**COMMANDS** (T-B)
+**S6a — 2G→2G** (raw binary SMPP over `nc`, port 2775)
+
+> **FLOW**: `MO 15557778888 (2G-MS2/ms2 @10.89.0.52) → OSMO-SMSC (mvno-osmosmsc
+> @10.89.0.49:2775, ESME route) → 2G radio (mvno-2g-core @10.89.0.50) → MT
+> 15554443322 (2G-MS1/ms1 @10.89.0.51 → T-A sms.txt)`. Bridge/SMPP counters
+> stay flat (native 2G, no 5G, no IP-SM-GW).
 
 ```bash
 python3 scripts/testing/send_raw_smpp.py 15557778888 15554443322 "Hello raw 2G2G"
 sleep 8
 podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt | tail -2
 ```
-
 **EXPECT** — `SMPP BIND_TRANSCEIVER Successful` + `SUBMIT_SM accepted
 (ESME_ROK)`; MS1 prints `[SMS from +15557778888]` / `Hello raw 2G2G`. Bridge
 counters stay flat (not involved).
 
-**S6b — 2G→5G (row into the bridge's polled queue)**
+**S6b — 2G→5G** (row into the bridge's polled queue)
+
+> **FLOW**: `MO 15554443322 (2G-MS1) → smsc.db row (state/hlr/smsc.db) →
+> IP-SM-GW bridge (mvno-ip-sm-gw @10.89.0.53, polls smsc.db) → SIP MESSAGE →
+> KAMAILIO (mvno-kamailio @10.89.0.23:5060, INTERCEPT_SMS callout to
+> mvno-api:8080 → ai-filter:8008) → MT 15559998888 (baresip-rx @10.89.0.60,
+> prints the body)`.
 
 ```bash
 python3 scripts/testing/inject_smsc_row.py 15554443322 15559998888 "Hello raw 2G5G"
 sleep 8
-podman logs mvno-ip-sm-gw --since 2m | grep -E "POLL|DELIVERED" | tail -2
-podman logs baresip-rx 2>&1 | grep "Hello raw 2G5G"        # MESSAGE body seen
+podman logs mvno-ip-sm-gw --since 2m 2>&1 | grep -E "POLL|DELIVERED" | tail -2
+podman logs baresip-rx 2>&1 | grep "Hello raw 2G5G"    # MESSAGE body seen
+```
+**EXPECT** — bridge `[POLL] row_id=NN …` → `[DELIVERED] row_id=NN marked sent`;
+Kamailio relays; baresip-rx prints the body. Clean up after so the gates stay
+unpolluted:
+```bash
+sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"
 ```
 
-**EXPECT** — bridge `[POLL] row_id=NN …` → `[DELIVERED] row_id=NN marked sent`;
-Kamailio relays; baresip-rx prints the body. Cleanup afterwards so the gates
-aren't polluted: `sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"`.
+**S6c — 5G→2G** (digest-auth SIP MESSAGE via Kamailio 5066)
 
-**S6c — 5G→2G (digest-auth SIP MESSAGE via Kamailio 5066)**
+> **FLOW**: `MO 15553332211 (baresip-tx @10.89.0.61 — or any digest UA) → SIP
+> MESSAGE → KAMAILIO 5066 (digest auth `testpass`; INTERCEPT_SMS → ai-filter) →
+> IP-SM-GW bridge (mvno-ip-sm-gw [RELAY] 5G→2G) → SMPP SUBMIT_SM → OSMO-SMSC
+> @2775 → 2G radio → MT 15554443322 (2G-MS1 → T-A sms.txt)`.
 
 ```bash
 python3 scripts/testing/send_digest_sms.py 15553332211 15554443322 "Hello raw 5G2G"
 sleep 8
 podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt | tail -2
 ```
-
 **EXPECT** — `SIP/2.0 200 OK`; bridge `[RELAY] 5G->2G …` + `[SMPP] BIND_TRANSCEIVER
 OK` + `[SMPP] SUBMIT_SM OK`; MS1 prints `[SMS from +15553332211]` /
 `Hello raw 5G2G`. (MS2 trap: an SMS to `15557778888` is accepted but never
 receipted — the 2G container serves only MS1; always use `15554443322`.)
 
-**S6d — 5G→5G (digest-auth SIP MESSAGE to the registered IMS number)**
+**S6d — 5G→5G** (digest-auth SIP MESSAGE to the registered IMS number)
+
+> **FLOW**: `MO 15553332211 (baresip-tx @10.89.0.61) → SIP MESSAGE → KAMAILIO
+> 5066 (digest auth; INTERCEPT_SMS → ai-filter) → lookup("location") → MT
+> 15559998888 (baresip-rx @10.89.0.60)`. Pure IMS-to-IMS — no bridge/SMPP
+> (those counters stay flat).
 
 ```bash
 python3 scripts/testing/send_digest_sms.py 15553332211 15559998888 "Hello raw 5G5G"
 sleep 8
-podman logs baresip-rx 2>&1 | grep "Hello raw 5G5G"        # body received
+podman logs baresip-rx 2>&1 | grep "Hello raw 5G5G"    # body received
 ```
+**EXPECT** — `SIP/2.0 200 OK`; baresip-rx prints the body — pure IMS-to-IMS SMS,
+no bridge/SMPP (those counters stay flat).
 
-**EXPECT** — `SIP/2.0 200 OK`; baresip-rx prints the body — pure IMS SMS, no
-bridge/SMPP (counters stay flat).
-
-**FALLBACK** — per-path detail + terminal setups: `docs/TESTING_REFERENCE.md`
-Flows A–D; raw PDU (Protocol Data Unit)/digest/rig mechanics (the original inline commands):
-`docs/TESTING_REFERENCE.md` §Raw mechanics; scripted SMPP variant: S7.
+**FALLBACK** — per-path terminal setups: `docs/TESTING_REFERENCE.md` Flows A–D;
+raw PDU/digest mechanics: §Raw mechanics; scripted SMPP variant: S7.
 
 ---
 
@@ -261,44 +399,54 @@ Flows A–D; raw PDU (Protocol Data Unit)/digest/rig mechanics (the original inl
 **PURPOSE** — the same SMPP 3.4 channel via the harness, ending with the SMS
 row provably stored in the SMSC DB (terminal evidence).
 
+> **FLOW**: `MO 15551234567 (ESME: send_smpp_sms.py, BIND_TRANSCEIVER) →
+> OSMO-SMSC @10.89.0.49:2775 (esme mvno-api-route) → smsc.db row
+> (state/hlr/smsc.db — stored for the MT leg) → REST intercept verdict
+> (mvno-api:8080 → ai-filter:8008)`.
+
 **COMMANDS** (T-B)
 
 ```bash
-python3 scripts/testing/send_smpp_sms.py          # bind + SUBMIT_SM 15551234567 -> 15557654321
+python3 scripts/testing/send_smpp_sms.py    # bind + SUBMIT_SM 15551234567 -> 15557654321
 sqlite3 -header -column state/hlr/smsc.db \
-  "SELECT id, src_addr, dest_addr, substr(text,1,40) AS content, created, sent FROM SMS ORDER BY id DESC LIMIT 5;"
+  "SELECT id, src_addr, dest_addr, substr(text,1,40) AS content, created, sent \
+   FROM SMS ORDER BY id DESC LIMIT 5;"
 sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"   # drain (gate hygiene)
 ```
-
 **EXPECT** — `BIND_TRANSCEIVER Successful` / `SUBMIT_SM Delivered` /
 `Status=0x00000000` (ESME_ROK); the dump shows the row with
 `src_addr=15551234567, dest_addr=15557654321` and its body.
 
-**FALLBACK** — PDU byte anatomy + injector internals:
-`docs/TESTING_REFERENCE.md` §Injectors + Flow B; automated: `demo_runbook.sh` items 10/10b.
+**FALLBACK** — PDU anatomy + injector internals: `docs/TESTING_REFERENCE.md`
+Flows B & §Injectors; automated: `demo_runbook.sh` items 10/10b.
 
 ---
 
 ## S8 — REST API + smsc DB Dump  ·  ~1 min
 
-**PURPOSE** — the gateway interception API: clean content allowed, spam marker
-blocked; then the terminal evidence dump of the SMSC store.
+**PURPOSE** — the gateway interception API: clean content allowed, the E2E spam
+marker blocked; then the terminal evidence dump of the SMSC store.
+
+> **FLOW**: `curl (any HTTP client) → POST /api/v1/intercept/sms
+> (mvno-api @10.89.0.46:8080, X-API-Key) → ai-filter @10.89.0.44:8008
+> (classify) → {allow, reason} verdict` — the same verdict path Kamailio and
+> the bridge use per-message.
 
 **COMMANDS** (T-B)
 
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/intercept/sms \
   -H "Content-Type: application/json" -H "X-API-Key: mvno-demo-key-2026" \
-  -d '{"sender": "15551234567", "recipient": "15557654321", "content": "Hello MVNO 5G"}'
+  -d '{"sender":"15551234567","recipient":"15557654321","content":"Hello MVNO 5G"}'
 # -> {"allow":true,"reason":"Clean content"}
 curl -s -X POST http://localhost:8080/api/v1/intercept/sms \
   -H "Content-Type: application/json" -H "X-API-Key: mvno-demo-key-2026" \
-  -d '{"sender": "15551234567", "recipient": "15557654321", "content": "E2E-BLOCK REST test"}'
+  -d '{"sender":"15551234567","recipient":"15557654321","content":"E2E-BLOCK REST test"}'
 # -> {"allow":false,"reason":"Spam (E2E deterministic block)"}
 sqlite3 -header -column state/hlr/smsc.db \
-  "SELECT src_addr, dest_addr, substr(text,1,40) AS content, sent FROM SMS ORDER BY id DESC LIMIT 5;"
+  "SELECT src_addr, dest_addr, substr(text,1,40) AS content, sent \
+   FROM SMS ORDER BY id DESC LIMIT 5;"
 ```
-
 **EXPECT** — two verdicts (allow true/false); the smsc.db dump shows the stored
 SMS rows (real terminal evidence, non-empty).
 
@@ -309,19 +457,21 @@ SMS rows (real terminal evidence, non-empty).
 ## S9 — PromQL / Grafana  ·  ~1 min
 
 **PURPOSE** — telemetry: the interception counters live in VictoriaMetrics and
-the Network Operations Center (NOC) dashboard renders.
+the NOC dashboard renders.
 
 **COMMANDS** (T-B)
 
 ```bash
-for q in mvno_call_requests_total mvno_vosk_classified_total mvno_vosk_blocked_total mvno_sms_blocked_total; do
-  curl -s "http://localhost:8428/api/v1/query?query=$q" | grep -o '"value":\[[0-9]*,"[0-9]*"\]'
+for q in mvno_call_requests_total mvno_vosk_classified_total \
+         mvno_vosk_blocked_total mvno_sms_blocked_total; do
+  printf '%-28s ' "$q"
+  curl -s "http://localhost:8428/api/v1/query?query=$q" \
+    | jq -r '.data.result[0].value[1]'
 done
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/login   # 200
+curl -s -o /dev/null -w "grafana login HTTP %{http_code}\n" http://localhost:3000/login
 ```
-
-**EXPECT** — every counter returns a `"value":[<epoch>,"<N>"]` tuple (N ≥ 1 for
-the call/classified counters after S3–S5); Grafana login HTTP 200.
+**EXPECT** — every counter returns a number (`>= 1` for call/classified after
+S4–S5); Grafana login HTTP 200.
 
 **FALLBACK** — dashboard JSON: `docs/evidence/grafana-mvno-unified-noc.json`;
 details: `docs/TESTING_REFERENCE.md` Flow J.
@@ -330,21 +480,122 @@ details: `docs/TESTING_REFERENCE.md` Flow J.
 
 ## S10 — Runbook Gates  ·  ~15 min
 
-**PURPOSE** — the automated proof: e2e SMS matrix (5 cells / 8 ok) then the
+**PURPOSE** — the automated proof: the e2e SMS matrix (5 cells / 8 ok) then the
 full 13-item demo, both exiting 0, both teed to `docs/evidence/` logs.
 
 **COMMANDS** (T-B)
 
 ```bash
-sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"   # drain leftover demo rows
-./scripts/testing/e2e_runbook.sh ; echo "exit=$?"                 # ALL CELLS PASS, exit=0
-./scripts/testing/demo_runbook.sh ; echo "exit=$?"                # ALL 13 PASSED, exit=0
-podman rm -f baresip-rx baresip-tx        # demo cleanup
+sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"   # drain leftover rows
+./scripts/testing/e2e_runbook.sh ; echo "e2e exit=$?"             # ALL CELLS PASS, exit=0
+./scripts/testing/demo_runbook.sh ; echo "demo exit=$?"           # ALL 13 PASSED, exit=0
+podman rm -f baresip-rx baresip-tx    # demo cleanup (baresip is demo-only)
 ```
-
 **EXPECT** — `E2E RUNBOOK: ALL CELLS PASS (8 ok)` / `exit=0`; demo
-`ALL 13 DEMO ITEMS PASSED` / `exit=0`; fresh `docs/evidence/e2e-run-2026-08-07.log`
-and `demo-run-2026-08-07.log` (each run appends its day's file).
+`ALL 13 DEMO ITEMS PASSED` / `exit=0`; fresh logs
+`docs/evidence/e2e-run-<date>.log` and `docs/evidence/demo-run-<date>.log`
+(each run appends its day's file).
+
+> **Note on `demo_runbook.sh` item 9b**: the fresh-transcript `grep` for scam
+> keywords is itself WER-dependent (see S5). Its EXPECT is written
+> permissively for that cell; the **deterministic** transcript rule proof is
+> S5's direct `curl`. If 9b flakes on a live re-arch, re-run it or cite the S5
+> direct proof.
 
 **FALLBACK** — gate internals: `docs/TESTING_REFERENCE.md` Flows L & N;
 failure-path checks: Flow O.
+
+---
+
+## Partner-Repo Integration (read-only references)
+
+The org repos **`sms-client`**, **`SipClient`**, and **`AI-Filteration-System`**
+(https://github.com/AI-SpamFilter-PMN) are **not ours to modify** — we only prove
+the same ESME / UA / filter behaviour **here, MVNO-natively**:
+
+- **`sms-client` (Java ESME)** sends SMPP SUBMIT_SM to the SMSC. What S6a/S7
+  demonstrate with `send_raw_smpp.py`/`send_smpp_sms.py` is exactly the PDU
+  session that Java ESME issues — same SMSC, same ESME_ROK receipt.
+- **`SipClient` (Java SIP UA)** dials/registers like `baresip-tx/rx` do in S4.
+  The IMS call + SIP MESSAGE we show here (S6c/6d) is the same flow SipClient
+  drives; our containerized rig keeps the state reproducible without rebuilding
+  the Java client.
+- **`AI-Filteration-System`** provides the model; here `ai-filter` (S5) runs the
+  keyword layer the demo certifies. The partner repos have known config
+  mismatches vs this stack (documented in `ONBOARDING.md`); we reference, do not
+  edit.
+
+All four partner repos are currently 0-ahead/0-behind their remotes (nothing to
+pull).
+
+---
+
+## Quick Gate Checklist (before calling it done)
+
+```bash
+bash scripts/check-glossary.sh                                    # exit 0 (docs lint)
+./scripts/testing/e2e_runbook.sh >/dev/null && echo "E2E OK"     # exit 0
+./scripts/testing/demo_runbook.sh >/dev/null && echo "DEMO OK"   # exit 0
+```
+
+---
+
+## Appendix A — Address & Port Reference (authoritative bindings)
+
+Every address this demo touches, what it is, and whether it is **static** or
+**dynamic**. The container plan lives in `docker-compose.yml` (static pins,
+Issue 8.19); host ports are published for rootless Podman/Docker on
+`127.0.0.1`/`0.0.0.0` as shown. UE user-plane IPs are **dynamic** — always read
+`uesimtun0` at runtime, never hardcode.
+
+### A.1 — Host-published ports (this is what external tools/SIP/SMPP clients use)
+
+| Host endpoint | Container → port | Service | Demo step |
+|---|---|---|---|
+| `127.0.0.1:5066/udp` | kamailio `:5060` | SIP registrar/proxy (digest auth) | S6c/6d (external clients: INTEGRATION_CONTRACT §1) |
+| `127.0.0.1:2775` | osmo-smsc `:2775` | SMPP 3.4 SMSC (ESME bind/submit) | S3, S6a, S7 |
+| `127.0.0.1:8080` | telecom-api `:8080` | REST intercept API + actuator | S2, S8 |
+| `127.0.0.1:8008` | ai-filter `:8000` | AI classifier (mock, deterministic rules) | S2, S5 |
+| `127.0.0.1:8428` | victoria-metrics `:8428` | PromQL / vmui | S2, S5, S9 |
+| `127.0.0.1:8429` | vmagent `:8429` | scrape-agent self-metrics | S2 (optional) |
+| `127.0.0.1:3000` | grafana `:3000` | NOC dashboards | S9 |
+| `127.0.0.1:9999` | open5gs-webui `:3000` | 5G subscriber UI | — |
+| `127.0.0.1:27017` | mongodb `:27017` | 5G core subscriber DB | — |
+| `127.0.0.1:9900` | rtpengine `:9900` | RTPEngine Prometheus metrics | S9 (T8) |
+| `127.0.0.1:30000-30100/udp` | rtpengine `:30000-30100` | RTP media relay range (G.711 PCMU) | S4, S5 |
+| `127.0.0.1:9100` | ip-sm-gw `:9100` | bridge /metrics | — |
+
+> Host UDP `5060` is **not** used: a host Asterisk owns `0.0.0.0:5060`
+> (`ENVIRONMENT_MATRIX.md` §3). The optional `MVNO_PUBLISH_5060` compose extra
+> is default-off and blocked on this host.
+
+### A.2 — Static container IPs on `mvno_net` (10.89.0.0/24, pinned in compose)
+
+| Service | IP | Service | IP | Service | IP |
+|---|---|---|---|---|---|
+| mongodb | .4 | nrf | .11 | amf | .12 |
+| smf | .13 | upf | .14 | ausf | .15 |
+| bsf | .16 | udm | .17 | udr | .18 |
+| pcf | .19 | nssf | .20 | open5gs-webui | .22 |
+| kamailio | .23 | ueransim-gnb | .30 | ueransim-ue-1/2/3 | .31/.32/.33 |
+| vector | .40 | victoria-metrics | .41 | vmagent | .42 |
+| grafana | .43 | ai-filter | .44 | osmo-hlr | .45 |
+| telecom-api | .46 | mongodb-exporter | .47 | rtpengine | .48 |
+| osmo-smsc | .49 | 2g-core | .50 | 2g-ms | .51 |
+| 2g-ms2 | .52 | ip-sm-gw | .53 | | |
+
+Demo-only rigs (created by runbooks, not part of the 31-container core):
+`ims-uas58` @ `10.89.0.58`, `ims-caller59` @ `10.89.0.59` (Flow E),
+`baresip-rx/tx` @ `10.89.0.60/.61` (S4). All three IP pairs are **static by
+convention** (passed as `--ip` on `podman run`) — if one is occupied, reuse the
+same address plan (they are only used by demo containers).
+
+### A.3 — Dynamic addresses (never hardcode — read at runtime)
+
+| Address | Allocator | Notes |
+|---|---|---|
+| UE user-plane IPs `10.45.0.2 – 10.45.0.254` | SMF session pool (`smf.yaml`; `.1` = ogstun gateway excluded, Issue 5.7) | Re-allocated on **every** UE attach; `demo_runbook.sh` [5b] reads ue-1's `uesimtun0` IPv4 live (Issue 5.9 runbook fix). Current (2026-08-08): ue-1=10.45.0.5, ue-2=10.45.0.2, ue-3=10.45.0.4 |
+| `10.45.0.1/16` | UPF `ogstun` N6 gateway (static config) | `ip addr replace … dev ogstun`; UE default route via this |
+| SIP transport ports `:5070/:5071`, `:5090/:5091` | `sip_traffic_sim.py` `--listen-port` | Per-role convention, fixed in runbooks |
+| Kamailio source IP of UE calls | UPF SNAT (`MASQUERADE 10.45.0.0/16 !ogstun`) | UE calls appear from `10.89.0.14`, not the UE IP (Issue 8.20) |
+| Vosk/RTP spool file names | RTPEngine + `live_tap.sh` | `state/spool/pcaps/<pcap-stem>`; read via `newest.sh` |

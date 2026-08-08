@@ -55,11 +55,12 @@ but transcribes empty in Vosk; the 16 kHz resample yields the words (certified
 scripts/testing/live_tap.sh daemon
 # env: PCAP_DIR, SPOOL_DIR, TAP_DIR, POLL_SECS (1), CHUNK_SECS (4), IDLE_FINALIZE (3)
 
-# Tier 3 — one completed call, straight into the Vosk spool:
-scripts/testing/live_tap.sh --once $(\ls -t state/spool/pcaps/*.pcap | head -1)
+# Tier 3 — one completed call, straight into the Vosk spool (portable newest-file
+# idiom — scripts/testing/newest.sh is `ls`/`eza`-safe on GNU + Ubuntu):
+scripts/testing/live_tap.sh --once "$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')"
 
-# Watch transcripts + verdicts land:
-watch -n2 '\ls -t state/spool/archived/live-* 2>/dev/null | head'
+# Watch transcripts + verdicts land (portable leg pick; works under eza too):
+watch -n2 'scripts/testing/newest.sh "state/spool/archived/*.txt" 2>/dev/null; printf "\n"'
 ```
 
 ### systemd --user unit (optional, rootless)

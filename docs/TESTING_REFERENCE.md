@@ -653,11 +653,11 @@ replacement, see `docs/REALTIME_AUDIO.md`):
 
 ```bash
 # 1) Find the newest recording (also in state/spool/metadata/):
-\ls -t state/spool/pcaps/ | head -1
+scripts/testing/newest.sh 'state/spool/pcaps/*.pcap'
 
 # 2) Extract it — one WAV per source-IP leg, straight into the Vosk spool root
 #    (watcher polls this directory):
-scripts/testing/live_tap.sh --once $(\ls -t state/spool/pcaps/*.pcap | head -1)
+scripts/testing/live_tap.sh --once "$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')"
 ```
 
 **Expected** (one line per voice leg — even dstport = RTP, odd = RTCP dropped):
@@ -675,14 +675,17 @@ cat state/spool/archived/call-*.txt   # newest = the call you just made
 
 **Expected**: a JSON transcript line per recording. The certified 2026-08-03 run
 (synthetic 440 Hz tone) produced `{"text": ""}` — correct for a tone. For **real
-speech**, expect the words: LIVE_DEMO.md S3's baresip speech phrase transcribes to
-`{"text": "you have won a prime target now"}` (2026-08-06).
+speech**, expect the words: LIVE_DEMO.md S4's baresip speech phrase transcribes to
+`{"text": "your bank account has been blocked please confirm your detail now"}`
+(2026-08-08, Vosk-small-model — the phrase was chosen for ASR-stable keyword
+anchors `account`/`blocked`/`confirm`; the older phrase produced the mangled
+`"you have won a prime target now"`).
 
 > **Sample-rate note**: `live_tap.sh` decodes PCMU (8 kHz native) and resamples to
 > **16 kHz** on output — the certified 2026-08-06 evidence shows the raw 8 kHz WAV
 > transcribes empty in Vosk while the 16 kHz resample yields the spoken words
-> (`{"text": "you have won a prime target now"}`). The LIVE_DEMO.md S4 raw pipeline
-> outputs 16 kHz directly; both paths are equivalent.
+> (`{"text": "your bank account has been blocked please confirm your detail now"}`).
+> The LIVE_DEMO.md S4 raw pipeline outputs 16 kHz directly; both paths are equivalent.
 
 ### Terminal T6d — post-call AI transcript verdict
 
@@ -733,12 +736,14 @@ echo "exit=$?"    # 0 = ALL 13 CHECKS PASS
 
 > The 5G-path check (`[5b]`) runs a full scripted SIP dialog inside
 > `mvno-ueransim-ue-1` over the real 5G user plane: a UAS registers
-> `15559998888` bound to the UE's 5G IP (`10.45.0.8:5070`) and answers INVITEs,
-> while a caller (`15551234567`) dials it with RTP media. It asserts (1) the UAS
-> REGISTER returns 200 OK, (2) the INVITE is **answered with a final
-> `SIP/2.0 200 OK`** (the simulator waits past the interim 100 trying), (3) RTP
-> media flows, and (4) the UPF `ogstun` TX byte counter moves (+7448 bytes in
-> the 2026-08-06 run) — proof the dialog traversed GTP-U, not the test network.
+> `15559998888` bound to the UE's current 5G IP (`uesimtun0` IPv4 read at
+> runtime — e.g. `10.45.0.5:5070`, **never hardcoded**; see ISSUES.md Issue 5.9)
+> and answers INVITEs, while a caller (`15551234567`) dials it with RTP media.
+> It asserts (1) the UAS REGISTER returns 200 OK, (2) the INVITE is **answered
+> with a final `SIP/2.0 200 OK`** (the simulator waits past the interim 100
+> trying), (3) RTP media flows, and (4) the UPF `ogstun` TX byte counter moves
+> (+7448 bytes in the 2026-08-06 run) — proof the dialog traversed GTP-U, not
+> the test network.
 
 ---
 
@@ -771,8 +776,9 @@ With the 5G recipient still unregistered, inject a 2G→5G row and watch T3:
 
 > **Precondition (Issue 8.37)**: the demo runbook leaves live SIP registrations for
 > `15559998888` behind in Kamailio's usrloc (ims-uas58 @10.89.0.58 + ue-1's
-> sip_traffic_sim callee @10.89.0.14, plus the 5b UAS @10.45.0.8 which persists
-> for its 3600 s expiry even after the UAS process is killed). While any binding
+> sip_traffic_sim callee @10.89.0.14, plus the 5b UAS @ue-1's current
+> `uesimtun0` IP — e.g. 10.45.0.5 — which persists for its 3600 s expiry even
+> after the UAS process is killed). While any binding
 > exists, Kamailio relays the
 > MESSAGE (200 OK) and the retry never triggers. Clear it first with a
 > digest-authenticated deregister (`Contact: *`, `Expires: 0`, `testpass`); confirm
@@ -809,10 +815,12 @@ commands they wrap, for depth / teaching / failure-path inspection.
 
 ### 1. baresip call rig (what `demo_call.sh setup` assembles)
 
-Speech file + configs:
+Speech file + configs (phrase = `SCAM_PHRASE`, default the ASR-vetted
+"Your bank account has been blocked, please confirm your details now" —
+see `demo_call.sh`; override with `SCAM_PHRASE="..." bash demo_call.sh setup`):
 
 ```bash
-espeak-ng -v en-us "You have won a prize, call us now or your account will be closed" -w /tmp/speech.wav
+espeak-ng -v en-us "Your bank account has been blocked, please confirm your details now" -w /tmp/speech.wav
 mkdir -p state/baresip/rx state/baresip/tx
 ffmpeg -y -loglevel error -i /tmp/speech.wav -ar 8000 -ac 1 -c:a pcm_s16le \
   state/baresip/speech8k.wav
@@ -885,7 +893,7 @@ MSG='{"command":"hangup"}'
 podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; \
   printf '${#MSG}:${MSG},' >&3; timeout 2 cat <&3"
 podman logs baresip-rx | grep -c "200 Answering"    # expect 1
-\ls -t state/spool/pcaps/*.pcap | head -1            # the fresh recording
+scripts/testing/newest.sh 'state/spool/pcaps/*.pcap'   # the fresh recording
 ```
 
 ### 2. Raw binary SMPP 3.4 (what `send_raw_smpp.py` sends)

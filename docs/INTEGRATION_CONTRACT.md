@@ -194,19 +194,22 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   and MVNO host; the client's own RTP socket must be reachable (see `fix_nated_contact()` in
   `configs/kamailio/kamailio.cfg`).
 
-### sms-client (`src/main/resources/application.properties`) — ✅ verified
-- `smpp.host=127.0.0.1`, `smpp.port=2775`, `smpp.systemId=smsclient`, `smpp.password=password`
-  → **matches MVNO's published SMPP + the `esme smsclient` route in `osmo-smsc.cfg`** ✅.
-- `ai.classify.url=http://localhost:5000/classify` — ⚠ **mismatch confirmed in
-  source**: matches **no** MVNO endpoint (MVNO mock is `ai-filter:8000/api/v1/classify`;
-  `AI-Filteration-System` is `:8000/api/filter-sms`).
-  → **Exact replacement value** (co-hosted on `mvno_net`): `http://mvno-ai-filter:8000/api/v1/classify`
-  (from a non-containerized host: `http://localhost:8008/api/v1/classify`). This is **optional
-  redundancy** — MVNO enforces allow/block AFTER SMPP submission via the gateway, so client-side
-  classification is not required for the demo.
+### sms-client (`src/main/resources/application.properties`) — ⚠ **re-verified 2026-08-08: repo refactored 08-07 22:40, now targets a *different* SMPP server**
+> The 2026-08-03 verification below is **stale**: commit `9df7eb36` (2026-08-07 22:40 UTC,
+> "submit via SMPP to the teammate's server, require login, and redesign the web UI") changed
+> `smpp.port` from `2775` to **`2076`** and **removed the `ai.classify.url` property**. As of that
+> commit the client does **not** match MVNO's published SMPP port out of the box:
+- `smpp.host=127.0.0.1`, `smpp.port=2076` — ⚠ **mismatch vs MVNO's `osmo-smsc` on `2775`**
+  (MVNO `docker-compose.yml` publishes `2775:2775`; `osmo-smsc.cfg` defines the
+  `esme smsclient` route on that listener).
+  → **Exact replacement value** for the client to talk to MVNO: `smpp.port=2775`.
+- `smpp.systemId=smsclient`, `smpp.password=password` → still matches the `esme smsclient`
+  route in `osmo-smsc.cfg` ✅.
+- `ai.classify.url` — **removed in the refactor**: the client no longer classifies client-side.
+  (Pre-refactor value was `http://localhost:5000/classify` — matched **no** MVNO endpoint;
+  MVNO mock is `ai-filter:8000/api/v1/classify`.) Classification remains MVNO-side only.
 - `server.port=8080` ⚠ overlaps `telecom-api`'s `8080` if co-hosted — run on a different host/port
   (e.g. `server.port=8081`).
-- `sms.blockSpam=false` default: spam is NOT blocked client-side; MVNO policy gateway still enforces.
 - **SMPP credentials:** SMSC System-ID `MVNO_SMSC`; primary ESME account `mvno-api-route` /
   password `changeme`; secondary client ESME account `smsclient` / password `password`.
 - **REST Interception (optional):** `POST http://telecom-api:8080/api/v1/intercept/sms` with
@@ -229,8 +232,11 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   - The e2e Goal-7 AI-block cell asserts the `E2E-BLOCK` marker → `allow:false` and the demo's
     post-call scam-block story asserts phishing-keyword blocking on `TRANSCRIPT` events
     (word-boundary, lowercase: `won`, `prize`, `claim`, `free`, `urgent`, `account`, `blocked`,
-    `confirm` — tuned to Vosk small-model ASR output, e.g. "You have won a prize, call us now" →
-    Vosk hears `you have won an prize called us out`).
+    `confirm` — tuned to Vosk small-model ASR output, e.g. the demo phrase
+    "Your bank account has been blocked, please confirm your details now" →
+    Vosk hears `your bank account has been blocked please confirm your detail now`,
+    which keeps the `account`/`blocked`/`confirm` anchors; the older phrase
+    "You have won a prize, call us now" → Vosk heard `you have won an prize called us out`).
   - The replacement MUST keep an equivalent deterministic rule layer (marker + keyword list) OR
     prove the model blocks those exact inputs — otherwise `e2e_runbook.sh` and `demo_runbook.sh`
     check 9 break and the demo's blocked-call story is unverifiable.

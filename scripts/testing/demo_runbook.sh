@@ -17,11 +17,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
-# Evidence layer: durable run log (Aug-6 convention) — tee the whole run.
+# Evidence layer: clean-slate run log (Aug-8 convention) — the file is
+# truncated at run start and stamped with RUN:<ts>, so a green file contains
+# exactly ONE clean pass and a red file exactly ONE honest failure. Re-runs
+# never curate a mix of old failures and new passes into the same file.
 EVIDENCE_DIR="${REPO_ROOT}/docs/evidence"
 mkdir -p "${EVIDENCE_DIR}"
 RUN_LOG="${EVIDENCE_DIR}/demo-run-$(date +%F).log"
+: > "${RUN_LOG}"
 exec > >(tee -a "${RUN_LOG}") 2>&1
+echo "RUN:$(date +%Y-%m-%dT%H:%M:%S%z) — clean-slate evidence (previous contents discarded)"
 
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -176,32 +181,51 @@ podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
 # Validation Criteria: WAV extracted with audio; transcript archived <= 25s.
 # ==============================================================================
 echo -e "${YELLOW}[5c/13] 🎙️ Verifying Call Recording Pipeline (pcap -> WAV -> Vosk ASR)...${NC}"
-# Stale-frame guard: RTPEngine occasionally writes an empty recording frame
-# (no RTP payloads, e.g. a call that produced no media) alongside the real
-# pcap. live_tap.sh --once cannot decode these, and picking one breaks the
-# assertion. Skip-and-retry while the real (>= 1 KiB) pcap is being written.
-NEWEST_PCAP=""
+# The recording pipeline needs a call whose callee leg carries SPEECH (the
+# canned scam phrase), not the [5] sim call's tone leg (a 350 Hz sine transcribes
+# only noise like "the" and breaks the [9b] keyword assertion). Run the baresip
+# rig (LIVE_DEMO S4) right here so the newest pcap below IS the speech-bearing
+# call: baresip-rx @10.89.0.60 auto-answers and streams speech8k.wav via aufile.
+echo "  (baresip rig: demo_call.sh setup + dial — callee streams the scam phrase)"
+bash "${SCRIPT_DIR}/demo_call.sh" setup >/dev/null 2>&1 \
+  || { echo "[-] Error: baresip rig setup failed (espeak-ng present?)" >&2; exit 1; }
+bash "${SCRIPT_DIR}/demo_call.sh" dial 2>&1 | tail -3 || true
+# Stale-frame guard + mid-write tolerance: RTPEngine's pcap grows DURING the
+# call and is finalized only after its post-call flush (rtpengine.conf:
+# "recording-method=pcap writes ... as they arrive, so the pcap file grows
+# during the call"). Reading it mid-write yields an undecodable file, and the
+# [5] sim call's tone pcap may still be newest for a few seconds. Retry until
+# live_tap decodes the newest pcap AND the baresip callee leg (10.89.0.60 —
+# the speech-bearing aufile leg) is among the extracted WAVs.
+CALLEE_IP=10.89.0.60
+WAV_OUT=""
 for i in $(seq 1 6); do
     NEWEST_PCAP=$(\ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1 || true)
     if [ -n "$NEWEST_PCAP" ] && [ -s "$NEWEST_PCAP" ] && [ "$(stat -c %s "$NEWEST_PCAP")" -ge 1024 ]; then
-        break
+        WAV_OUT=$(bash "${SCRIPT_DIR}/live_tap.sh" --once "$NEWEST_PCAP" 2>&1) || true
+        if echo "$WAV_OUT" | grep -q "WAV extracted.*${CALLEE_IP}"; then
+            break
+        fi
     fi
     find state/spool/pcaps -name '*.pcap' -size -1k -delete 2>/dev/null || true
-    NEWEST_PCAP=""
-    sleep 2.5
+    sleep 5
 done
-[ -n "$NEWEST_PCAP" ] || { echo "[-] Error: no fresh recorded pcap found" >&2; exit 1; }
-WAV_OUT=$(bash "${SCRIPT_DIR}/live_tap.sh" --once "$NEWEST_PCAP" 2>&1) || true
-echo "$WAV_OUT" | grep -q "WAV extracted" || { echo "[-] Error: pcap->WAV extraction failed: ${WAV_OUT}" >&2; exit 1; }
+echo "$WAV_OUT" | grep -q "WAV extracted.*${CALLEE_IP}" \
+    || { echo "[-] Error: could not decode the baresip callee leg (pcap mid-write? no speech call?): ${WAV_OUT}" >&2; exit 1; }
 # live_tap.sh --once writes one WAV per leg straight into the Vosk spool root.
-# Pick the leg whose transcript is NON-EMPTY (the callee streams the spoken
-# phrase; the caller leg is silent aufine/ausine), never the empty caller leg.
+# Pick the CALLEE leg (10.89.0.60 — streams the spoken scam phrase via aufile):
+# the caller leg is a silent tone/ausine leg, and a sim-call tone leg would
+# transcribe only noise. Prefer the callee IP, fall back to any non-empty leg.
 WAV_STEM=$(basename "$NEWEST_PCAP" .pcap)
 TXT_PATH=""
 for i in $(seq 1 10); do
-    for cand in $(ls state/spool/archived/"${WAV_STEM}"-*.txt 2>/dev/null || true); do
-        if [ -s "$cand" ]; then TXT_PATH="$cand"; break; fi
-    done
+    TXT_PATH=$(ls state/spool/archived/"${WAV_STEM}"-${CALLEE_IP}.txt 2>/dev/null | head -1 || true)
+    if [ -z "$TXT_PATH" ] || [ ! -s "$TXT_PATH" ]; then
+        TXT_PATH=""
+        for cand in $(ls state/spool/archived/"${WAV_STEM}"-*.txt 2>/dev/null || true); do
+            if [ -s "$cand" ]; then TXT_PATH="$cand"; break; fi
+        done
+    fi
     [ -n "$TXT_PATH" ] && break
     sleep 2.5
 done
@@ -219,13 +243,19 @@ echo -e "  ✓ recorded WAV duration ${DUR}s >= 3s (scripted-leg floor)"
 echo -e "  --- playing recorded WAV via ALSA (aplay) ---"
 aplay -q "$WAV_PATH" || echo "  (warning: aplay playback failed — no ALSA sink on this host; evidence is the WAV + ffprobe)"
 echo -e "${GREEN}✓ Call recording playback proven: transcript + ${DUR}s WAV from the real recorded call${NC}\n"
+# The baresip rig registered the SAME AOR as the [5b] 5G-path UAS below
+# (15559998888). Remove the rig now so [5b]'s INVITE routes unambiguously to the
+# UE's binding (multiple usrloc contacts would answer from the bridge instead of
+# the 5G user plane). The recorded WAV + transcript evidence persists in the spool.
+podman rm -f baresip-rx baresip-tx >/dev/null 2>&1 || true
 
 # ==============================================================================
 # [5b/13] 5G SA USER-PLANE SIP CALL TRAVERSAL (GTP-U TUNNEL)
 # ==============================================================================
 # Technical Verification: Full scripted SIP dialog inside ueransim-ue-1 over
-# uesimtun0: a UAS registers 15559998888 binding the UE's 5G IP (10.45.0.8) and
-# answers INVITEs; a caller (15551234567) registers and calls it with RTP media.
+# uesimtun0: a UAS registers 15559998888 binding the UE's 5G IP (read at
+# runtime — UE IPs are dynamic across re-attaches) and answers INVITEs;
+# a caller (15551234567) registers and calls it with RTP media.
 # Protocol / Component: 5G GTP-U N3 Tunnel / UERANSIM ↔ Open5GS UPF (ogstun) ↔ Kamailio.
 # Validation Criteria: (1) SIP REGISTER returns 200 OK over the 5G path; (2) the
 # digest-authenticated INVITE is ANSWERED with a final "SIP/2.0 200 OK" (the
@@ -233,13 +263,18 @@ echo -e "${GREEN}✓ Call recording playback proven: transcript + ${DUR}s WAV fr
 # media flows; (4) ogstun TX byte counter moves, proving 5G user-plane traversal.
 # ==============================================================================
 echo -e "${YELLOW}[5b/13] 📡 Simulating SIP over the 5G SA User Plane (UE tun → N3 GTP-U → UPF ogstun → Kamailio)...${NC}"
+# UE 5G IPs are dynamic (allocated from the SMF pool on each attach), so read
+# ue-1's current uesimtun0 address instead of hardcoding a stale value.
+UE_IP=$(podman exec mvno-ueransim-ue-1 sh -c 'ip -4 addr show uesimtun0 2>/dev/null | awk "/inet /{print \$2}" | cut -d/ -f1' | tr -d '[:space:]')
+[ -n "$UE_IP" ] || { echo "[-] Error: cannot read ue-1 uesimtun0 IPv4 (5G session down?)" >&2; exit 1; }
+echo "  ue-1 5G IP (dynamic): $UE_IP"
 podman exec mvno-ueransim-ue-1 sh -c 'ip route replace 10.89.0.23/32 dev uesimtun0 2>/dev/null' || true
 podman cp "${SCRIPT_DIR}/sip_traffic_sim.py" mvno-ueransim-ue-1:/tmp/sip_traffic_sim.py >/dev/null
 podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
-podman exec mvno-ueransim-ue-1 sh -c 'rm -f /tmp/uas.log; nohup python3 -u /tmp/sip_traffic_sim.py --uas 15559998888 --host 10.89.0.23 --port 5060 --bind-ip 10.45.0.8 --listen-port 5070 > /tmp/uas.log 2>&1 &'
+podman exec mvno-ueransim-ue-1 sh -c "rm -f /tmp/uas.log; nohup python3 -u /tmp/sip_traffic_sim.py --uas 15559998888 --host 10.89.0.23 --port 5060 --bind-ip $UE_IP --listen-port 5070 > /tmp/uas.log 2>&1 &"
 sleep 4
 BEFORE=$(podman exec mvno-upf cat /sys/class/net/ogstun/statistics/tx_bytes 2>/dev/null || echo 0)
-OUT=$(podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py --rtp 3 --caller 15551234567 --callee 15559998888 --host 10.89.0.23 --port 5060 --bind-ip 10.45.0.8 --listen-port 5072 2>&1) || true
+OUT=$(podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py --rtp 3 --caller 15551234567 --callee 15559998888 --host 10.89.0.23 --port 5060 --bind-ip "$UE_IP" --listen-port 5072 2>&1) || true
 AFTER=$(podman exec mvno-upf cat /sys/class/net/ogstun/statistics/tx_bytes 2>/dev/null || echo 0)
 UAS_LOG=$(podman exec mvno-ueransim-ue-1 cat /tmp/uas.log 2>/dev/null || true)
 podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
@@ -510,6 +545,15 @@ assert d.get('allow') is True, f'unexpected: {d}'
 assert d.get('reason') == 'Clean content', f'unexpected reason: {d}'
 print('  ✓ SMS allowed: allow=true, reason=Clean content')" <<< "$SMSR" || fail "5G SMS interception did not allow (got: $SMSR)"
 pass "User SMS allowed (real SMPP MO -> OsmoSMSC GSM-7, nonce ${SMS_NONCE} decoded) + REST verdict Clean"
+
+# Housekeeping: remove the [8] MO row from smsc.db. The row's dest
+# (15557654321) is a 5G MSISDN, so the IP-SM-GW bridge would otherwise keep
+# polling it (5 RETRYs burn the poll budget and leave a confusing leftover
+# that trips up the e2e runbook's bridge-counter assertions).
+SMS_NONCE="${SMS_NONCE}" sqlite3 state/hlr/smsc.db \
+  "DELETE FROM SMS WHERE src_addr='15551234567' AND dest_addr='15557654321' AND created > datetime('now','-5 minutes');" \
+  >/dev/null 2>&1 || true
+echo "  ✓ cleaned up [8] MO row(s) from smsc.db (bridge poll hygiene)"
 
 # ==============================================================================
 # [9/13] NATIVE VOSK JAVA 21 SPEECH-TO-TEXT ASR & SPOOL ARCHIVING PIPELINE

@@ -225,6 +225,20 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   ```
 * **2026-08-05 regression re-certification**: full `demo_runbook.sh` gate passed **13/13 (exit 0)** after the gNB+UE restart, including the 5G user-plane SIP traversal (5b), 407→digest→403 zero-balance block (6), EIR SIM-swap (7), 5G SMS interception (8), Vosk ASR + spool archive (9), SMPP bind (10), PromQL (11/13) and Grafana NOC (12).
 
+### Issue 5.9: 5G Downlink Dead After Concurrent UE Re-Registration Burst — Lost `UpdateSmContext` (gNB F-TEID) via SBI HTTP/2 Framing Error
+* **Symptom** (2026-08-08 regression): `demo_runbook.sh` check 5b fails: the 5G-path UAS REGISTER to `10.89.0.23:5060` from `mvno-ueransim-ue-1` times out, while UEs on sessions created moments earlier/later work. The failure signature differs from Issue 5.8: **uplink is healthy** (REGISTER reaches Kamailio; UPF `ogstun` RX/iptables INPUT `dport 2152` counts packets) and the upfd **reads the downlink reply** (`ogstun` TX increments, TUN fd read confirmed) but **never emits GTP-U** — iptables OUTPUT `dport 2152` stays at **0 packets**. No `[DROP]`/`ogs_tun_read() failed`/`No GTP Node Setup`/`No GTP Socket Setup` lines appear in `upf.log` (v2.8.0 source: `src/upf/gtp-path.c` `_gtpv1_tun_recv_common_cb` drops silently when `upf_sess_find_by_ue_ip_address()` or the DL PDR/FAR match fails; `lib/pfcp/handler.c` `ogs_pfcp_up_handle_pdr()` **buffers silently when `far->gnode == NULL`**).
+* **Root Cause**: At `08-08 05:09:54` three UEs re-registered nearly simultaneously (20 s after the UPF restart). The AMF logged `Error in the HTTP2 framing layer (16)` + `ogs_sbi_client_handler() failed [-1]` at `05:09:54.172` — exactly while ue-1's `Nsmf_PDUSession_UpdateSMContext` (which carries the gNB's N3 F-TEID) was in flight to the SMF. The SMF consequently never provisioned the **downlink FAR with the gNB F-TEID** on the UPF (`far->gnode == NULL`), so downlink G-PDUs were silently buffered/dropped while uplink (whose FAR targets the N6/ogstun side, no gnode required) worked. Evidence correlation:
+  - UPF session `10.45.0.3` (ue-1) added at `05:09:54.166`, **6 ms before** the AMF SBI error; `10.45.0.2` (ue-2, `05:09:33`) and `10.45.0.4` (ue-3, `05:09:54.175`) were unaffected — and only ue-1's downlink was dead.
+  - AMF: `Cannot receive SBI message` / `No SmContextUpdateError [400]` at `05:10:04.175` (10 s SBI timeout); SMF: `Unknown message [214]` at `05:10:04.177`; gNB NGAP `protocol/semantic-error` at `05:10:04`.
+* **Fix**: Re-establish the affected UE's PDU session (fresh PFCP Session Establishment carries the gNB F-TEID correctly):
+  ```bash
+  podman restart mvno-ueransim-ue-1   # re-attach -> new session/IP (e.g. 10.45.0.5)
+  # wait for uesimtun0 to come up, then re-run the 5b probe with the NEW UE IP.
+  ```
+  No core/upf restart is needed; sessions created outside the SBI error window are healthy.
+* **Verification**: after the UE restart, `iptables -L OUTPUT -nv | grep 2152` on `mvno-upf` moves from `0` to `>0` packets, `ogstun` TX increments, and the full 5b dialog (UAS REGISTER 200 OK → INVITE 407→100→180→200 OK → RTP) completes over the 5G user plane.
+* **Runbook robustness fix (2026-08-08)**: `demo_runbook.sh` [5b] previously hardcoded ue-1's UE IP (`--bind-ip 10.45.0.8`), which went stale as UE IPs are re-allocated from the SMF pool on every attach. The runbook now reads ue-1's current `uesimtun0` IPv4 at runtime and fails fast with a clear message if the 5G session is down.
+
 ---
 
 ## 6. Control-Plane & Telemetry Pipeline Operational RCA
