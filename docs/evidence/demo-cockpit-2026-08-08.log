@@ -1,6 +1,6 @@
 ================================================================
-COCKPIT PROOF — demo_live.sh run-evidence (2026-08-08 19:38:21)
-  mode: --live-mic
+COCKPIT PROOF — demo_live.sh run-evidence (2026-08-08 20:06:17)
+  mode: deterministic (tone caller)
 ================================================================
 [1/5] launching cockpit…
 [2/5] waiting for session + panes (≤180s)…
@@ -16,16 +16,10 @@ COCKPIT PROOF — demo_live.sh run-evidence (2026-08-08 19:38:21)
   ~ P7 evidence marker not visible yet
   ✓ pane markers: 6/8 core matched
 [4/5] waiting for mid-call evidence (≤180s, REALTIME_AUDIO budget)…
-  ✓ live-*.wav chunk: live-2c83799064af5aa0-11b32c681e46992d-10.89.0.60-0.wav
-  ✓ archived transcript: mic_probe_1786207102.txt
-  ✓ fresh pcap: 2c83799064af5aa0-11b32c681e46992d.pcap
-  ✓ tshark decoded 623 RTP frames (30000 range)
-[4b] interactive mic pass — SPEAK NOW (5s)…
-  ✓ mic live & captured (mic_call_1786207132.wav) but no speech detected:
-[caller/you · recorded 5s · SILENCE "·····" 5 symbols]
-  (no speech detected — raw WAV + empty transcript kept as evidence;
-   real-voice headline NOT proven this run)
-  (PASS-with-note: real-voice headline not proven this run)
+  ✓ live-*.wav chunk: live-9961f73d92f210ae-a899bcb5317edd99-10.89.0.60-0.wav
+  ✓ archived transcript: mic_probe_1786208777.txt
+  ✓ fresh pcap: 9961f73d92f210ae-a899bcb5317edd99.pcap
+  ✓ tshark decoded 509 RTP frames (30000 range)
 [5/5] teardown…
   ✓ session torn down
   ✓ baresip rigs removed
