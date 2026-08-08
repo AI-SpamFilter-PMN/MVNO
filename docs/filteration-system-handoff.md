@@ -5,10 +5,13 @@
 > this document is the contract its maintainers implement so the org decider can be
 > wired into the live flows. MVNO stays a standalone demo until then.
 >
-> **Status**: proposal — verified against the Filteration-System source tree
-> (2 commits, skeletal: `SmppServerManager`, `SpamFilterMessageReceiver`,
-> `SpamFilterService`, `OsmoMscClient`, domain entities `Message`/`Call`/
-> `Subscriber`/`Blocklist`/`WhitelistedSender`/`SenderPolicy`/`SenderStatus`).
+> **Status**: ⚠ **RE-VERIFY REQUIRED** — the source audit below is from
+> 2026-08-03 (then: 2 commits, skeletal: `SmppServerManager`,
+> `SpamFilterMessageReceiver`, `SpamFilterService`, `OsmoMscClient`, domain
+> entities `Message`/`Call`/`Subscriber`/`Blocklist`/`WhitelistedSender`/
+> `SenderPolicy`/`SenderStatus`). The repo is **private** and has advanced
+> since (updates 2026-08-08+); confirm the class names, the SMPP bind `:2776`,
+> and the `OsmoMscClient` → `:2775` wiring still hold before relying on §2.
 
 ---
 

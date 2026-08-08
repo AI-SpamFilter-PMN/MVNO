@@ -9,6 +9,13 @@ repositories are treated as **read-only external consumers**.
 > Principle: MVNO exposes stable interfaces; external clients align to them.
 > MVNO never edits external repositories. Gaps are surfaced as *recommendations*, never as edits.
 
+> **Contract: v1.2** — verified 2026-08-09 against MVNO `main @ 342dcb7`,
+> `sms-client` `origin/main @ 1a388af` (refactored), `SipClient` `main`
+> (initialization milestone), and last-known `Filteration-System` state (private
+> — re-verify). On any conflict between this file and another doc, **this file
+> wins**; if it conflicts with the live stack, file an ISSUES entry rather than
+> adapting a client to a drift.
+
 **Flow ordering:**
 - **SMS:** the message is classified by the AI filter **first**; an allowed message then proceeds
   through the MVNO gateway and is delivered to the MT recipient (consumer → AI filter → MVNO → MT).
@@ -23,11 +30,11 @@ repositories are treated as **read-only external consumers**.
 | Interface | Endpoint / Port | Protocol | Consumed by | Status |
 |---|---|---|---|---|
 | **SIP registrar/proxy** | `127.0.0.1:5066` (host) → Kamailio `:5060` (container) | UDP/TCP SIP, RFC 3261 + digest auth | `SipClient` | ✅ stable |
-| **SMPP SMSC** | `127.0.0.1:2775` → OsmoSMSC | SMPP 3.4 (ESME bind/submit) | `sms-client` | ✅ stable |
-| **SMS intercept REST** | `POST /api/v1/intercept/sms` (`mvno-api:8080`, host `8080`) | HTTP JSON + `X-API-Key` | `sms-client` (optional) | ✅ stable |
-| **Call intercept REST** | `POST|GET /api/v1/intercept/call` (`mvno-api:8080`) | HTTP JSON + `X-API-Key` | `SipClient` (via Kamailio) | ✅ stable |
+| **SMPP SMSC** | `127.0.0.1:2775` → OsmoSMSC | SMPP 3.4 (ESME bind/submit) | (see §5: refactored `sms-client` uses its own SMPP `:2076` + Neon today; `2775` is present but not currently consumed) | ✅ stable (present) |
+| **SMS intercept REST** | `POST /api/v1/intercept/sms` (`mvno-api:8080`, host `8080`) | HTTP JSON + `X-API-Key` | `sms-client` (optional), Kamailio `route[INTERCEPT_SMS]` | ✅ stable |
+| **Call intercept REST** | `POST|GET /api/v1/intercept/call` (`mvno-api:8080`) | HTTP JSON + `X-API-Key` | `SipClient` via Kamailio `route[INTERCEPT]` | ✅ stable |
 | **Subscriber balance REST** | `GET /api/v1/intercept/subscriber/{msisdn}` | HTTP JSON + `X-API-Key` | NOC / external consumers | ✅ stable |
-| **AI classifier** | `POST /api/v1/classify` on `ai-filter:8000` (host `8008`) | HTTP JSON — 3 event types (Section 4) | `telecom-api` outbound; drop-in target for `AI-Filteration-System` | ✅ mock-authoritative |
+| **AI classifier** | `POST /api/v1/classify` on `ai-filter:8000` (host `8008`) | HTTP JSON — 3 event types (Section 3) | `telecom-api` outbound; drop-in target for `AI-Filteration-System` | ✅ mock-authoritative |
 | **Post-call analytics REST** | `POST /api/v1/transcriptions` (`mvno-api:8080`) | HTTP JSON (transcript + biometrics + DTMF) | external clients pushing post-call analytics | ✅ stable (inbound only) |
 
 The inline mock (defined in `docker-compose.yml`) is the **authoritative classifier
@@ -59,9 +66,12 @@ X-API-Key: mvno-demo-key-2026
   `ai-filter`) and `/actuator/*` are unaffected; SIP (407 digest) and SMPP (ESME credentials)
   authenticate at their own protocol layers.
 - **Kamailio callout** (voice path): `GET /api/v1/intercept/call?caller=<$fU>&callee=<$rU>` with the
-  `X-API-Key` header (see `kamailio.cfg` `route[INTERCEPT]`, `http_client_query`). Caller/callee are
-  E.164 MSISDNs; the gateway response is `{ "allow": boolean, "reason": "string" }` — `allow:false`
-  → Kamailio rejects the call with `403 Call Intercepted / Blocked`.
+  `X-API-Key` header (see `kamailio.cfg` `route[INTERCEPT]`, `http_client_query`). Query params are
+  `caller`, `callee`, `call_id`, `imei` (all optional; blank `caller` → `400`). `POST
+  /api/v1/intercept/call` carries the same fields as a JSON body (`CallInterceptRequest`:
+  `caller`, `callee`, `call_id`, `imei`). Caller/callee are E.164 MSISDNs; the gateway response is
+  `{ "allow": boolean, "reason": "string" }` — `allow:false` → Kamailio rejects the call with
+  `403 Call Intercepted / Blocked`.
 
 ---
 
@@ -129,6 +139,19 @@ header and reject other types with `415 Unsupported Media Type`.
 * **`allow`**: `true` if call/SMS setup is allowed (or transcript is clean); `false` to block.
 * **`reason`**: human-readable classification explanation for NOC audit logging.
 
+**Inbound post-call analytics (external clients → MVNO, `POST /api/v1/transcriptions`)** —
+schema from `TranscriptionController` (`Telecom-api`):
+```json
+{
+  "callId": "call-<epoch>%<host>-<hash>",
+  "audioFile": "call-<epoch>%<host>-<hash>.wav",
+  "transcript": "Hello, this is your bank...",
+  "biometrics": { "silenceRatio": 0.31, "spectralFlatness": 0.08, "durationSeconds": 18.4 },
+  "dtmfEvents": [ { "digit": 1, "timestamp": 1721590001000 } ]
+}
+```
+Response: `200 {"status":"received"}`. No `X-API-Key` required (not under `/intercept/**`).
+
 ---
 
 ## 4. SLA Constraints & Fail-Open Behavior
@@ -193,26 +216,31 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 - **Firewall:** open UDP `30000-30100` (RTP relay range) and UDP `5066` (SIP) between client host
   and MVNO host; the client's own RTP socket must be reachable (see `fix_nated_contact()` in
   `configs/kamailio/kamailio.cfg`).
+- **Any RFC-3261 softphone works (mobile/desktop)**: MVNO publishes `5066/udp` and RTP
+  `30000-30100/udp` on **all host interfaces** (`*`, verified live), so a phone on the same LAN can
+  REGISTER directly with `username=<MSISDN>`, `password=testpass`, realm `localhost`, server
+  `<host-ip>:5066`, codec **PCMU only**. See `docs/LIVE_DEMO.md` S15 and
+  `docs/partner/SipClient-INTEGRATION.md` (drop-in for the repo's README).
 
-### sms-client (`src/main/resources/application.properties`) — ⚠ re-verified 2026-08-08 against `origin/main @ 9df7eb3` (local clone `main` is 3 behind)
-> ⚠ **Correction to the 2026-08-08 audit**: the refactor commit `9df7eb3`
-> ("refactor(sms-client): submit via SMPP to the teammate's server, require
-> login, and redesign the web UI") **DOES exist and is the current `origin/main`
-> HEAD** — the earlier "does not exist" claim audited the **local** clone
-> (`main @ ddb3df8`, 3 commits behind). `origin/main` ships the **refactored**
-> shape: `smpp.port=2076` (teammate's classification server, not the SMSC),
-> Neon Postgres connectivity (`db.url`, read-only history display), login +
-> phone-number ownership, and **no `sms.blockSpam`/`ai.classify` keys**. MVNO
-> integration impact: a drop-in point at `2775` **no longer applies** — the
-> refactored client talks to its own SMPP server on `2076` and reads history
-> from Neon, so the MVNO SMSC (`2775`) is **not** the client's target today.
-> The classic (pre-refactor) shape below describes the local 3-behind clone
-> only:
-> 
-> **Classic shape (local `ddb3df8`, pre-refactor):**
-- `smpp.host=127.0.0.1`, `smpp.port=2775` — ✅ **matches** MVNO's `osmo-smsc` publish
-  (`docker-compose.yml` `2775:2775`; `osmo-smsc.cfg` `esme smsclient` route). **No change needed
-  to reach MVNO today.** When Filteration-System is wired (see handoff
+### sms-client (`src/main/resources/application.properties`) — ⚠ re-verified 2026-08-09 against `origin/main @ 1a388af`
+> **Current truth (origin/main @ `1a388af`, refactored client)**: ships its **own
+> SMPP server on `:2076`** (the teammate classification server, NOT the MVNO
+> SMSC), **Neon Postgres** read-only history (`db.url`), **login + phone-number
+> ownership**, and **no `sms.blockSpam`/`ai.classify` keys**. Integration
+> consequence: the classic MVNO drop-in at `2775` **does not apply today** — this
+> client does not talk to `osmo-smsc` unless re-pointed. Plan against this shape.
+>
+> **Planned org flow (when the Filteration-System decider is wired —
+> `docs/filteration-system-handoff.md`)**: `sms-client` re-points to **`:2776`**
+> (the decider's SMPP listener); the decider forwards clean SMS to MVNO
+> `osmo-smsc:2775`. MVNO stays in-band **transport**; `2775` remains the SMSC
+> seam but the client's target becomes `2776`.
+>
+> **Legacy/classic shape** (pre-refactor `ddb3df8`, rollback/reference only):
+- `smpp.host=127.0.0.1`, `smpp.port=2775` — ✅ still matches MVNO's `osmo-smsc` publish
+  (`docker-compose.yml` `2775:2775`; `osmo-smsc.cfg` `esme smsclient` route), but this exact
+  wiring is **rollback/reference only** — the refactored `origin/main @ 1a388af` client does not
+  target `2775` today. When Filteration-System is wired (see handoff
   `docs/filteration-system-handoff.md`), this port becomes **`2776`** (the org filter's SMPP
   listener) — MVNO is bypassed until then.
 - `smpp.systemId=smsclient`, `smpp.password=password` → matches the `esme smsclient` route ✅

@@ -80,6 +80,7 @@ listed — see the pinned ALLOWLIST in `scripts/check-glossary.sh`.
 | **NG** | Next Generation | 5G-adjacent (NG-RAN, N26 interface) |
 | **NGAP** | Next Generation Application Protocol | 5GC — signaling between gNB and AMF (N2 interface) [C] |
 | **NOC** | Network Operations Center | Grafana command center (`noc_victoriametrics.json`) |
+| **Neon** | Neon serverless Postgres (external) | Read-only SMS-history store for the refactored `sms-client` (not part of MVNO) |
 | **NRF** | Network Repository Function | 5GC — service registry for all NFs [C] |
 | **NSSF** | Network Slice Selection Function | 5GC — selects network slice for UE [C] |
 | **OBS** | Open Build Service | Osmocom package repositories |

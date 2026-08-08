@@ -710,30 +710,32 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 
 ## 10. Cross-Repo Integration Contract Specifications
 
-This section defines the multi-agent integration boundaries across team repositories within the `AI-SpamFilter-PMN` organization.
+> **Synopsis — the authoritative contract is `docs/INTEGRATION_CONTRACT.md`
+> (v1.2, verified 2026-08-09).** This section is a memory hook for the
+> multi-repo boundaries inside the `AI-SpamFilter-PMN` org. On any conflict
+> with the contract file, **the contract wins** — full payload schemas,
+> SLA/fail-open, credentials, and per-repo notes live there and are **not**
+> restated here (they have already drifted once; see the sms-client note).
 
 ### 1. `ai-filter` Model Container Interface (`AI-Filteration-System` Repo)
-- **Container Service Name**: `ai-filter` (attached to `mvno_net` bridge network).
-- **Listening Socket**: `0.0.0.0:8000` inside container.
-- **REST Contract**: `POST /api/v1/classify`
-- **Request Payload** (event-typed): `{ "event_type": "SMS", "sender_msisdn", "recipient_msisdn", "content_text", "timestamp_epoch_ms" }` for SMS; `{ "event_type": "VOICE_CALL", "caller_msisdn", "callee_msisdn", "call_id", "timestamp_epoch_ms" }` for voice (no `content_text`, no `call_id` on SMS — verified against `AiFilterService.java`)
-- **Response Payload**: `{ "allow": boolean, "reason": string }`
-- **SLA Bound**: Response time $\le 5.0\text{s}$ (Fail-open SLA fallback on timeout).
+- `POST /api/v1/classify` on `ai-filter:8000` (container) / host `8008`; **three event types**
+  (`SMS`, `VOICE_CALL`, `TRANSCRIPT`); response `{ "allow": bool, "reason": string }`;
+  SLA ≤ 5 s read with fail-open + circuit breaker — see INTEGRATION_CONTRACT §3–§4.
 
 ### 2. `sms-client` SMPP Client Interface (Ali — `sms-client` Repo)
-- **Protocol**: SMPP v3.4 BIND_TRANSCEIVER over TCP.
-- **Target Host & Port**: `osmo-smsc:2775` (inside container network `mvno_net`).
-- **SMSC System-ID**: `MVNO_SMSC`
-- **Primary ESME Credentials**: `mvno-api-route` / `changeme`
-- **Secondary Client ESME Credentials**: `smsclient` / `password`
-- **REST Interception Gateway**: Calls `POST /api/v1/intercept/sms` on `telecom-api:8080` with header `X-API-Key: mvno-demo-key-2026` (zero-trust Section 1.2; missing/mismatched key → `401`).
+- ⚠ **Current refactored client does NOT target MVNO today**: it runs its own SMPP `:2076`
+  + Neon + login (`origin/main @ 1a388af`). The classic MVNO seam is `osmo-smsc:2775`
+  (SMSC System-ID `MVNO_SMSC`; ESME `mvno-api-route`/`changeme` primary,
+  `smsclient`/`password` secondary). The **planned** org flow re-points the client to the
+  Filteration-System decider `:2776` first (see INTEGRATION_CONTRACT §5 + handoff).
+- REST interception: `POST /api/v1/intercept/sms` on `telecom-api:8080` with
+  `X-API-Key: mvno-demo-key-2026` (missing/mismatched → `401`).
 
 ### 3. `SipClient` User Agent Interface (`SipClient` Repo)
-- **Protocol**: SIP RFC 3261 over UDP.
-- **Target Host & Port**: `localhost:5066` on host (maps to `kamailio:5060/udp`).
-- **SIP REGISTER Authentication**: Digest authentication (`auth_check()`) using credentials seeded in `kamailio.db`.
-- **SIP INVITE Authentication**: `INVITE` is also challenged (`407 Proxy Authentication Required`, zero-trust Section 1.1) — retry with `Authorization: Digest` (realm `localhost`).
-- **RTP Media Streams**: RTPEngine UDP port range `30000-30100/udp` (G.711u PCMU codec).
+- SIP UDP at `127.0.0.1:5066` (host) → `kamailio:5060/udp`; works for any RFC-3261 softphone
+  (desktop/mobile), not just this repo's client — see LIVE_DEMO S15. REGISTER **and** INVITE are
+  digest-challenged (realm `localhost`, subscriber-table creds; `407` → retry with
+  `Authorization: Digest`). RTP relay `30000-30100/udp`, **PCMU only** (no transcode).
 
 ---
 
