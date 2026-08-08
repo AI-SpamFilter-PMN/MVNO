@@ -35,6 +35,12 @@ rebuild: clean init-db
 # Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
 	@mkdir -p state/mongodb state/spool/archived state/hlr state/kamailio state/vm-data state/victorialogs state/grafana state/logs/kamailio state/logs/osmocom state/logs/vector
+	@# RTPEngine spool is written by rtpengine (root) and archived by mvno-api
+	@# (container uid 1001, mounted :z — no :U chown). Fresh 755 dirs make the
+	@# Vosk watcher fail to write transcripts/archived WAVs on cold start
+	@# ("Spool directory polling error"). Match the 777 convention of the WAV
+	@# files themselves so every writer (host live_tap, rtpengine, mvno-api) works.
+	@chmod 777 state/spool state/spool/archived state/spool/tmp state/spool/metadata 2>/dev/null || true
 	@# WAL/shm are now SHARED with the running kamailio (dir mount) — never delete
 	@# them under a live process; a cold re-init should tear down first.
 	@if ! podman ps --format '{{.Names}}' 2>/dev/null | grep -q '^mvno-kamailio$$'; then \
@@ -58,7 +64,7 @@ init-db:
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
 			VALUES ('15551234567', 'localhost', 'testpass', '', '', '15551234567', 100);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15557654321', 'localhost', 'testpass', '', '', '15557654321', 100);" \
+			VALUES ('15557654321', 'localhost', 'testpass', '', '', '15557654321', 0);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
 			VALUES ('15559998888', 'localhost', 'testpass', '', '', '15559998888', 100);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
