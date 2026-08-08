@@ -16,9 +16,10 @@ This document outlines upcoming architectural enhancements, operational backlog 
 - **Current State**: `telecom-api` enforces `X-API-Key` on all `/api/v1/intercept/**` endpoints via `ApiKeyInterceptor` (commit `0590aac`). Missing/mismatched key → `401 Unauthorized`. Key from `intercept.api-key` property (`X_API_KEY` env override, demo default `mvno-demo-key-2026`); Kamailio INTERCEPT queries carry the header via 4-arg `http_client_query`.
 - **Verification**: unit tests (3 interceptor cases, 26/26 total), Makefile + runbook curls all carry the header; no-header → 401 confirmed live.
 
-### 3. VictoriaLogs Log Ingestion Sink
+### 3. VictoriaLogs Log Ingestion Sink — ✅ IMPLEMENTED (Aug 8 2026)
 - **Current State**: Vector outputs JSON logs to `[sinks.stdout]`.
 - **Roadmap Item**: Add `[sinks.victorialogs]` HTTP ingestion sink targeting `victorialogs:9428` for long-term log archiving and Grafana log queries.
+- **Implemented**: `victorialogs` service (`victoriametrics/victoria-logs:latest`, distroless, port 9428, static IP 10.89.0.54, `-retentionPeriod=7d`, data in `./state/victorialogs`) + vector `[sinks.victorialogs]` (elasticsearch sink, `mode="bulk"`, `endpoints = ["http://victorialogs:9428/insert/elasticsearch/"]`, inputs = `parse_telecom_events`; `healthcheck.enabled=false` — VL rejects vector's `_cluster/health` probe (400), bulk ingest unaffected). `._msg = .message` VRL mapping added so VL/Grafana display real log lines. Verified: `/health` OK, rows ingested and queryable via LogsQL (`/select/logsql/query?query=*`) with fresh timestamps from kamailio/2g/ms containers.
 
 ### 3b. Real-Call Recording → ASR Transcription Pipeline (pcap→wav→Vosk) — ✅ IMPLEMENTED
 - **Current State**: rtpengine mr9.4 records calls as `recording-format=eth` pcaps only (no WAV support in this build); `record-call=yes` produces pcaps while the Vosk watcher consumed `.wav` — real calls were never transcribed.

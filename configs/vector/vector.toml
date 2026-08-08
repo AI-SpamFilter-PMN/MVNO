@@ -27,6 +27,9 @@ source = '''
 .timestamp = parse_timestamp(.timestamp, format: "%+") ?? .timestamp
 .container = .container_name
 
+# VictoriaLogs reads the message from _msg (log display field in VL/Grafana).
+._msg = .message
+
 # VRL Regex Parsing: Extract E.164 phone numbers (MSISDN) from raw signaling logs
 if contains(to_string!(.message), "INVITE") {
   .event_type = "SIP_INVITE"
@@ -46,6 +49,22 @@ type = "file"
 inputs = ["parse_telecom_events"]
 path = "/var/log/vector/telecom_events.json"
 encoding.codec = "json"
+
+# ==============================================================================
+# LOG SINK — VictoriaLogs (ROADMAP item 3: persistent log ingestion).
+# Vector's elasticsearch sink in bulk mode is the documented VictoriaLogs
+# integration (VictoriaMetrics docs: "Vector -> VictoriaLogs"):
+# POST /insert/elasticsearch/_bulk on victorialogs:9428.
+# ==============================================================================
+[sinks.victorialogs]
+type = "elasticsearch"
+inputs = ["parse_telecom_events"]
+endpoints = ["http://victorialogs:9428/insert/elasticsearch/"]
+mode = "bulk"
+api_version = "v8"
+# VL rejects vector's ES-sink healthcheck probe (400) — bulk ingest works;
+# row landing is verified via the LogsQL API (see gate/runbook evidence).
+healthcheck.enabled = false
 
 # ==============================================================================
 # METRICS PIPELINE — scrape IP-SM-GW bridge counters and remote-write to

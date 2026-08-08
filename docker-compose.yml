@@ -644,6 +644,9 @@ services:
       - ./configs/vector/vector.toml:/etc/vector/vector.toml:z
       - ./state/logs/vector:/var/log/vector:z
       - ${DOCKER_SOCK:-/run/user/${PODMAN_USER_UID:-1000}/podman/podman.sock}:/var/run/docker.sock:ro,z
+    depends_on:
+      victorialogs:
+        condition: service_started
     networks:
       mvno_net:
         ipv4_address: 10.89.0.40
@@ -660,6 +663,23 @@ services:
     networks:
       mvno_net:
         ipv4_address: 10.89.0.41
+    restart: unless-stopped
+
+  # ─── VictoriaLogs Log Database (ROADMAP item 3: persistent log sink) ───
+  victorialogs:
+    image: victoriametrics/victoria-logs:latest
+    container_name: mvno-victorialogs
+    ports:
+      - "9428:9428"
+    # -retentionPeriod=7d: lightweight footprint (logs are operational evidence,
+    # not archive). Distroless image (no shell/tools) — healthcheck fallback:
+    # vector depends_on service_started (see ROADMAP item 4 documented fallback).
+    command: ["-retentionPeriod=7d"]
+    volumes:
+      - ./state/victorialogs:/victoria-logs-data:z
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.57
     restart: unless-stopped
 
   # ─── VictoriaMetrics Telemetry Scraper (vmagent) ───
