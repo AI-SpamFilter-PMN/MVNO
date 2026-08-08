@@ -200,10 +200,10 @@ python3 scripts/testing/send_raw_smpp.py 15557778888 15554443322 "Hello raw 2G2G
 
 ```bash
 podman exec -it mvno-2g-ms /bin/bash
-# Use the Osmocom mobile terminal utility built into the container.
-# (mctest / vtycmd live in /tmp/ of the container)
-cd /tmp
-./mctest -l /tmp/osmocom_l2 -P mm    # bring up MM layer toward MSC
+# The Osmocom mobile terminal is auto-attached at container start
+# (PID 1 runs `mobile -c /etc/osmocom/mobile.cfg` + `virtphy` on
+# /tmp/osmocom_l2) — no manual bring-up. Watch receipts:
+tail -f /root/.osmocom/bb/sms.txt
 ```
 
 ### Terminal T0 — trigger an MO 2G→2G SMS
@@ -1072,7 +1072,7 @@ retries it at poll speed during e2e cell 4, and the relay traffic trips the
 
 ## Certification (2026-08-06)
 
-All flows below were re-verified live against the running 31-container stack on
+All flows below were re-verified live against the running 32-container stack on
 **2026-08-06** (the "Make Every Flow Audible & Provably Working" audit). Each flow
 has ≥ 1 human-visible artifact; runbook evidence is in `docs/evidence/`:
 

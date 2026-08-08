@@ -38,7 +38,7 @@ listed — see the pinned ALLOWLIST in `scripts/check-glossary.sh`.
 | **GERAN** | GSM EDGE Radio Access Network | 2G RAN (Osmocom stack) |
 | **GIL** | Global Interpreter Lock | CPython threading constraint |
 | **GLIBC** | GNU C Library | Host libc (baresip rig mounts) |
-| **MM** | Mobility Management | 2G layer — `mctest -P mm` bring-up (S2) |
+| **MM** | Mobility Management | 2G layer — `mobile -c /etc/osmocom/mobile.cfg` auto-attach (S2) |
 | **NEA** | NR Encryption Algorithm | 5G ciphering — NEA1/2 (128-NEA1/NEA2) |
 | **NIA** | NR Integrity Algorithm | 5G integrity — NIA0/1/2 (NIA0 = off) |
 | **SMS** | Short Message Service | SMS paths (2G/IMS), SMSC store-and-forward |

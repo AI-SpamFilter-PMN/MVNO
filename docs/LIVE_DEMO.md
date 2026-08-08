@@ -11,7 +11,7 @@
 
 | Terminal | Role | Steps |
 |---|---|---|
-| **T-A** | 2G MS (`podman exec -it mvno-2g-ms /bin/bash` + `mctest`) | S3, S6 |
+| **T-A** | 2G MS (`podman exec -it mvno-2g-ms /bin/bash`, auto-attached, watch `sms.txt`) | S3, S6 |
 | **T-B** | main — host shell at repo root | all others |
 | **T-C** | live view: `watch` transcripts + verdicts + container logs | S2, S5 |
 | **T-G** | playback: `aplay` the archived legs | S5 |
@@ -41,10 +41,10 @@ podman compose up -d   # or `docker compose up -d`
 ```
 
 **EXPECT** — `Started`/`Up` lines; `podman compose ps | grep -c Up` eventually
-returns **31** (the core stack; `baresip-rx`/`baresip-tx` are demo-only and are
+returns **32** (the core stack; `baresip-rx`/`baresip-tx` are demo-only and are
 added by S4). Health can take ~30 s — poll:
 ```bash
-until [ "$(podman compose ps 2>/dev/null | grep -c Up)" -ge 31 ]; do
+until [ "$(podman compose ps 2>/dev/null | grep -c Up)" -ge 32 ]; do
   sleep 3; printf '.'
 done; echo " UP"
 ```
@@ -86,7 +86,7 @@ receipt terminal.
 
 ```bash
 curl -s http://localhost:8080/actuator/health | head -c 120; echo
-podman logs --latest mvno-api 2>&1 | tail -2 || podman logs mvno-api 2>&1 | tail -2
+podman logs mvno-api 2>&1 | tail -2
 curl -s http://localhost:8008/ | head -c 20; echo " <- ai-filter alive"
 curl -s 'http://localhost:8428/api/v1/query?query=up' | jq -r '.data.result[0].value[1]'
 ```
@@ -101,14 +101,16 @@ curl -s 'http://localhost:8428/api/v1/query?query=up' | jq -r '.data.result[0].v
 
 **ATTACH THE 2G MS** (T-A — keep this terminal): the receipt reader
 (MS1 / `15554443322`, IMSI `001010000000004`); every 2G-received SMS lands in
-`/root/.osmocom/bb/sms.txt`.
+`/root/.osmocom/bb/sms.txt`. The MS **auto-attaches at container start**
+(PID 1 runs `mobile -c /etc/osmocom/mobile.cfg` + `virtphy -s /tmp/osmocom_l2`),
+so T-A only watches receipts — no manual MM bring-up needed:
 
 ```bash
 podman exec -it mvno-2g-ms /bin/bash
-cd /tmp && ./mctest -l /tmp/osmocom_l2 -P mm    # bring up MM layer toward MSC
+tail -f /root/.osmocom/bb/sms.txt          # MS1 auto-attached; receipts stream here
 ```
-**EXPECT** — `mctest` shows MM-layer bring-up toward the MSC (idle `MM`/`CM`
-attach). Leave this terminal attached for the whole demo (S6a/6c receipts). Steps
+**EXPECT** — sms.txt exists and streams `[SMS from …]` lines as S3/S6a/6c send.
+Leave this terminal attached for the whole demo (S6a/6c receipts). Steps
 S4+ run on **T-B**.
 
 **FALLBACK** — stack gates: `./scripts/preflight.sh` auto-verifies the host;
@@ -582,13 +584,16 @@ Issue 8.19); host ports are published for rootless Podman/Docker on
 | grafana | .43 | ai-filter | .44 | osmo-hlr | .45 |
 | telecom-api | .46 | mongodb-exporter | .47 | rtpengine | .48 |
 | osmo-smsc | .49 | 2g-core | .50 | 2g-ms | .51 |
-| 2g-ms2 | .52 | ip-sm-gw | .53 | | |
+| 2g-ms2 | .52 | ip-sm-gw | .53 | victorialogs | .57 |
 
-Demo-only rigs (created by runbooks, not part of the 31-container core):
+Demo-only rigs (created by runbooks, not part of the 32-container core):
 `ims-uas58` @ `10.89.0.58`, `ims-caller59` @ `10.89.0.59` (Flow E),
 `baresip-rx/tx` @ `10.89.0.60/.61` (S4). All three IP pairs are **static by
 convention** (passed as `--ip` on `podman run`) — if one is occupied, reuse the
-same address plan (they are only used by demo containers).
+same address plan (they are only used by demo containers). `.54–.56` are the
+e2e runbook's transient receivers (`ims_rx54/55/56`) and `.58–.61` the demo
+rigs — **do not reuse these for static services** (`make check-pins` guards
+uniqueness in compose, not the runbook rigs).
 
 ### A.3 — Dynamic addresses (never hardcode — read at runtime)
 
