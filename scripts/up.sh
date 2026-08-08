@@ -47,6 +47,23 @@ CUSTOM_IMAGES=(
   # mvno-vosk-worker — removed: ASR runs in-process via NativeVoskService.java
 )
 
+# ─── Cold-start fail-fast (guided error, not silent breakage) ─────────────────
+# A plain launch (or --build) with no subscriber DBs means a silently broken
+# stack: no Kamailio subscriber table (SIP digest auth fails), no hlr.db IMSI
+# map (2G paths), no balances (403 contract). `make init-db` (or the one-command
+# `make bootstrap`) creates them. Passthrough commands work without the DBs.
+case "${1:-}" in
+  down|logs|ps|stop|restart|config|create) : ;;  # passthrough: no DB needed
+  *)
+    if [ ! -f state/kamailio/kamailio.db ] || [ ! -f state/hlr/hlr.db ]; then
+      echo "❌ cold start: subscriber DBs missing (state/kamailio/kamailio.db, state/hlr/hlr.db)." >&2
+      echo "   Run 'make init-db' first — or the one-command 'make bootstrap'" >&2
+      echo "   (≡ init-db -> up -> seed-mongo -> bootstrap-check)." >&2
+      exit 1
+    fi
+    ;;
+esac
+
 # ─── Passthrough commands that need no build logic (down, logs, ps, stop, etc.) ─────
 case "${1:-}" in
   down|logs|ps|stop|restart|config|create)

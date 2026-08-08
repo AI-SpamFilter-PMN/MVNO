@@ -45,9 +45,17 @@ make seed-mongo     # Open5GS 5G subscriber docs — AFTER up: it execs into the
                     # running mongodb container (without it: UDR "No UE-AMBR" ->
                     # 5G UEs cannot register, gate cell 2 fails)
 ```
-One-command equivalent (≡ `init-db` → `up` → `seed-mongo`):
+One-command equivalent — `make bootstrap` (≡ `init-db` → `up` → `seed-mongo`
+→ `bootstrap-check`, the post-up **functional health gate**). The gate polls
+(bounded) that the stack is *functional*, not just Up: Kamailio subscriber
+rows, hlr.db IMSI map, Open5GS 3 UEs, API + ai-filter health, unique IP pins,
+bridge 2G AoRs, and `ran_ue == 3` — the first red marker names the exact
+missing step. `make up` itself now **fails fast** with a guided error if the
+subscriber DBs are missing (no more silent broken stack).
+
 ```bash
 make bootstrap
+# or the explicit steps: make init-db && make up && make seed-mongo && make bootstrap-check
 ```
 If `make` isn't available, the compose path is `podman compose up -d` (or
 `docker compose up -d`) — but still run `make init-db` and `make seed-mongo`
@@ -750,13 +758,15 @@ depending on the partner repo's state.
 ## Quick Gate Checklist (before calling it done)
 
 > **First-run prerequisite** — on a fresh box run `make bootstrap` (≡ `make
-> init-db` → `make up` → `make seed-mongo`) once first; every gate below assumes
-> the subscriber DBs and Open5GS Mongo are populated. `make gate` is the
-> deterministic oracle (5G preflight + 8-cell SMS matrix); the two scripts below
-> are its narrated equivalents.
+> init-db` → `make up` → `make seed-mongo` → `make bootstrap-check`) once first;
+> every gate below assumes the subscriber DBs and Open5GS Mongo are populated.
+> `make gate` is the deterministic oracle (5G preflight + 8-cell SMS matrix);
+> `make bootstrap-check` is the fast cold-start health gate; the two scripts
+> below are the narrated equivalents.
 
 ```bash
 bash scripts/check-glossary.sh                                    # exit 0 (docs lint)
+make bootstrap-check                                            # exit 0 (8/8 cold-start gate)
 make gate                                                       # exit 0 (8/8 oracle)
 ./scripts/testing/sms_matrix.sh >/dev/null && echo "E2E OK"     # exit 0
 ./scripts/testing/live_demo.sh >/dev/null && echo "DEMO OK"   # exit 0

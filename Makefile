@@ -33,11 +33,11 @@ rebuild: clean init-db
 	./scripts/up.sh --build
 
 # One-command cold start (fresh box or after `make clean`): SQLite DBs -> launch
-# stack -> seed Open5GS Mongo. Order matters: seed-mongo.sh execs into the RUNNING
-# mvno-mongodb container, so it must come after `up` (it is NOT the init-db->
-# seed-mongo->up order a reader might assume). Every step is an idempotent upsert,
-# so re-running is safe on a live box too.
-bootstrap: init-db up seed-mongo
+# stack -> seed Open5GS Mongo -> functional health gate. Order matters:
+# seed-mongo.sh execs into the RUNNING mvno-mongodb container, so it must come
+# after `up` (it is NOT the init-db->seed-mongo->up order a reader might assume).
+# Every step is an idempotent upsert, so re-running is safe on a live box too.
+bootstrap: init-db up seed-mongo bootstrap-check
 
 # Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
@@ -221,7 +221,7 @@ check-pins:
 #   make watchdog-log        tail the watchdog log
 #   make watchdog-status     systemd unit status
 # ─────────────────────────────────────────────────────────────────────────────
-.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test check-subs
+.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test check-subs bootstrap-check
 
 watchdog-install:
 	@mkdir -p $(HOME)/.config/systemd/user
@@ -258,6 +258,13 @@ watchdog-status:
 #   make subscriber-proof    add-subscriber.sh 5-store + SIP REGISTER evidence
 #   make watchdog-self-test  fault-injection recovery evidence (bridge outage)
 # ─────────────────────────────────────────────────────────────────────────────
+# Post-up functional health gate (the cold-start oracle): asserts the subscriber
+# DBs / Mongo seed / APIs / IP pins / bridge AoRs / UE fleet are FUNCTIONAL, not
+# just "Up" — the first red marker names the exact missing step. Tees to
+# docs/evidence/ with `bash -o pipefail` so a FAIL can never be swallowed by tee.
+bootstrap-check:
+	@bash -o pipefail -c 'bash scripts/check-bootstrap.sh 2>&1 | tee docs/evidence/bootstrap-$(shell date +%F).log'
+
 proof: cockpit-proof subscriber-proof watchdog-self-test
 	@echo "══════════════════════════════════════════════════════════════"
 	@echo "✅ PROOF PASS — all three evidence logs written to docs/evidence/"
