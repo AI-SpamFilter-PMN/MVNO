@@ -136,31 +136,62 @@ MVNO_RUN_LOCKS=(mvno-gate.lock mvno-preflight.lock mvno-sms-matrix.lock \
 # bash -c whose cmdline contains the invocation), which made the gate see
 # itself as in-flight and refuse to start.
 
-# acquire_run_lock NAME — staleness-aware PID lock in ${TMPDIR}. Registers a
-# single EXIT trap releasing it (idempotent). Returns 1 if the lock is held by
-# a live process.
+# acquire_run_lock NAME — staleness-aware PID lock in ${TMPDIR}. Returns 1 if
+# the lock is held by a live process.
 #
-# LIMITATION: bash supports ONE EXIT trap per process — a second acquire in the
-# same process would replace the first trap and leak that lock (no caller does
-# this today; every orchestrator holds exactly one lock). release_run_lock is
-# available if a caller ever needs more than one.
-_LOCK_NAME=""
+# NESTING-SAFE by design (audit hardening): every acquired lock is recorded in
+# the process-held list _LOCK_NAMES, and ONE EXIT trap releases ALL of them — a
+# second acquire in the same process can no longer leak the first (bash has a
+# single EXIT trap, but the trap iterates the full list). Every orchestration
+# script holds exactly one lock today; nesting is now safe if one ever needs
+# more.
+#
+# TRAP-ORDERING caveat: acquire_run_lock installs its own `trap ... EXIT`, so
+# a caller that registered an EXIT trap BEFORE acquire would have it silently
+# replaced. Callers must register their own traps AFTER acquire (the documented
+# cockpit_proof pattern), or release explicitly via release_run_lock.
+_LOCK_NAMES=()
 acquire_run_lock() {
     local name="$1" f
     f="${TMPDIR:-/tmp}/${name}"
-    _LOCK_NAME="$name"
     if [ -f "$f" ] && [ -s "$f" ] && kill -0 "$(cat "$f" 2>/dev/null)" 2>/dev/null; then
         echo "[-] Error: lock '${name}' held by PID $(cat "$f" 2>/dev/null) — refusing to collide (another run in progress)" >&2
         return 1
     fi
     echo $$ > "$f"
-    trap 'rm -f "${TMPDIR:-/tmp}/'"$_LOCK_NAME"'"' EXIT
+    _LOCK_NAMES+=("$name")
+    trap '_release_all_locks' EXIT
     return 0
 }
 
+# _release_all_locks — internal EXIT handler: remove every lock this process
+# holds (idempotent; missing files are ignored).
+_release_all_locks() {
+    local name
+    # _LOCK_NAMES is always initialized (never unbound), so no :- guard needed
+    # — and a plain "${arr[@]}" on an empty array expands to nothing, avoiding
+    # a phantom empty-name iteration that "${arr[@]:-}" can produce.
+    for name in "${_LOCK_NAMES[@]}"; do
+        rm -f "${TMPDIR:-/tmp}/${name}" 2>/dev/null || true
+    done
+    _LOCK_NAMES=()
+}
+
 # release_run_lock [NAME] — explicit release (also released by the EXIT trap).
+# With no NAME, releases the most recently acquired lock. Removes it from the
+# held list so the EXIT trap won't touch it again.
 release_run_lock() {
-    rm -f "${TMPDIR:-/tmp}/${1:-$_LOCK_NAME}" 2>/dev/null || true
+    local name="${1:-}"
+    if [ -z "$name" ]; then
+        [ "${#_LOCK_NAMES[@]}" -gt 0 ] || return 0
+        name="${_LOCK_NAMES[${#_LOCK_NAMES[@]}-1]}"
+    fi
+    rm -f "${TMPDIR:-/tmp}/${name}" 2>/dev/null || true
+    local i kept=()
+    for i in "${_LOCK_NAMES[@]}"; do
+        [ "$i" = "$name" ] || kept+=("$i")
+    done
+    _LOCK_NAMES=("${kept[@]}")
 }
 
 # run_in_flight — 0 when ANY registered orchestrator is active: a live lock in
@@ -188,7 +219,10 @@ run_in_flight() {
 # capture). Best-effort and NEVER fatal: generates a tiny WAV once with ffmpeg
 # (sine 660->880 Hz, ~0.5 s), then plays via the first working path:
 #   paplay (Pulse/PipeWire socket) -> aplay (ALSA) -> terminal BEL
-# Escape hatch: MVNO_NO_BEEP=1 skips the sound entirely (headless runs).
+# DEPENDENCY NOTE: needs ffmpeg + paplay/aplay present at call time — all of
+# them are preflight.sh DEMO_TOOLS (checked at S1), so a stock demo box has
+# them; a headless box without Pulse falls through to the terminal BEL, never
+# a hard fail. Escape hatch: MVNO_NO_BEEP=1 skips the sound entirely.
 # Used by: demo_call.sh dial() and mic_record.sh (both the SPEAK NOW call
 # window and the graduation/cockpit mic captures share this one helper).
 play_go_beep() {

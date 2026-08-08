@@ -177,7 +177,9 @@ Vosk transcript.
 > `mic_record.sh` starts capturing), a short two-tone **pep sound** plays over
 > the host speakers — that is the "the call is live, start talking now" cue
 > (`play_go_beep` in `scripts/lib/common.sh`; `paplay` → `aplay` → terminal
-> BEL fallback; `MVNO_NO_BEEP=1` to mute for headless runs).
+> BEL fallback; `MVNO_NO_BEEP=1` to mute for headless runs). Needs `ffmpeg` +
+> `paplay`/`aplay` at call time — all of them are `preflight.sh` DEMO_TOOLS
+> (S1), and a box without Pulse still degrades to the BEL, never a hard fail.
 >
 > **Phrase** (realistic, ASR-vetted): *"Your bank account has been blocked,
 > please confirm your details now"* — Vosk hears it almost verbatim, so the
