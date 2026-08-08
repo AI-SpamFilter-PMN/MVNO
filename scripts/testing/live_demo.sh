@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# MVNO Telecom Core — Graduation Project Live Demo & Presentation Runbook
+# MVNO Telecom Core — Graduation Project Live Demo (live_demo.sh)
 # ==============================================================================
 # Executable 13-step demonstration script verifying end-to-end 5G SA Core,
 # IMS SIP Interception, SMPP SMSC, Gateway REST APIs, and SOTA Grafana NOC.
@@ -22,11 +22,11 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
 # Re-entrancy guard (evidence race guard): refuse to start while another
-# instance is active, so two runbooks can never truncate/flush the same
+# instance is active, so two live_demo instances can never truncate/flush the same
 # clean-slate RUN_LOG concurrently. Lock is released on EXIT.
-LOCK_FILE="${TMPDIR:-/tmp}/mvno-demo-runbook.lock"
+LOCK_FILE="${TMPDIR:-/tmp}/mvno-live-demo.lock"
 if [ -f "${LOCK_FILE}" ] && kill -0 "$(cat "${LOCK_FILE}" 2>/dev/null)" 2>/dev/null; then
-    echo "[-] Error: another demo_runbook.sh instance is active (PID $(cat "${LOCK_FILE}")) — refusing to start to protect clean-slate evidence" >&2
+    echo "[-] Error: another live_demo.sh instance is active (PID $(cat "${LOCK_FILE}")) — refusing to start to protect clean-slate evidence" >&2
     exit 1
 fi
 echo $$ > "${LOCK_FILE}"
@@ -51,14 +51,14 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-echo -e "${CYAN}==== demo runbook log: ${RUN_LOG} ====${NC}"
+echo -e "${CYAN}==== live demo log: ${RUN_LOG} ====${NC}"
 
 PASS=0; FAIL=0
 pass() { PASS=$((PASS+1)); echo -e "${GREEN}  ✓ $1${NC}"; }
 fail() { FAIL=$((FAIL+1)); echo -e "${RED}  ✗ $1${NC}" >&2; exit 1; }
 
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
-echo -e "${CYAN}${BOLD}  🎓 MVNO 5G SA Core & Interception Gateway — Live Demo Runbook        ${NC}"
+echo -e "${CYAN}${BOLD}  🎓 MVNO 5G SA Core & Interception Gateway — Live Demo                    ${NC}"
 echo -e "${CYAN}${BOLD}========================================================================${NC}"
 echo ""
 
@@ -223,7 +223,7 @@ WAV_OUT=""
 # Mid-write race guard: RTPEngine flushes the pcap AFTER the call; reading it
 # while it grows yields an undecodable file and live_tap --once fails SILENTLY.
 # Wait for the newest pcap to be STABLE (size unchanged across 2 s) before
-# decoding, so a short call cannot strand the runbook on an unfinalized file.
+# decoding, so a short call cannot strand live_demo on an unfinalized file.
 NEWEST_PCAP=""
 for i in $(seq 1 10); do
     CAND=$(\ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1 || true)
@@ -621,7 +621,7 @@ pass "User SMS allowed (real SMPP MO -> OsmoSMSC GSM-7, nonce ${SMS_NONCE} decod
 # Housekeeping: remove the [8] MO row from smsc.db. The row's dest
 # (15557654321) is a 5G MSISDN, so the IP-SM-GW bridge would otherwise keep
 # polling it (5 RETRYs burn the poll budget and leave a confusing leftover
-# that trips up the e2e runbook's bridge-counter assertions).
+# that trips up sms_matrix's bridge-counter assertions).
 SMS_NONCE="${SMS_NONCE}" sqlite3 state/hlr/smsc.db \
   "DELETE FROM SMS WHERE src_addr='15551234567' AND dest_addr='15557654321' AND created > datetime('now','-5 minutes');" \
   >/dev/null 2>&1 || true
@@ -903,7 +903,7 @@ pass "Master telemetry gate re-asserted (value ≥ 1)"
 echo -e "${GREEN}✓ All core telecom, signaling, interception, ASR, and observability flows verified live${NC}\n"
 
 if [ "$FAIL" -gt 0 ]; then
-  echo -e "${RED}${BOLD}==== DEMO RUNBOOK: ${FAIL} FAILURE(S), ${PASS} PASSED — ABORTING ====${NC}"
+  echo -e "${RED}${BOLD}==== LIVE DEMO: ${FAIL} FAILURE(S), ${PASS} PASSED — ABORTING ====${NC}"
   exit 1
 fi
 echo -e "${CYAN}${BOLD}========================================================================${NC}"

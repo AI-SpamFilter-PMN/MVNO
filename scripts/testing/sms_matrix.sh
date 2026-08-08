@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# MVNO End-to-End SMS Interworking Runbook - Goal 7
+# MVNO End-to-End SMS Interworking Matrix (sms_matrix.sh) - Goal 7
 # ==============================================================================
 # Verifies the FULL 4-cell SMS interworking matrix across the 2G and 5G domains
 # plus a deterministic AI-block policy path, asserting on LIVE metrics:
@@ -30,11 +30,11 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
 # Re-entrancy guard (evidence race guard): refuse to start while another
-# instance is active, so two runbooks can never truncate/flush the same
+# instance is active, so two sms_matrix instances can never truncate/flush the same
 # clean-slate RUN_LOG concurrently. Lock is released on EXIT.
-LOCK_FILE="${TMPDIR:-/tmp}/mvno-e2e-runbook.lock"
+LOCK_FILE="${TMPDIR:-/tmp}/mvno-sms-matrix.lock"
 if [ -f "${LOCK_FILE}" ] && kill -0 "$(cat "${LOCK_FILE}" 2>/dev/null)" 2>/dev/null; then
-    echo "[-] Error: another e2e_runbook.sh instance is active (PID $(cat "${LOCK_FILE}")) — refusing to start to protect clean-slate evidence" >&2
+    echo "[-] Error: another sms_matrix.sh instance is active (PID $(cat "${LOCK_FILE}")) — refusing to start to protect clean-slate evidence" >&2
     exit 1
 fi
 echo $$ > "${LOCK_FILE}"
@@ -219,9 +219,9 @@ stop_ims ims_rx56
 # =============================================================================
 echo
 if [ "$FAIL" -eq 0 ]; then
-  echo -e "${GREEN}==== E2E RUNBOOK: ALL CELLS PASS (${PASS} ok) ====${NC}"
+  echo -e "${GREEN}==== SMS MATRIX: ALL CELLS PASS (${PASS} ok) ====${NC}"
   exit 0
 else
-  echo -e "${RED}==== E2E RUNBOOK: ${FAIL} FAILURE(S), ${PASS} ok ====${NC}"
+  echo -e "${RED}==== SMS MATRIX: ${FAIL} FAILURE(S), ${PASS} ok ====${NC}"
   exit 1
 fi

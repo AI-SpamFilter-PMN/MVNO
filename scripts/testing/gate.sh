@@ -4,11 +4,14 @@
 # ==============================================================================
 # The "source of truth" per AGENTS.md Karpathy rule 4: a repeatable, fully
 # deterministic verification suite that never depends on interactive input.
-# The live demo (demo_runbook.sh) is the labelled showcase ON TOP of this gate.
+# The live demo (live_demo.sh) is the labelled showcase ON TOP of this gate.
+#
+#   The assertion-count contract lives in docs/VERIFICATION_MODEL.md — if any
+#   doc quotes a cell/item count that disagrees with it, the contract doc wins.
 #
 #   gate.sh  ->  (1) preflight_5g.sh  : 5G user plane UP (live uesimtun0 IP,
 #                                        REGISTER 200 OK + GTP-U DL emitted)
-#                (2) e2e_runbook.sh   : SMS interworking 4-cell + AI-block
+#                (2) sms_matrix.sh   : SMS interworking 4-cell + AI-block
 #                                        (2G->2G, 2G->5G, 5G->2G, 5G->5G, block)
 #
 # Exit 0 = all gates green; otherwise the failing gate's message is the fix.
@@ -31,12 +34,12 @@ else
     exit 1
 fi
 
-# --- (2) End-to-end SMS interworking + AI-block (e2e_runbook.sh) -------------
-echo -e "\033[0;36m--- gate 2/2: e2e SMS interworking (e2e_runbook.sh) ---${NC}"
-if bash scripts/testing/e2e_runbook.sh; then
+# --- (2) End-to-end SMS interworking + AI-block (sms_matrix.sh) -------------
+echo -e "\033[0;36m--- gate 2/2: e2e SMS interworking (sms_matrix.sh) ---${NC}"
+if bash scripts/testing/sms_matrix.sh; then
     echo -e "${GREEN}  gate 2/2 PASS: e2e 4-cell + AI-block green${NC}"
 else
-    echo -e "${RED}  gate 2/2 FAIL: e2e runbook failed (see evidence/e2e-run-*.log)${NC}"
+    echo -e "${RED}  gate 2/2 FAIL: sms_matrix failed (see evidence/e2e-run-*.log)${NC}"
     exit 1
 fi
 
