@@ -59,6 +59,8 @@ AGENTS.md
 **/AGENTS.md
 .opencode/
 .opencode
+opencode.jsonc
+opencode.json
 # .cursorrules / .goosehints — agent rule files (Cursor, Goose).
 # Same policy as AGENTS.md: STRICTLY machine-local, never publish.
 .cursorrules
