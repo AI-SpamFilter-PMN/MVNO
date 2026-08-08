@@ -17,6 +17,9 @@
 | **T-G** | playback: `aplay` the archived legs | S5 |
 | **T-M** | metrics: `watch` the PromQL counters | S7, S9 |
 
+> **One-shot cockpit**: instead of juggling T-A..T-M by hand, `bash
+> scripts/demo/demo_live.sh` opens all of them as a tmux session (S11).
+
 > **Portable `find` newest-file idiom**: this host (and many dev shells) alias
 > `ls` to `eza`, which breaks `ls -t | head` (icons/ANSI, no GNU sort). Everywhere
 > the demo needs "the newest file" it uses
@@ -520,6 +523,90 @@ podman rm -f baresip-rx baresip-tx    # demo cleanup (baresip is demo-only)
 
 **FALLBACK** — gate internals: `docs/TESTING_REFERENCE.md` Flows L & N;
 failure-path checks: Flow O.
+
+---
+
+## S11 — One-Shot Demo Cockpit (tmux) · ~1 min
+
+**PURPOSE** — S4–S9 as a single tmux cockpit: the real call with your live mic,
+**mid-call transcription** (the `live_tap.sh` daemon feeding Vosk while the call
+is still up), **live capture** of the RTP/SIP traffic, plus log/metrics/receipt
+watches — all in one session, with an auto-recovering 5G preflight.
+
+```bash
+bash scripts/demo/demo_live.sh          # preflight -> tmux session mvno-live
+# ... run the call from P0 (SPEAK NOW ~12 s), watch the daemon + capture ...
+bash scripts/demo/demo_live.sh --down   # teardown (idempotent; evidence kept)
+```
+
+**PANE MAP** (session `mvno-live`, windows `call` + `monitors`):
+
+| Pane | Live content | Equiv |
+|---|---|---|
+| **P0** (large) | `demo_call.sh setup && dial` — **SPEAK NOW = your mic** | S4 |
+| **P1** | `live_tap.sh daemon` — pcap → 16 kHz WAV → Vosk chunks mid-call | S4/S5 |
+| **P2** | live capture — RTP `30000-30100` + SIP `5066` on host loopback | S4 |
+| **P3** | `podman logs -f mvno-kamailio` — REGISTER/INVITE/INTERCEPT | S4 |
+| **P4** | Vosk verdicts — `mvno-api` NativeVosk / AI transcript lines | S5 |
+| **P5** | metrics — `mvno_vosk_blocked_total` + rtpengine counters | S9 |
+| **P6** | 2G MS receipts — `sms.txt` tail on `mvno-2g-ms` | S6a/6c |
+| **P7** | evidence — newest `state/spool` WAVs + archived transcripts | S5 |
+
+**What the preflight does before the panes open** (all audited against
+`docs/ISSUES.md`):
+
+- **Refuses to collide** with a running `live_demo.sh` (re-entrancy lock) and
+  refuses a second cockpit while one exists.
+- **Spool 777** guarantee (mirror of `make init-db`) so the daemon/rtpengine/
+  mvno-api three-uid write path works from a cold start.
+- **Mic probe is SOFT here** — a no-mic run warns and the caller falls back to
+  the canned tone leg; the callee/scam block still works (S5 honesty rule:
+  the block verdict keys off the callee/synthetic leg only).
+- **5G user plane auto-recovery** — `preflight_5g.sh --auto-recover` runs the
+  documented 5.8/5.9/7.x ladder (stage 1: `podman restart mvno-ueransim-ue-1`;
+  stage 2: atomic UERANSIM trio recreate — never a single UERANSIM container,
+  Issue 7.4) before the call. This is the **demo path only**: `make gate`
+  keeps `--no-recover` and stays the deterministic oracle.
+- **Clean slate** (Issue 8.37): removes `baresip-rx/tx` and deregisters the
+  four demo AoRs so routing is unambiguous.
+
+**Wireshark pane note (P2)**: rootless podman publishes the RTP relay on host
+loopback, so the pane captures `lo` (Issue 8.20 — host has no route to the
+bridge IPs) with a forced RTP decode. The plan's `udp.portrange` decode field
+is **not** valid in tshark 4.x; the working form (verified on this host) is
+`-d udp.port==30000-30100,rtp` (range as value). If live capture lacks dumpcap
+permissions the pane falls back to tailing the newest relay pcap with the same
+decode.
+
+**Teardown** keeps the evidence (pcaps, `live-*.wav`, archived transcripts),
+removes the rigs, deregisters the AoRs, and drains `smsc.db` `sent IS NULL`
+rows so `sms_matrix.sh` / `live_demo.sh` stay green afterward.
+
+---
+
+## S12 — Adding a Subscriber · ~1 min
+
+**PURPOSE** — provision a brand-new user (2G + 5G) with a single MSISDN;
+IMSI and the 5G crypto keys are derived automatically.
+
+```bash
+bash scripts/add-subscriber.sh 15551234999            # full 2G+5G user
+bash scripts/add-subscriber.sh 15551234998 --2g-only # 2G/3G only (no keys)
+```
+
+**EXPECT** — the script writes **every store** the stack reads:
+OsmoHLR VTY (2G), `state/hlr/hlr.db` mirror, the **Kamailio sqlite `auth_db`**
+(the store `kamailio.cfg` digest-authenticates — without it the new user
+cannot SIP-auth), the Kamailio MongoDB parallel store, and the Open5GS MongoDB
+5G SA doc (top-level `ambr`/`msisdn`/`slice` + `security` K/OP — the
+`f8e367b` true-cold REGISTER requirement). It refuses to overwrite an MSISDN/
+IMSI already present, and (full mode) generates
+`configs/ueransim/ue-<N>.yaml` with the auto K/OP plus the compose service
+snippet for an optional real attach (`podman compose up -d ueransim-ue-<N>`).
+
+> **Crypto truth** (why 5G keys are generated and 2G keys are not): a 5G SA
+> REGISTER is impossible without K/OP/AMF on **both** the core and the UE;
+> 2G/3G authentication is IMSI-based, so a 2G user needs only IMSI+MSISDN.
 
 ---
 

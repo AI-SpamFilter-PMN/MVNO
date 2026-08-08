@@ -79,6 +79,9 @@ init-db:
 		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
 			VALUES ('15553332211', 'localhost', 'testpass', '', '', '15553332211', 100) \
 			ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
+		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
+			VALUES ('15557778888', 'localhost', 'testpass', '', '', '15557778888', 100) \
+			ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
 	@sqlite3 state/hlr/hlr.db \
