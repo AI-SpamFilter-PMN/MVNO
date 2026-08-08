@@ -229,8 +229,8 @@ verdict — first the **deterministic** rule, then the live record.
 NEW=$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')
 bash scripts/testing/live_tap.sh --once "$NEW"
 sleep 3
-legs=$(scripts/testing/newest.sh "state/spool/${NEW##*/}"* 2>/dev/null \
-        || printf '%s\n' state/spool/"${NEW##*/}"*)
+legs=$(scripts/testing/newest.sh "state/spool/${NEW##*/%.pcap}"* 2>/dev/null \
+        || printf '%s\n' state/spool/"${NEW##*/%.pcap}"*)
 ls -1 state/spool/"${NEW##*/}"*.wav 2>/dev/null
 ```
 
@@ -411,13 +411,17 @@ row provably stored in the SMSC DB (terminal evidence).
 ```bash
 python3 scripts/testing/send_smpp_sms.py    # bind + SUBMIT_SM 15551234567 -> 15557654321
 sqlite3 -header -column state/hlr/smsc.db \
-  "SELECT id, src_addr, dest_addr, substr(text,1,40) AS content, created, sent \
+  "SELECT id, src_addr, dest_addr, hex(substr(user_data,1,20)) AS content_gsm7, created, sent \
    FROM SMS ORDER BY id DESC LIMIT 5;"
 sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"   # drain (gate hygiene)
 ```
 **EXPECT** — `BIND_TRANSCEIVER Successful` / `SUBMIT_SM Delivered` /
 `Status=0x00000000` (ESME_ROK); the dump shows the row with
-`src_addr=15551234567, dest_addr=15557654321` and its body.
+`src_addr=15551234567, dest_addr=15557654321` and a non-NULL `content_gsm7`.
+> **Why `user_data`, not `text`**: OsmoSMSC stores the payload GSM-7-packed in
+> `user_data` (BLOB); the `text` column stays empty. Decode it the same way
+> `ip_sm_gw.gsm7_decode` does (see `demo_runbook.sh` nonce check) — e.g.
+> `python3 -c "from ip_sm_gw import gsm7_decode; print(gsm7_decode(bytes.fromhex('<hex>')))"`.
 
 **FALLBACK** — PDU anatomy + injector internals: `docs/TESTING_REFERENCE.md`
 Flows B & §Injectors; automated: `demo_runbook.sh` items 10/10b.
@@ -446,11 +450,16 @@ curl -s -X POST http://localhost:8080/api/v1/intercept/sms \
   -d '{"sender":"15551234567","recipient":"15557654321","content":"E2E-BLOCK REST test"}'
 # -> {"allow":false,"reason":"Spam (E2E deterministic block)"}
 sqlite3 -header -column state/hlr/smsc.db \
-  "SELECT src_addr, dest_addr, substr(text,1,40) AS content, sent \
+  "SELECT src_addr, dest_addr, hex(substr(user_data,1,20)) AS content_gsm7, sent \
    FROM SMS ORDER BY id DESC LIMIT 5;"
 ```
-**EXPECT** — two verdicts (allow true/false); the smsc.db dump shows the stored
-SMS rows (real terminal evidence, non-empty).
+**EXPECT** — two verdicts (allow true/false). The smsc.db dump shows stored
+SMS rows only if S3/S6/S7 ran and were NOT drained (S7 ends with a
+`DELETE WHERE sent IS NULL` drain for gate hygiene — run S8's dump before that
+drain, or re-send a message, to see rows; content is GSM-7-packed in
+`user_data`, see S7). The REST intercept itself does NOT write smsc.db — it
+evaluates the same verdict path Kamailio/the bridge use; the DB rows are
+terminal evidence of the *messaging* flows.
 
 **FALLBACK** — API schema: `docs/TESTING_REFERENCE.md` Flow I + INTEGRATION_CONTRACT.
 
@@ -527,8 +536,11 @@ the same ESME / UA / filter behaviour **here, MVNO-natively**:
   mismatches vs this stack (documented in `ONBOARDING.md`); we reference, do not
   edit.
 
-All four partner repos are currently 0-ahead/0-behind their remotes (nothing to
-pull).
+Three of the four partner repos are currently 0-ahead/0-behind their remotes;
+**`sms-client` is 3 commits behind** (`origin/main`, non-fast-forward — local
+work not yet pushed by the partner team). We reference these repos read-only;
+the MVNO-native equivalents (S6a/S7) prove the same ESME behaviour without
+depending on the partner repo's state.
 
 ---
 

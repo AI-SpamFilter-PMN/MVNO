@@ -194,11 +194,22 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   and MVNO host; the client's own RTP socket must be reachable (see `fix_nated_contact()` in
   `configs/kamailio/kamailio.cfg`).
 
-### sms-client (`src/main/resources/application.properties`) — ✅ re-verified 2026-08-08 against `origin/main @ ddb3df8`
-> ⚠ **Correction to earlier audit**: the previously claimed refactor commit `9df7eb36`
-> ("submit via SMPP to the teammate's server… redesigned web UI", reported 2026-08-07)
-> **does not exist** in `origin/main` (0 matches in the full history). The client still
-> ships the classic shape below; treat any "port 2076 / no classify" claim as unverified.
+### sms-client (`src/main/resources/application.properties`) — ⚠ re-verified 2026-08-08 against `origin/main @ 9df7eb3` (local clone `main` is 3 behind)
+> ⚠ **Correction to the 2026-08-08 audit**: the refactor commit `9df7eb3`
+> ("refactor(sms-client): submit via SMPP to the teammate's server, require
+> login, and redesign the web UI") **DOES exist and is the current `origin/main`
+> HEAD** — the earlier "does not exist" claim audited the **local** clone
+> (`main @ ddb3df8`, 3 commits behind). `origin/main` ships the **refactored**
+> shape: `smpp.port=2076` (teammate's classification server, not the SMSC),
+> Neon Postgres connectivity (`db.url`, read-only history display), login +
+> phone-number ownership, and **no `sms.blockSpam`/`ai.classify` keys**. MVNO
+> integration impact: a drop-in point at `2775` **no longer applies** — the
+> refactored client talks to its own SMPP server on `2076` and reads history
+> from Neon, so the MVNO SMSC (`2775`) is **not** the client's target today.
+> The classic (pre-refactor) shape below describes the local 3-behind clone
+> only:
+> 
+> **Classic shape (local `ddb3df8`, pre-refactor):**
 - `smpp.host=127.0.0.1`, `smpp.port=2775` — ✅ **matches** MVNO's `osmo-smsc` publish
   (`docker-compose.yml` `2775:2775`; `osmo-smsc.cfg` `esme smsclient` route). **No change needed
   to reach MVNO today.** When Filteration-System is wired (see handoff
