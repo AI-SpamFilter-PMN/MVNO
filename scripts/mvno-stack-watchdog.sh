@@ -200,22 +200,43 @@ case "${MODE}" in
         # output to docs/evidence/watchdog-recovery-<date>.log when run via
         # `make watchdog-self-test`. Safe: recovery skips when a demo is in
         # flight, and the bridge re-registers at boot either way.
+        #
+        # LIVE-WATCHDOG RACE FIX (2026-08-08): the systemd --loop unit (30s
+        # cadence) used to race the injection — it detected the stopped bridge
+        # and restarted it before this self-test's confirm, so /health was 200
+        # again and the test falsely logged "inject did not take". The unit is
+        # now PAUSED for the duration of the self-test and resumed afterwards;
+        # the outage confirm checks CONTAINER STATE (podman ps absent), which
+        # the racing unit can no longer restore.
+        WD_RESUME=0
+        if systemctl --user --no-pager is-active mvno-stack-watchdog.service >/dev/null 2>&1; then
+            systemctl --user stop mvno-stack-watchdog.service >/dev/null 2>&1 \
+                && WD_RESUME=1 \
+                || log "WARN: could not pause live watchdog — self-test may race it"
+        fi
         log "self-test: injecting bridge outage (podman stop mvno-ip-sm-gw)"
         podman stop mvno-ip-sm-gw >/dev/null 2>&1
         sleep 2
-        if bridge_reg_ok; then
-            log "self-test FAIL: bridge still healthy after stop — inject did not take"
+        if podman ps --format '{{.Names}}' | grep -qx mvno-ip-sm-gw; then
+            log "self-test FAIL: bridge container still Up after stop — inject did not take"
+            [ "${WD_RESUME}" -eq 1 ] && systemctl --user start mvno-stack-watchdog.service >/dev/null 2>&1 || true
             exit 1
         fi
-        log "self-test: outage confirmed — running one recovery"
+        log "self-test: outage confirmed (container stopped) — running one recovery"
         recover
         rc=$?
         if [ "${rc}" -eq 0 ] && bridge_reg_ok; then
             log "self-test PASS: bridge outage recovered (restart -> /health 200)"
-            exit 0
+        else
+            log "self-test FAIL: recovery did not restore bridge /health (rc=${rc})"
+            rc=1
         fi
-        log "self-test FAIL: recovery did not restore bridge /health (rc=${rc})"
-        exit 1
+        if [ "${WD_RESUME}" -eq 1 ]; then
+            systemctl --user start mvno-stack-watchdog.service >/dev/null 2>&1 \
+                && log "self-test: live watchdog resumed" \
+                || log "WARN: could not resume live watchdog — start it manually: make watchdog-install"
+        fi
+        exit "${rc}"
         ;;
     --loop)
         log "watchdog loop starting (interval=${INTERVAL}s, log=${LOG_FILE})"

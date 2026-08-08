@@ -231,9 +231,12 @@ cockpit-proof:
 subscriber-proof:
 	@bash scripts/testing/subscriber_proof.sh
 
+# pipefail: the recipe's exit code is the SCRIPT's, not tee's — a self-test
+# FAIL must abort make (and therefore `make proof`) instead of being masked by
+# the pipeline (real false-PASS caught in the 2026-08-08 live verification).
 watchdog-self-test:
-	@bash scripts/mvno-stack-watchdog.sh --self-test 2>&1 \
-		| tee docs/evidence/watchdog-recovery-$(shell date +%F).log
+	@bash -o pipefail -c 'bash scripts/mvno-stack-watchdog.sh --self-test 2>&1 \
+		| tee docs/evidence/watchdog-recovery-$(shell date +%F).log'
 
 # Subscriber-topology drift guard (single source: scripts/lib/common.sh). Fails
 # if any script/Makefile references a non-canonical MSISDN or the balance seeds
