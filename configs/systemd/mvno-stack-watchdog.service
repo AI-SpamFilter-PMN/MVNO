@@ -1,0 +1,19 @@
+[Unit]
+Description=MVNO stack watchdog — continuous UE-fleet + bridge 2G-AoR functional health
+Documentation=docs/LIVE_DEMO.md
+# The watchdog only acts when the stack is up and no demo/gate/cockpit is in
+# flight, so it never fights a run. Recovery is the opt-in preflight ladder.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# @REPO@ is substituted by `make watchdog-install`
+ExecStart=/usr/bin/bash @REPO@/scripts/mvno-stack-watchdog.sh --loop
+Environment=WATCHDOG_INTERVAL=30
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

@@ -171,6 +171,45 @@ check-pins:
 # docs/evidence/GRADUATION.md §Timing). Stage markers print so it never looks
 # hung. Env: GRADUATION=1 is exported for the live_demo caller-leg hardening.
 # ==============================================================================
+# ─────────────────────────────────────────────────────────────────────────────
+# Watchdog — continuous functional health (UE fleet + bridge 2G-AoR regs).
+# Closes the "silent-but-Up" holes restart: unless-stopped can't catch. The
+# gate oracle is never touched: recovery is the opt-in preflight ladder and
+# skips while any demo/gate/cockpit runs.
+#   make watchdog-install    install + start the systemd --user service
+#   make watchdog-once       one check (recovers if needed); exit 0 healthy
+#   make watchdog-uninstall  stop + remove the service
+#   make watchdog-log        tail the watchdog log
+#   make watchdog-status     systemd unit status
+# ─────────────────────────────────────────────────────────────────────────────
+.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status
+
+watchdog-install:
+	@mkdir -p $(HOME)/.config/systemd/user
+	@sed 's|@REPO@|$(CURDIR)|g' configs/systemd/mvno-stack-watchdog.service \
+		> $(HOME)/.config/systemd/user/mvno-stack-watchdog.service
+	@systemctl --user daemon-reload
+	@systemctl --user enable --now mvno-stack-watchdog.service
+	@echo "✓ watchdog installed + started (systemd --user, interval 30s)"
+	@echo "  → survive logout: loginctl enable-linger $(USER)"
+	@echo "  → check: systemctl --user status mvno-stack-watchdog.service"
+
+watchdog-once:
+	@bash scripts/mvno-stack-watchdog.sh --once
+
+watchdog-uninstall:
+	@systemctl --user disable --now mvno-stack-watchdog.service 2>/dev/null || true
+	@rm -f $(HOME)/.config/systemd/user/mvno-stack-watchdog.service
+	@systemctl --user daemon-reload
+	@echo "✓ watchdog uninstalled"
+
+watchdog-log:
+	@tail -n 50 state/logs/watchdog.log 2>/dev/null || echo "(no watchdog log yet)"
+
+watchdog-status:
+	@systemctl --user --no-pager status mvno-stack-watchdog.service 2>/dev/null \
+		| head -n 10 || echo "(watchdog not installed — make watchdog-install)"
+
 graduation: init-db seed-mongo
 	@echo "══════════════════════════════════════════════════════════════"
 	@echo "🎓 GRADUATION DEMO — fully-live, single-command (no CI)"
