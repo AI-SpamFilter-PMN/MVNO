@@ -583,6 +583,48 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Fix**: convert the five kamailio subscriber seeds in `Makefile init-db` from `INSERT OR IGNORE` to true **UPSERTs**: `INSERT INTO subscriber (…) VALUES (…) ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance`. `init-db` now enforces the canonical balances (UE1/3/4/5 = 100, UE2 = 0) on every run regardless of prior DB state or WAL deletion — idempotent by construction.
 * **Verification**: after the fix, `make init-db` → `sqlite3 state/kamailio/kamailio.db 'SELECT username, balance FROM subscriber'` shows `15557654321|0` (only zero-balance row) and the gateway returns `{"msisdn":"15557654321","balance":0}`; `live_demo.sh` then passed **ALL 13 ITEMS (exit 0)** including item 6/13 (407 → digest → 403) on the cold-started stack; `make gate` SMS MATRIX 8/8 remained green. `provision-subscribers.sh` and `seed-mongo.sh` carry no balance field and do not override the SQLite value (verified by grep). Note: `provision-subscribers.sh` also upserts a parallel MongoDB `kamailio.subscriber` doc (no balance field) that the SQLite `auth_db` path does not read — a dual-track store, not a balance source; the SQLite `subscriber` table is authoritative for `telecom-api` balance lookups.
 
+### Issue 8.39: Watchdog `--self-test` Recovery Path Was Never Exercised
+
+* **Symptom**: the watchdog's committed 2-round bridge-restart recovery (`recover()` → `podman restart`, ≤2 attempts) was never executed, so the "not exercised" audit gap went unproven; a transient restart failure could previously log `ERROR` while the bridge's own retry loop silently recovered.
+* **Root Cause**: no fault-injection path existed to prove recovery end-to-end.
+* **Fix**: added `--self-test` mode — `podman stop mvno-ip-sm-gw`, assert the outage took, run one `recover()`, assert `/health` returns 200; safe because `recover()` calls `demo_running()` (lock files + `mvno-live` tmux + pgrep gate/sms_matrix/live_demo/demo_live) and skips when a demo is in flight.
+* **Verification**: `bash scripts/mvno-stack-watchdog.sh --self-test` exits 0 and logs `self-test PASS: bridge outage recovered (restart -> /health 200)`; `make watchdog-self-test` tees to `docs/evidence/watchdog-recovery-<date>.log`.
+
+### Issue 8.40: `cockpit_proof.sh` Stale-Evidence False-PASS Window (Proof Harness)
+
+* **Symptom**: the proof's freshness baseline is a single `touch /tmp/cockpit-proof-$$.mark`; a pre-existing demo's already-written `state/spool/live-*.wav`, `state/spool/archived/*.txt`, or `state/spool/pcaps/*.pcap` with mtime ≥ the mark can satisfy the mid-call evidence assertion and green the proof on **stale** data.
+* **Root Cause**: the mark only anchors "newer-than"; it does not clear pre-existing spool artifacts, so a healthy-but-not-fresh run can pass.
+* **Fix**: after tearing down any pre-existing `mvno-live` session and before launch, `rm -f state/spool/live-*.wav state/spool/archived/live-*.txt state/spool/pcaps/*.pcap` (non-interactive mode only, preserving real recordings under `--live-mic`), then require evidence to appear; keep `-newer "$MARK"` as belt-and-suspenders.
+* **Verification**: `make cockpit-proof` twice back-to-back — both must PASS, the second proving no stale file satisfies it.
+
+### Issue 8.41: `subscriber_proof.sh` Hardcoded Throwaway MSISDN Races (Proof Harness, optional-hardening)
+
+* **Symptom**: `THROWAWAY=15551234999` is hardcoded; parallel/concurrent `make proof` runs (or historical archives) can both purge/provision the same MSISDN and race, and an `add-subscriber.sh` die mid-provision (its documented "mongo step under set -e" half-provision guard) can leave a stray row.
+* **Root Cause**: a fixed, non-unique throwaway plus no absence-assert after pre-purge.
+* **Fix**: derive a time/random-unique MSISDN suffix at runtime; after pre-purge, assert the throwaway is **absent** from all 5 stores and fail (non-zero) if any row remains, so a leftover from an interrupted run stops the proof instead of proceeding to a probable `add-subscriber` die.
+* **Verification**: two parallel/subsequent `make subscriber-proof` runs both PASS without an "exists" pre-purge failure; a deliberately left-over row makes the proof fail-fast.
+
+### Issue 8.42: `subscriber_proof.sh` SIP-REGISTER String-Match Fragility (Proof Harness, optional low)
+
+* **Symptom**: the UAS assertion greps the exact string `SIP REGISTER 200 OK for subscriber ${THROWAWAY}`; if `sip_traffic_sim.py`'s output format drifts (trailing colon, `SIP/2.0 200 OK` variant), the proof false-FAILs.
+* **Fix** (optional): relax to a looser `REGISTER[^\n]*200 OK` match on the UAS output.
+* **Verification**: `make subscriber-proof` still green.
+
+### Issue 8.43: Caller Now Gets an Audible Call-Open Beep (Demo UX)
+
+* **Symptom**: at call-open the live-mic speak-window was ambiguous — the operator had to watch the terminal for the `SPEAK NOW` countdown instead of hearing when to start talking.
+* **Fix**: `play_go_beep()` in `scripts/lib/common.sh` generates a 0.48 s 660→880 Hz two-tone once into `${TMPDIR}` via ffmpeg and plays it via `paplay` (Pulse socket) → `aplay` → terminal BEL; fired from `demo_call.sh dial()` at the start of the SPEAK NOW window (and the tone-fallback TALK NOW branch) and from `mic_record.sh` before capture; `MVNO_NO_BEEP=1` mutes for headless runs and the deterministic proofs stay tone-caller-based.
+* **Verification**: with a Pulse socket, `demo_call.sh dial` beeps at the start of the speak-window and the user's speech lands in the near-real-time Vosk path; `MVNO_NO_BEEP=1 make cockpit-proof` twice — both green.
+
+> **Audited-and-clear (do NOT re-file as bugs)** — two suspected issues were
+> investigated and refuted:
+> (a) the watchdog `--self-test` "unguarded `podman stop` mid-demo" concern —
+> false: `recover()` calls `demo_running()` (lock files + `mvno-live` tmux +
+> pgrep gate/sms_matrix/live_demo/demo_live) and skips when a demo is in flight;
+> (b) the tshark RTP decode-direction concern — false: compose maps
+> `30000-30100:30000-30100/udp` (both directions), so
+> `-d udp.port==30000-30100,rtp` decodes src and dst frames.
+
 
 ---
 
