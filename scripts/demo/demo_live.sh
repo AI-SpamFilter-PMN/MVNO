@@ -81,6 +81,10 @@ down() {
 # graceful message with the post-hoc one-liner instead.
 GUI_CAP=0
 [ "${1:-}" = "--wireshark" ] && GUI_CAP=1
+# Summary suffix: shown ONLY when the GUI pane will actually exist (a bare
+# "0" is non-empty, so ${GUI_CAP:+...} cannot be used as a boolean guard).
+GUI_SUFFIX=""
+[ "${GUI_CAP}" -eq 1 ] && GUI_SUFFIX=" | P8 Wireshark GUI"
 
 # ------------------------------------------------------------------------------
 # Preflight (fail-fast on deterministic blockers)
@@ -191,7 +195,7 @@ NPANES=$(tmux list-panes -s -t "$SESSION" | wc -l)
 say "cockpit '${SESSION}' ready — ${NPANES} panes across 2 windows"
 echo ""
 echo "  Window 'call'     P0 caller (SPEAK NOW) | P1 live_tap daemon | P2 RTP/SIP capture"
-echo "  Window 'monitors' P3 kamailio | P4 Vosk verdicts | P5 metrics | P6 2G receipts | P7 evidence${GUI_CAP:+ | P8 Wireshark GUI}"
+echo "  Window 'monitors' P3 kamailio | P4 Vosk verdicts | P5 metrics | P6 2G receipts | P7 evidence${GUI_SUFFIX}"
 echo "  Attach:   tmux attach -t ${SESSION}        (or tmux a -t ${SESSION})"
 echo "  Teardown: bash scripts/demo/demo_live.sh --down"
 echo ""
