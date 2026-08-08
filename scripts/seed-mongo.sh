@@ -40,6 +40,25 @@ ENGINE="$RUNTIME"
 
 echo "Using container engine: ${ENGINE}"
 
+# Bounded mongodb-readiness poll: seed-mongo execs into the RUNNING container,
+# so a cold bootstrap (make bootstrap / deploy.sh) can race mongod's boot. Wait
+# until mongosh answers a ping (up to ~60s) before attempting the upserts.
+readiness_ok=0
+for i in $(seq 1 20); do
+    if ${ENGINE} exec -i mvno-mongodb mongosh --quiet --eval 'db.runCommand({ping:1}).ok' 2>/dev/null | grep -q '^1$'; then
+        readiness_ok=1
+        break
+    fi
+    sleep 3
+done
+if [ "${readiness_ok}" -ne 1 ]; then
+    echo "ERROR: mvno-mongodb not accepting connections after 60s — cannot seed subscribers" >&2
+    echo "       check the container: podman logs mvno-mongodb" >&2
+    exit 1
+fi
+
+echo "mongodb ready — seeding 5G subscribers"
+
 MONGO_JS=$(cat <<'EOF'
 const subscribers = [
   { imsi: "001010000000001", msisdn: "15551234567", k: "465B5CE8B199B49FAA5F0A2EE238A6BC", op: "E8ED289DEBA952E4283B54E88E6183CA" },

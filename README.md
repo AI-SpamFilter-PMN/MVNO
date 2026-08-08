@@ -86,6 +86,10 @@ make init-db
 # 4. Start the stack — offline-first (uses pre-loaded images)
 make up
 
+# 5. Seed Open5GS 5G subscribers — AFTER up (execs into the running mongodb)
+#    Without it the 5G UEs cannot register (UDR "No UE-AMBR").
+make seed-mongo
+
 #    To build from source instead (needs internet):
 #    podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 

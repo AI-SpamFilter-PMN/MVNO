@@ -103,9 +103,12 @@ cd MVNO
 ```bash
 ./scripts/pull-images.sh # pull the 8 custom images from docker.io/5attab007/mvno-*
 make init-db             # creates SQLite WAL DBs + seeds test subscribers
-make up                  # offline-first launch (31 containers)
+make up                  # offline-first launch (32 containers)
+make seed-mongo          # Open5GS 5G subscribers — AFTER up (execs into mongodb)
 make test                # runs test-vty + test-api + test-sms + test-call
 ```
+
+(One-command cold start: `make bootstrap` ≡ the three `make` steps above.)
 
 ---
 
@@ -113,7 +116,7 @@ make test                # runs test-vty + test-api + test-sms + test-call
 
 | Target | Purpose |
 |--------|---------|
-| `make up` | Start container stack (offline-first, uses pre-loaded images; 31 containers) |
+| `make up` | Start container stack (offline-first, uses pre-loaded images; 32 containers) |
 | `make down` | Stop container stack |
 | `make ps` | List active container services |
 | `make logs` | Stream live container logs across microservices |

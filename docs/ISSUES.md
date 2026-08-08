@@ -625,6 +625,48 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 > `30000-30100:30000-30100/udp` (both directions), so
 > `-d udp.port==30000-30100,rtp` decodes src and dst frames.
 
+### Issue 8.44: True-Cold HLR Crash-Loop — init-db minimal schema vs osmo-hlr v7 (2G leg down)
+* Symptom: on a truly cold start (`make clean` -> `make bootstrap`) `mvno-osmo-hlr`
+  crash-loops `Exited (1)` with `Error opening database` and the 2G leg is dead;
+  `make gate` fails at preflight. Warm-state runs never hit it (the pre-existing
+  full-schema hlr.db masked the defect).
+* Root Cause: init-db created a minimal `subscriber (id, imsi, msisdn)` table.
+  osmo-hlr 1.9.3 (`--db-upgrade`) reads `PRAGMA user_version` (NOT a meta table)
+  and expects the full **v7** schema. The minimal table reads as user_version 0,
+  so the v1->v7 upgrade path runs and fails twice: first `no such column:
+  imeisv` in the v3 `subscriber_backup` copy, then (after a partial column fix)
+  `NOT NULL constraint failed: subscriber_backup.nam_cs` — leaving the DB at
+  user_version 2 with a half-mutated table, crash-looping on every retry.
+* Fix: init-db now creates the exact v7 schema from osmo-hlr `sql/hlr.sql`
+  (subscriber with `msc_number` — `hlr_number` was renamed in v3 — and
+  `nam_cs`/`nam_ps`/`ms_purged_cs`/`ms_purged_ps` NOT NULL DEFAULTs, plus
+  `subscriber_apn`/`subscriber_multi_msisdn`/`auc_2g`/`auc_3g`/`ind` and
+  `PRAGMA user_version = 7`), with a drop-if-broken guard that rebuilds the
+  schema only when `msc_number` is missing AND `mvno-osmo-hlr` is not running
+  (WAL-shared with the live process otherwise).
+* Verification: osmo-hlr Up (healthy) logging `schema version 7`, telnet/CTRL/
+  IPA interfaces up, osmo-msc connected; `make gate` 8/8 and `make proof` 3/3
+  PASS on the cold state (fresh evidence in `docs/evidence/e2e-run-*`,
+  `demo-cockpit-*`, `demo-subscriber-*`, `watchdog-recovery-*`).
+
+### Issue 8.45: Cold-Start Ordering Gaps in Docs & Setup (make up alone is not enough)
+* Symptom: LIVE_DEMO S1 and ONBOARDING said `make up` only; on a fresh box the
+  subscriber DBs and Open5GS Mongo were never created, so SMS auth / balance-403
+  / HLR lookups and 5G UE registration would all fail. `deploy.sh` (the
+  documented one-command path) also ran `init-db` but never `seed-mongo`.
+* Root Cause: `make up` / `up.sh` is a pure compose launch; the DB init and
+  Mongo seed are separate steps, and `seed-mongo.sh` must run AFTER `up` (it
+  execs into the running mongodb container). The order was undocumented.
+* Fix: `make bootstrap` = `init-db -> up -> seed-mongo` (one-command cold
+  start); `deploy.sh` gained the missing `seed-mongo` step; LIVE_DEMO S1,
+  README, ONBOARDING, deployment_guide, ENVIRONMENT_MATRIX and
+  TESTING_REFERENCE all state the canonical order. `seed-mongo.sh` now also
+  polls mongodb readiness (bounded 60s) so a cold bootstrap cannot race
+  mongod's boot.
+* Verification: the documented sequence was executed live end-to-end on a
+  wiped state (`make clean` -> `init-db` -> `up` -> `seed-mongo`) with `make
+  gate` 8/8 and `make proof` 3/3 green.
+
 
 ---
 
