@@ -1,18 +1,18 @@
-RUN:2026-08-08T17:18:02+0300 — clean-slate evidence (previous contents discarded)
+RUN:2026-08-08T17:22:16+0300 — clean-slate evidence (previous contents discarded)
 [0;36m==== GOAL 7 : End-to-End SMS Interworking (4-cell + AI-block) ====[0m
 [0;36m==== Preflight ====[0m
 [0;32m  ok  bridge /metrics reachable[0m
 [0;32m  ok  mvno-api metrics reachable[0m
 [0;36m==== Cell 1: 2G->2G  (15557778888 -> 15554443322, 2G SMSC direct) ====[0m
-[0;32m  ok  delivered via 2G SMSC; bridge counters unchanged (2g5g=4,5g2g=4)[0m
-[0;32m  ok  MS1 handset receipt in sms.txt (1x 'E2E 2G2G 171802')[0m
+[0;32m  ok  delivered via 2G SMSC; bridge counters unchanged (2g5g=5,5g2g=5)[0m
+[0;32m  ok  MS1 handset receipt in sms.txt (1x 'E2E 2G2G 172216')[0m
 [0;36m==== Cell 2: 2G->5G  (15554443322 -> 15551234567, smsc.db poll -> SIP relay) ====[0m
-[0;32m  ok  delivered 2G->5G via bridge+Kamailio (2g5g +1); terminal got 'E2E 2G5G 171802'[0m
+[0;32m  ok  delivered 2G->5G via bridge+Kamailio (2g5g +1); terminal got 'E2E 2G5G 172216'[0m
 [0;36m==== Cell 3: 5G->2G  (15551234567 -> 15554443322, bridge relay -> SMPP) ====[0m
-[0;32m  ok  delivered 5G->2G via bridge+SMPP (5g2g +1); MS1 sms.txt has 'E2E 5G2G 171802'[0m
+[0;32m  ok  delivered 5G->2G via bridge+SMPP (5g2g +1); MS1 sms.txt has 'E2E 5G2G 172216'[0m
 [0;36m==== Cell 4: 5G->5G  (15551234567 -> 15557654321, Kamailio twin relay) ====[0m
-[0;32m  ok  relayed 5G->5G via Kamailio; terminal got 'E2E 5G5G 171802'; bridge untouched (2g5g=5,5g2g=5)[0m
+[0;32m  ok  relayed 5G->5G via Kamailio; terminal got 'E2E 5G5G 172216'; bridge untouched (2g5g=6,5g2g=6)[0m
 [0;36m==== Cell 5: AI-BLOCK  (E2E-BLOCK marker -> 403, counter++, no delivery) ====[0m
-[0;32m  ok  blocked by AI core (blocked 1->2, sender saw 403, receiver untouched, kamailio logged block)[0m
+[0;32m  ok  blocked by AI core (blocked 2->3, sender saw 403, receiver untouched, kamailio logged block)[0m
 
 [0;32m==== SMS MATRIX: ALL CELLS PASS (8 ok) ====[0m
