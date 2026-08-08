@@ -26,6 +26,11 @@
 # Usage:
 #   bash scripts/demo/demo_live.sh             # build the cockpit (8 panes)
 #   bash scripts/demo/demo_live.sh --wireshark # + P8 live Wireshark GUI pane
+#   bash scripts/demo/demo_live.sh --windowed  # pop the cockpit up as a VISIBLE
+#                                              #   desktop terminal window (needs
+#                                              #   DISPLAY/WAYLAND_DISPLAY + a
+#                                              #   terminal emulator; headless
+#                                              #   prints the tmux attach hint)
 #   bash scripts/demo/demo_live.sh --down      # teardown (idempotent)
 #
 # Teardown keeps the evidence (pcaps, live-*.wav chunks, archived transcripts)
@@ -76,11 +81,22 @@ down() {
 
 [ "${1:-}" = "--down" ] && down
 
-# Opt-in Wireshark GUI pane (P8). Never part of the deterministic cockpit /
-# proof harness: requires a display + the wireshark binary; headless runs get a
-# graceful message with the post-hoc one-liner instead.
+# Opt-in flags. --wireshark adds the P8 GUI capture pane; --windowed pops the
+# cockpit up as a VISIBLE desktop terminal window (a terminal emulator attaches
+# to the tmux session). Neither is ever part of the deterministic cockpit /
+# proof harness: --wireshark requires a display + the wireshark binary;
+# --windowed requires a display + an emulator, and headless runs print the
+# tmux-attach hint instead.
 GUI_CAP=0
-[ "${1:-}" = "--wireshark" ] && GUI_CAP=1
+WINDOWED=0
+for a in "$@"; do
+    case "$a" in
+        --wireshark) GUI_CAP=1 ;;
+        --windowed)  WINDOWED=1 ;;
+        --down)      down ;;   # teardown is position-independent (down exits)
+        *) die "unknown flag: $a (see usage)" ;;
+    esac
+done
 # Summary suffix: shown ONLY when the GUI pane will actually exist (a bare
 # "0" is non-empty, so ${GUI_CAP:+...} cannot be used as a boolean guard).
 GUI_SUFFIX=""
@@ -197,6 +213,39 @@ echo ""
 echo "  Window 'call'     P0 caller (SPEAK NOW) | P1 live_tap daemon | P2 RTP/SIP capture"
 echo "  Window 'monitors' P3 kamailio | P4 Vosk verdicts | P5 metrics | P6 2G receipts | P7 evidence${GUI_SUFFIX}"
 echo "  Attach:   tmux attach -t ${SESSION}        (or tmux a -t ${SESSION})"
+echo "  Windowed: bash scripts/demo/demo_live.sh --windowed   (pops up a desktop terminal)"
 echo "  Teardown: bash scripts/demo/demo_live.sh --down"
 echo ""
-[ -t 1 ] && { tmux attach -t "$SESSION" || true; }
+
+# launch_windowed — pop the cockpit up as a VISIBLE desktop window: launch a
+# terminal emulator that attaches to the tmux session (the session itself stays
+# detached/deterministic; only the VIEW is brought to the screen). Guarded:
+# requires DISPLAY/WAYLAND_DISPLAY + at least one known emulator; a headless
+# run prints the tmux-attach hint and returns (proof harness unaffected). The
+# emulator is nohup'd so demo_live.sh returns while the window keeps the
+# cockpit live on the desktop.
+launch_windowed() {
+    [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || {
+        echo "  (--windowed ignored: no DISPLAY/WAYLAND_DISPLAY — run 'tmux attach -t ${SESSION}' in any terminal)"
+        return 0
+    }
+    local inner="tmux attach -t ${SESSION}; exec bash"
+    local emu
+    for emu in konsole kitty alacritty gnome-terminal xterm; do
+        command -v "$emu" >/dev/null 2>&1 || continue
+        case "$emu" in
+            konsole)        nohup "$emu" --nofork -e bash -c "$inner" >/dev/null 2>&1 & ;;
+            gnome-terminal) nohup "$emu" -- bash -c "$inner" >/dev/null 2>&1 & ;;
+            *)              nohup "$emu" -e bash -c "$inner" >/dev/null 2>&1 & ;;
+        esac
+        echo "  🖥  launched ${emu} window attached to ${SESSION} (detach: Ctrl-b d, then close)"
+        return 0
+    done
+    echo "  (--windowed: no terminal emulator found — run 'tmux attach -t ${SESSION}' manually)"
+}
+
+if [ "${WINDOWED}" -eq 1 ]; then
+    launch_windowed
+elif [ -t 1 ]; then
+    tmux attach -t "$SESSION" || true
+fi

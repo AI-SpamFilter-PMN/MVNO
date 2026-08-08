@@ -90,10 +90,12 @@ main() {
     ok "post-purge: throwaway absent from all stores"
 
     # --- [1] provision ---
-    echo "[1/4] provisioning ${THROWAWAY} via add-subscriber.sh…"
-    OUT="$(bash scripts/add-subscriber.sh "${THROWAWAY}" 2>&1)" \
+    echo "[1/4] provisioning ${THROWAWAY} via add-subscriber.sh (--balance 250)…"
+    # Non-default balance proves the --balance flag is honored end-to-end (the
+    # audit gap: balance was hardcoded to 100).
+    OUT="$(bash scripts/add-subscriber.sh "${THROWAWAY}" --balance 250 2>&1)" \
         || { echo "FATAL: add-subscriber.sh failed:"; echo "$OUT" | tail -8; return 1; }
-    echo "$OUT" | grep -q "Provisioning Complete" && ok "provisioned ${THROWAWAY}" || { echo "$OUT" | tail -8; fail "no Provisioning Complete"; }
+    echo "$OUT" | grep -q "Provisioning Complete" && ok "provisioned ${THROWAWAY} (balance 250)" || { echo "$OUT" | tail -8; fail "no Provisioning Complete"; }
     IMSI="$(echo "$OUT" | grep -oE 'IMSI [0-9]{15}' | head -1 | awk '{print $2}')"
     echo "    IMSI: ${IMSI:-<unknown>}"
 
@@ -101,6 +103,9 @@ main() {
     echo "[2/4] asserting all 5 stores…"
     sqlite3 state/kamailio/kamailio.db "SELECT 1 FROM subscriber WHERE username='${THROWAWAY}';" 2>/dev/null | grep -q 1 \
         && ok "Kamailio sqlite auth_db (SIP digest)" || fail "auth_db row missing"
+    BAL="$(sqlite3 state/kamailio/kamailio.db "SELECT balance FROM subscriber WHERE username='${THROWAWAY}';" 2>/dev/null)"
+    [ "$BAL" = "250" ] && ok "Kamailio balance=250 (--balance honored)" \
+        || fail "auth_db balance=${BAL:-<missing>} (expected 250 — the --balance flag was not honored)"
     sqlite3 state/hlr/hlr.db "SELECT 1 FROM subscriber WHERE msisdn='${THROWAWAY}';" 2>/dev/null | grep -q 1 \
         && ok "state/hlr/hlr.db mirror" || fail "hlr.db row missing"
     podman exec mvno-mongodb mongosh --quiet open5gs --eval \

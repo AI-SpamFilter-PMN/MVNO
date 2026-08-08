@@ -590,9 +590,20 @@ watches — all in one session, with an auto-recovering 5G preflight.
 ```bash
 bash scripts/demo/demo_live.sh          # preflight -> tmux session mvno-live (8 panes)
 bash scripts/demo/demo_live.sh --wireshark  # same, + P8 = live Wireshark GUI capture
+bash scripts/demo/demo_live.sh --windowed   # pop the cockpit up as a VISIBLE
+#                                        #   desktop terminal window (konsole /
+#                                        #   kitty / alacritty / … auto-picked;
+#                                        #   needs a display; headless prints
+#                                        #   the tmux-attach hint instead)
 # ... run the call from P0 (SPEAK NOW ~12 s), watch the daemon + capture ...
 bash scripts/demo/demo_live.sh --down   # teardown (idempotent; evidence kept)
 ```
+
+> **See it on your screen**: the cockpit session is built detached (`tmux
+> new-session -d`), so by itself it never opens a window. Run it from a
+> terminal and it auto-attaches (`tmux attach -t mvno-live`), or use
+> `--windowed` to pop up a desktop terminal window that attaches — the session
+> stays deterministic either way; only the VIEW is brought to the screen.
 
 **PANE MAP** (session `mvno-live`, windows `call` + `monitors`):
 
@@ -662,14 +673,19 @@ rows so `sms_matrix.sh` / `live_demo.sh` stay green afterward.
 IMSI and the 5G crypto keys are derived automatically.
 
 ```bash
-bash scripts/add-subscriber.sh 15551234999            # full 2G+5G user
+bash scripts/add-subscriber.sh 15551234999            # full 2G+5G user (balance 100)
 bash scripts/add-subscriber.sh 15551234998 --2g-only # 2G/3G only (no keys)
+bash scripts/add-subscriber.sh 15551234997 --balance 250  # opening credit 250
+#                                                        (Kamailio auth_db; the
+#                                                         SIP 403-on-zero-balance
+#                                                         contract reads this)
 ```
 
 **EXPECT** — the script writes **every store** the stack reads:
 OsmoHLR VTY (2G), `state/hlr/hlr.db` mirror, the **Kamailio sqlite `auth_db`**
 (the store `kamailio.cfg` digest-authenticates — without it the new user
-cannot SIP-auth), the Kamailio MongoDB parallel store, and the Open5GS MongoDB
+cannot SIP-auth; the `--balance` opening credit lands here and drives the
+SIP 403-on-zero-balance contract), the Kamailio MongoDB parallel store, and the Open5GS MongoDB
 5G SA doc (top-level `ambr`/`msisdn`/`slice` + `security` K/OP — the
 `f8e367b` true-cold REGISTER requirement). It refuses to overwrite an MSISDN/
 IMSI already present, and (full mode) generates

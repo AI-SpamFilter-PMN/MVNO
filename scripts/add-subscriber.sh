@@ -3,7 +3,7 @@
 # add-subscriber.sh — provision a NEW MVNO subscriber (2G + 5G), keys auto
 # ==============================================================================
 # MSISDN-only interface; everything else is derived:
-#   bash scripts/add-subscriber.sh <MSISDN> [--2g-only] [--imsi <IMSI>]
+#   bash scripts/add-subscriber.sh <MSISDN> [--2g-only] [--imsi <IMSI>] [--balance <N>]
 #
 # Writes every store the demo/core reads, so a new subscriber actually works:
 #   1. OsmoHLR VTY (2G/3G, real store)            — subscriber imsi <I> create
@@ -38,11 +38,13 @@ warn() { echo -e "\033[0;33m[add-subscriber] ⚠ $*\033[0m"; }
 
 usage() {
     cat <<EOF
-Usage: bash scripts/add-subscriber.sh <MSISDN> [--2g-only] [--imsi <IMSI>]
+Usage: bash scripts/add-subscriber.sh <MSISDN> [--2g-only] [--imsi <IMSI>] [--balance <N>]
 
-  <MSISDN>   11-digit MVNO number, must start with 155 (e.g. 15551234999)
-  --2g-only  skip Open5GS 5G keys + the UERANSIM UE yaml (2G/3G only)
-  --imsi <I> manual IMSI (default: next free in 0010100xxxxxxxx range)
+  <MSISDN>    11-digit MVNO number, must start with 155 (e.g. 15551234999)
+  --2g-only   skip Open5GS 5G keys + the UERANSIM UE yaml (2G/3G only)
+  --imsi <I>  manual IMSI (default: next free in 0010100xxxxxxxx range)
+  --balance <N>  opening credit in the Kamailio sqlite auth_db (SIP 403-on-
+               zero-balance contract). Default 100. Non-negative integer.
 
 Refuses to overwrite an MSISDN/IMSI that already exists in any store.
 EOF
@@ -53,15 +55,18 @@ EOF
 MSISDN="$1"; shift
 TWO_G_ONLY=0
 IMSI=""
+BALANCE=100
 while [ $# -gt 0 ]; do
     case "$1" in
         --2g-only) TWO_G_ONLY=1 ;;
         --imsi) [ $# -ge 2 ] || die "--imsi needs a value"; IMSI="$2"; shift ;;
+        --balance) [ $# -ge 2 ] || die "--balance needs a value"; BALANCE="$2"; shift ;;
         -h|--help) usage ;;
         *) die "unknown flag: $1 (see --help)" ;;
     esac
     shift
 done
+[[ "$BALANCE" =~ ^[0-9]+$ ]] || die "--balance must be a non-negative integer (got: $BALANCE)"
 
 # --- Validate MSISDN -----------------------------------------------------------
 [[ "$MSISDN" =~ ^155[0-9]{8}$ ]] || die "MSISDN must be 11 digits starting 155 (got: $MSISDN)"
@@ -181,7 +186,7 @@ sqlite3 state/hlr/hlr.db \
 say "[3/5] Kamailio sqlite auth_db — SIP digest auth user ${MSISDN} (password ${PASSWORD})"
 sqlite3 state/kamailio/kamailio.db \
     "INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-     VALUES ('${MSISDN}', 'localhost', '${PASSWORD}', '', '', '${MSISDN}', 100) \
+     VALUES ('${MSISDN}', 'localhost', '${PASSWORD}', '', '', '${MSISDN}', ${BALANCE}) \
      ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, \
      password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
     || die "sqlite auth_db upsert failed"
@@ -268,7 +273,7 @@ echo "=== Provisioning Complete ==="
 echo "  MSISDN ${MSISDN} / IMSI ${IMSI} provisioned:"
 echo "    - OsmoHLR VTY (2G/3G)          ✓"
 echo "    - state/hlr/hlr.db mirror      ✓"
-echo "    - Kamailio sqlite auth_db      ✓ (SIP digest auth, password ${PASSWORD})"
+echo "    - Kamailio sqlite auth_db      ✓ (SIP digest auth, password ${PASSWORD}, balance ${BALANCE})"
 if [ "$TWO_G_ONLY" -eq 0 ]; then
     echo "    - Kamailio MongoDB             ✓ (parallel store)"
     echo "    - Open5GS MongoDB (5G SA)     ✓  K=${K} OP=${OP}"
