@@ -12,8 +12,17 @@ Type=simple
 ExecStart=/usr/bin/bash @REPO@/scripts/mvno-stack-watchdog.sh --loop
 Environment=WATCHDOG_INTERVAL=30
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-Restart=on-failure
+# Restart=always (not on-failure): a watchdog --loop killed by a stray SIGTERM
+# (e.g. compose/init-db teardown churn during a cold rebuild) is treated by
+# on-failure as a "clean" death and would strand the 24/7 guard silently.
+# `systemctl stop` is still honoured (manual stop is not a failure), so the
+# self-test's pause/resume keeps working.
+Restart=always
 RestartSec=10
+# Cap the restart rate so a pathological environment cannot create a
+# restart storm.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Install]
 WantedBy=default.target
