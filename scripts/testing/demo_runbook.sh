@@ -5,10 +5,14 @@
 # Executable 13-step demonstration script verifying end-to-end 5G SA Core,
 # IMS SIP Interception, SMPP SMSC, Gateway REST APIs, and SOTA Grafana NOC.
 # ==============================================================================
-# Demo-time human speech (optional): during the [5b] live call, speaking the
-# scam script into the host microphone yields rich live transcripts (proven by
-# the Aug-6 live-mic re-run). The seeded fixtures in docs/evidence/fixtures/
-# guarantee non-empty transcripts regardless of whether anyone speaks.
+# Demo-time human speech (optional): during the [5b] live call, speaking into
+# the host microphone captures the [caller/you] leg (pulse); the [callee/
+# synthetic scam rig] leg streams the canned phrase via aufile. Both legs are
+# LABELED in the evidence — your words are never presented as the canned
+# phrase and never asserted against the [9b] block keyword gate (which keys
+# off the callee/synthetic leg only). The seeded fixtures in
+# docs/evidence/fixtures/ guarantee non-empty transcripts regardless of
+# whether anyone speaks.
 # ==============================================================================
 
 set -euo pipefail
@@ -16,6 +20,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
+
+# Re-entrancy guard (evidence race guard): refuse to start while another
+# instance is active, so two runbooks can never truncate/flush the same
+# clean-slate RUN_LOG concurrently. Lock is released on EXIT.
+LOCK_FILE="${TMPDIR:-/tmp}/mvno-demo-runbook.lock"
+if [ -f "${LOCK_FILE}" ] && kill -0 "$(cat "${LOCK_FILE}" 2>/dev/null)" 2>/dev/null; then
+    echo "[-] Error: another demo_runbook.sh instance is active (PID $(cat "${LOCK_FILE}")) — refusing to start to protect clean-slate evidence" >&2
+    exit 1
+fi
+echo $$ > "${LOCK_FILE}"
+trap 'rm -f "${LOCK_FILE}"' EXIT
 
 # Evidence layer: clean-slate run log (Aug-8 convention) — the file is
 # truncated at run start and stamped with RUN:<ts>, so a green file contains
@@ -199,23 +214,39 @@ bash "${SCRIPT_DIR}/demo_call.sh" dial 2>&1 | tail -3 || true
 # the speech-bearing aufile leg) is among the extracted WAVs.
 CALLEE_IP=10.89.0.60
 WAV_OUT=""
+# Mid-write race guard: RTPEngine flushes the pcap AFTER the call; reading it
+# while it grows yields an undecodable file and live_tap --once fails SILENTLY.
+# Wait for the newest pcap to be STABLE (size unchanged across 2 s) before
+# decoding, so a short call cannot strand the runbook on an unfinalized file.
+NEWEST_PCAP=""
+for i in $(seq 1 10); do
+    CAND=$(\ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1 || true)
+    if [ -n "$CAND" ] && [ "$(stat -c %s "$CAND" 2>/dev/null || echo 0)" -ge 1024 ]; then
+        S1=$(stat -c %s "$CAND"); sleep 2; S2=$(stat -c %s "$CAND")
+        if [ "$S2" = "$S1" ]; then NEWEST_PCAP="$CAND"; break; fi
+    fi
+    find state/spool/pcaps -name '*.pcap' -size -1k -delete 2>/dev/null || true
+    sleep 3
+done
 for i in $(seq 1 6); do
-    NEWEST_PCAP=$(\ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1 || true)
     if [ -n "$NEWEST_PCAP" ] && [ -s "$NEWEST_PCAP" ] && [ "$(stat -c %s "$NEWEST_PCAP")" -ge 1024 ]; then
         WAV_OUT=$(bash "${SCRIPT_DIR}/live_tap.sh" --once "$NEWEST_PCAP" 2>&1) || true
         if echo "$WAV_OUT" | grep -q "WAV extracted.*${CALLEE_IP}"; then
             break
         fi
     fi
-    find state/spool/pcaps -name '*.pcap' -size -1k -delete 2>/dev/null || true
     sleep 5
 done
 echo "$WAV_OUT" | grep -q "WAV extracted.*${CALLEE_IP}" \
     || { echo "[-] Error: could not decode the baresip callee leg (pcap mid-write? no speech call?): ${WAV_OUT}" >&2; exit 1; }
 # live_tap.sh --once writes one WAV per leg straight into the Vosk spool root.
-# Pick the CALLEE leg (10.89.0.60 — streams the spoken scam phrase via aufile):
-# the caller leg is a silent tone/ausine leg, and a sim-call tone leg would
-# transcribe only noise. Prefer the callee IP, fall back to any non-empty leg.
+# LEG LABELS (P2 honesty): the CALLEE leg (10.89.0.60) streams the canned
+# scam phrase via aufile — label it [callee/synthetic scam rig]. The CALLER
+# leg (10.89.0.61) carries the operator's LIVE voice via the host Pulse
+# socket when present (demo_call.sh tx_src=pulse), else a tone fallback —
+# label it [caller/you] when it transcribes speech, otherwise note the
+# fallback. The [9b] block verdict keys off the callee/synthetic leg only.
+CALLER_IP=10.89.0.61
 WAV_STEM=$(basename "$NEWEST_PCAP" .pcap)
 TXT_PATH=""
 for i in $(seq 1 10); do
@@ -231,7 +262,7 @@ for i in $(seq 1 10); do
 done
 [ -n "$TXT_PATH" ] || { echo "[-] Error: Vosk did not archive a non-empty transcript within 25s" >&2; exit 1; }
 echo -e "${GREEN}✓ Recording pipeline proven: transcript archived at ${TXT_PATH}${NC}"
-echo "  --- real transcript content (${TXT_PATH}) ---"
+echo "  --- transcript of [callee/synthetic scam rig] leg (canned phrase through the real call) ---"
 cat "${TXT_PATH}"
 grep -q '"[[:space:]]*[^"[:space:]]' "${TXT_PATH}" || { echo "[-] Error: transcript body is empty (\{\"text\":\"\"\})" >&2; exit 1; }
 WAV_PATH="${TXT_PATH%.txt}.wav"
@@ -240,6 +271,25 @@ DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$WAV_PATH" || 
 echo "  --- real recorded WAV: ${WAV_PATH} (${DUR}s) ---"
 awk -v d="$DUR" 'BEGIN { if (d < 3) exit 1 }' || { echo "[-] Error: recorded WAV duration ${DUR}s < 3s (scripted-leg floor)" >&2; exit 1; }
 echo -e "  ✓ recorded WAV duration ${DUR}s >= 3s (scripted-leg floor)"
+# Caller leg: the operator's LIVE voice (pulse) — echo its transcript if the
+# spool archived non-empty speech, otherwise state the no-mic fallback
+# honestly. This leg is the [9d] clean-call evidence, never a block source.
+CALLER_TXT_PATH=""
+for i in $(seq 1 8); do
+    CALLER_TXT_PATH=$(ls state/spool/archived/"${WAV_STEM}"-${CALLER_IP}.txt 2>/dev/null | head -1 || true)
+    [ -n "$CALLER_TXT_PATH" ] && [ -s "$CALLER_TXT_PATH" ] && break
+    CALLER_TXT_PATH=""
+    sleep 2
+done
+if [ -n "$CALLER_TXT_PATH" ] && grep -q '"[[:space:]]*[^"[:space:]]' "$CALLER_TXT_PATH"; then
+    echo "  --- transcript of [caller/you] leg (operator live voice) ---"
+    cat "$CALLER_TXT_PATH"
+    CALLER_WAV_PATH="${CALLER_TXT_PATH%.txt}.wav"
+else
+    CALLER_TXT_PATH=""
+    CALLER_WAV_PATH=""
+    echo "  [caller/you] leg: no speech archived (no mic or operator silent — tone fallback, honest label)"
+fi
 echo -e "  --- playing recorded WAV via ALSA (aplay) ---"
 aplay -q "$WAV_PATH" || echo "  (warning: aplay playback failed — no ALSA sink on this host; evidence is the WAV + ffprobe)"
 echo -e "${GREEN}✓ Call recording playback proven: transcript + ${DUR}s WAV from the real recorded call${NC}\n"
@@ -263,6 +313,11 @@ podman rm -f baresip-rx baresip-tx >/dev/null 2>&1 || true
 # media flows; (4) ogstun TX byte counter moves, proving 5G user-plane traversal.
 # ==============================================================================
 echo -e "${YELLOW}[5b/13] 📡 Simulating SIP over the 5G SA User Plane (UE tun → N3 GTP-U → UPF ogstun → Kamailio)...${NC}"
+# P3 preflight (Issue 5.8/5.9 family): read the LIVE uesimtun0 IP and assert
+# GTP-U DOWNLINK emits (iptables OUTPUT 2152 delta) before wiring the call —
+# fail fast with the actionable fix instead of a silent stale-IP/buffered-DL.
+bash "${SCRIPT_DIR}/preflight_5g.sh" || {
+    echo "[-] Error: 5G user-plane preflight failed (see [preflight-5g] above)" >&2; exit 1; }
 # UE 5G IPs are dynamic (allocated from the SMF pool on each attach), so read
 # ue-1's current uesimtun0 address instead of hardcoding a stale value.
 UE_IP=$(podman exec mvno-ueransim-ue-1 sh -c 'ip -4 addr show uesimtun0 2>/dev/null | awk "/inet /{print \$2}" | cut -d/ -f1' | tr -d '[:space:]')
@@ -587,10 +642,10 @@ for i in $(seq 1 5); do
 done
 [ -n "$archived_path" ] || { echo "[-] Error: Vosk did not archive a transcript for the real recording within 15s" >&2; exit 1; }
 echo "  ✓ Native Vosk ASR engine archived a transcript: $archived_path"
-echo "  --- REAL Vosk transcript (from the live call) ---"
+echo "  --- [callee/synthetic scam rig] transcript (canned phrase re-arched from the real call) ---"
 cat "$archived_path"
 grep -q '"[[:space:]]*[^"[:space:]]' "$archived_path" || { echo "[-] Error: real transcript body is empty" >&2; exit 1; }
-echo -e "${GREEN}✓ Native Vosk Java 21 ASR Pipeline Proven on the REAL Recorded Call (no synthetic waveform)${NC}\n"
+echo -e "${GREEN}✓ Native Vosk Java 21 ASR Pipeline Proven on the REAL Recorded Call (canned rig phrase, labeled)${NC}\n"
 
 # ------------------------------------------------------------------------------
 # [9b/13] POST-CALL SCAM VERDICT (real recorded speech -> Vosk -> TRANSCRIPT -> BLOCKED)
@@ -604,6 +659,11 @@ echo -e "${GREEN}✓ Native Vosk Java 21 ASR Pipeline Proven on the REAL Recorde
 # watcher / AiFilterService.classifyTranscript -> ai-filter mock keyword rule.
 # Validation Criteria: transcript archived with the REAL spam words; the real
 # transcript is echoed (not a hardcoded string); block counter increments >= 1.
+# ⚠ DECIDER SCOPE: the verdict comes from the inline ai-filter MOCK (standalone
+# demo decider, honestly labeled). Per org separation the real decider is
+# Filteration-System (SMPP in-band; no call hook yet) — see
+# docs/filteration-system-handoff.md. This check proves the TRANSCRIPT pipeline
+# end-to-end with the demo fallback, never the org decider.
 # ==============================================================================
 echo -e "${YELLOW}[9b/13] 🚨 Real Scam Call -> AI Blocked Verdict (real recording -> Vosk -> TRANSCRIPT -> blocked)...${NC}"
 command -v ffmpeg >/dev/null 2>&1 || { echo "[-] Error: ffmpeg missing — install via ./scripts/deploy.sh" >&2; exit 1; }
@@ -626,7 +686,7 @@ for i in $(seq 1 10); do
     SCAM_TXT=""
 done
 [ -n "$SCAM_TXT" ] || { echo "[-] Error: scam recording was not transcribed within 25s" >&2; exit 1; }
-echo -e "  --- REAL Vosk transcript of this run's scam call (${SCAM_TXT}) ---"
+echo -e "  --- [callee/synthetic scam rig] transcript of this run's call (canned phrase — NOT operator speech) ---"
 cat "$SCAM_TXT"
 grep -q '"[[:space:]]*[^"[:space:]]' "$SCAM_TXT" || { echo "[-] Error: real scam transcript is empty" >&2; exit 1; }
 # The transcript must contain a scam keyword the ai-filter matches, proving the
@@ -647,6 +707,40 @@ done
 echo -e "${GREEN}✓ Real scam call BLOCKED: mvno_vosk_blocked_total ${BLOCKED_BEFORE} -> ${BLOCKED_AFTER} (real recorded speech, transcript echoed above)${NC}\n"
 
 # ------------------------------------------------------------------------------
+# [9d/13] CLEAN CALL ALLOWED (operator live voice / real-voice fixture -> ALLOW)
+# ------------------------------------------------------------------------------
+# Technical Verification: the SAME ai-filter TRANSCRIPT rule that blocked the
+# [callee/synthetic] scam leg must ALLOW the operator's real voice. Source is
+# the [5c] caller leg when the operator spoke into the live mic; otherwise the
+# certified real-voice fixture (docs/evidence/fixtures/archived/live-caller.wav,
+# the operator's voice captured on 2026-08-06, labeled as such).
+# Protocol / Component: Vosk ASR transcript -> ai-filter /api/v1/classify
+# (event_type=TRANSCRIPT) -> allow:true expected.
+# Validation Criteria: verdict allow==true with reason "Clean content".
+# ⚠ DECIDER SCOPE: same inline ai-filter MOCK as [9b] (standalone demo decider).
+# The org decider (Filteration-System) replaces it in the wiring phase — this
+# check only proves the same TRANSCRIPT rule allows clean operator speech.
+# ==============================================================================
+echo -e "${YELLOW}[9d/13] ✅ Clean Call ALLOWED (operator live voice -> ai-filter ALLOW)...${NC}"
+CLEAN_TXT="${CALLER_TXT_PATH:-}"
+CLEAN_SRC="live [caller/you] leg from this run's call"
+if [ -z "$CLEAN_TXT" ] || [ ! -s "$CLEAN_TXT" ]; then
+    CLEAN_TXT="docs/evidence/fixtures/archived/live-caller.txt"
+    CLEAN_SRC="certified real-voice fixture (operator voice, captured 2026-08-06, labeled)"
+fi
+echo "  clean-call source: $CLEAN_SRC"
+echo "  --- [caller/you] transcript ---"
+cat "$CLEAN_TXT"
+grep -q '"[[:space:]]*[^"[:space:]]' "$CLEAN_TXT" || { echo "[-] Error: clean-call transcript is empty" >&2; exit 1; }
+CLEAN_TEXT=$(python3 -c "import json,sys; print(json.load(open('$CLEAN_TXT'))['text'])")
+CLEAN_V=$(curl -s -m 5 -X POST http://localhost:8008/api/v1/classify \
+  -H 'Content-Type: application/json' \
+  -d "{\"event_type\":\"TRANSCRIPT\",\"transcript\":\"${CLEAN_TEXT}\"}")
+echo "  ai-filter verdict: $CLEAN_V"
+echo "$CLEAN_V" | grep -q '"allow": *true' || { echo "[-] Error: clean call was NOT allowed by ai-filter (got: $CLEAN_V)" >&2; exit 1; }
+echo -e "${GREEN}✓ Clean call ALLOWED by the same TRANSCRIPT rule (${CLEAN_SRC})${NC}\n"
+
+# ------------------------------------------------------------------------------
 # [9c/13] PLAYBACK PROOF (seeded real-voice recording over ALSA + its transcript)
 # ------------------------------------------------------------------------------
 # Technical Verification: Plays the seeded live-caller.wav fixture (real human
@@ -654,7 +748,7 @@ echo -e "${GREEN}✓ Real scam call BLOCKED: mvno_vosk_blocked_total ${BLOCKED_B
 # Protocol / Component: ALSA aplay / docs/evidence/fixtures/ (append-only ledger).
 # Validation Criteria: ffprobe duration >= 15s; transcript printed non-empty.
 # ==============================================================================
-echo -e "${YELLOW}[9c/13] 🔊 Playback Proof: seeded real-voice recording (live-caller.wav)...${NC}"
+echo -e "${YELLOW}[9c/13] 🔊 Playback Proof: operator real-voice fixture (your voice, certified prior capture)...${NC}"
 PLAY_WAV="docs/evidence/fixtures/archived/live-caller.wav"
 PLAY_TXT="docs/evidence/fixtures/archived/live-caller.txt"
 [ -f "$PLAY_WAV" ] || { echo "[-] Error: playback fixture missing: ${PLAY_WAV}" >&2; exit 1; }
@@ -663,7 +757,7 @@ awk -v d="$PDUR" 'BEGIN { if (d < 15) exit 1 }' || { echo "[-] Error: playback f
 echo -e "  ✓ fixture duration ${PDUR}s >= 15s (real voice)"
 echo -e "  --- playing live-caller.wav via ALSA (aplay) ---"
 aplay -q "$PLAY_WAV" || echo "  (warning: aplay playback failed — no ALSA sink; evidence = hashed fixture + ffprobe + transcript)"
-echo -e "  --- archived transcript (${PLAY_TXT}) ---"
+echo -e "  --- [caller/you] archived transcript (${PLAY_TXT}) ---"
 cat "$PLAY_TXT"
 [ -s "$PLAY_TXT" ] || { echo "[-] Error: playback transcript is empty" >&2; exit 1; }
 echo -e "${GREEN}✓ Playback proof: ${PDUR}s real-voice recording played + transcript printed${NC}\n"

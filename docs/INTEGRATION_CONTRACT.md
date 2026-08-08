@@ -194,24 +194,30 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   and MVNO host; the client's own RTP socket must be reachable (see `fix_nated_contact()` in
   `configs/kamailio/kamailio.cfg`).
 
-### sms-client (`src/main/resources/application.properties`) — ⚠ **re-verified 2026-08-08: repo refactored 08-07 22:40, now targets a *different* SMPP server**
-> The 2026-08-03 verification below is **stale**: commit `9df7eb36` (2026-08-07 22:40 UTC,
-> "submit via SMPP to the teammate's server, require login, and redesign the web UI") changed
-> `smpp.port` from `2775` to **`2076`** and **removed the `ai.classify.url` property**. As of that
-> commit the client does **not** match MVNO's published SMPP port out of the box:
-- `smpp.host=127.0.0.1`, `smpp.port=2076` — ⚠ **mismatch vs MVNO's `osmo-smsc` on `2775`**
-  (MVNO `docker-compose.yml` publishes `2775:2775`; `osmo-smsc.cfg` defines the
-  `esme smsclient` route on that listener).
-  → **Exact replacement value** for the client to talk to MVNO: `smpp.port=2775`.
-- `smpp.systemId=smsclient`, `smpp.password=password` → still matches the `esme smsclient`
-  route in `osmo-smsc.cfg` ✅.
-- `ai.classify.url` — **removed in the refactor**: the client no longer classifies client-side.
-  (Pre-refactor value was `http://localhost:5000/classify` — matched **no** MVNO endpoint;
-  MVNO mock is `ai-filter:8000/api/v1/classify`.) Classification remains MVNO-side only.
+### sms-client (`src/main/resources/application.properties`) — ✅ re-verified 2026-08-08 against `origin/main @ ddb3df8`
+> ⚠ **Correction to earlier audit**: the previously claimed refactor commit `9df7eb36`
+> ("submit via SMPP to the teammate's server… redesigned web UI", reported 2026-08-07)
+> **does not exist** in `origin/main` (0 matches in the full history). The client still
+> ships the classic shape below; treat any "port 2076 / no classify" claim as unverified.
+- `smpp.host=127.0.0.1`, `smpp.port=2775` — ✅ **matches** MVNO's `osmo-smsc` publish
+  (`docker-compose.yml` `2775:2775`; `osmo-smsc.cfg` `esme smsclient` route). **No change needed
+  to reach MVNO today.** When Filteration-System is wired (see handoff
+  `docs/filteration-system-handoff.md`), this port becomes **`2776`** (the org filter's SMPP
+  listener) — MVNO is bypassed until then.
+- `smpp.systemId=smsclient`, `smpp.password=password` → matches the `esme smsclient` route ✅
+  (MVNO SMSC System-ID `MVNO_SMSC`; primary ESME `mvno-api-route`/`changeme`).
+- `ai.classify.url=http://localhost:5000/classify` — ⚠ **dead endpoint** (nothing serves :5000
+  on this host; MVNO's mock is `ai-filter:8000/api/v1/classify`). The client fails **open** to
+  `Classification.UNKNOWN` on connect/read errors (`ai.connectTimeoutMs=3000`,
+  `ai.readTimeoutMs=5000`), so SMS delivery is unaffected — the classify call is a silent no-op
+  in the current standalone demo. Response shape expected: `{ "label": "spam|ham", "score": 0.x }`
+  (⚠ **not** the MVNO mock's `{ "allow", "reason" }` — a drop-in URL swap alone does NOT activate
+  blocking).
+- `sms.blockSpam=false` — ⚠ **blocking is OFF by default**: even a real `spam` verdict would NOT
+  stop submission until this is `true` (or `-Dsms.blockSpam=true`). MVNO-side blocking
+  (telecom-api → ai-filter → 403) is the standalone-demo enforcement path.
 - `server.port=8080` ⚠ overlaps `telecom-api`'s `8080` if co-hosted — run on a different host/port
-  (e.g. `server.port=8081`).
-- **SMPP credentials:** SMSC System-ID `MVNO_SMSC`; primary ESME account `mvno-api-route` /
-  password `changeme`; secondary client ESME account `smsclient` / password `password`.
+  (e.g. `-Dserver.port=8081`). All keys are overridable via `-Dkey=value`.
 - **REST Interception (optional):** `POST http://telecom-api:8080/api/v1/intercept/sms` with
   `X-API-Key: mvno-demo-key-2026`; response `{ "allow": boolean, "reason": "string" }`.
 
@@ -243,6 +249,29 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 - **TRANSCRIPT events are post-call analytics only**: verdicts never retro-block an in-flight call;
     they increment `mvno_vosk_blocked_total` and appear in the mvno-api log.
 
+### Filteration-System (SMPP in-band filter — the org's decider) — verified via source audit, NOT cloned locally
+> The intended live decider per the org's separation of concerns. It is **SMPP-based, not REST**:
+> it sits **in-band between the ESME and the MSC**, so SMS traffic must be re-routed through it
+> (see `docs/filteration-system-handoff.md` for the full teammate-facing contract).
+- **Topology (from source):** `ESME → SMPP :2776 → Filteration-System [decides] → SMPP → MSC :2775 → MT`.
+  - `SmppServerManager`: SMPP server listener on **`2776`** (binds as `SpamFilter`), attaches
+    `SpamFilterMessageReceiver` per session.
+  - `SpamFilterMessageReceiver`: on each `SUBMIT_SM`/`DELIVER_SM` calls
+    `filterService.isSpam(sender, receiver, body)`; spam → reject (`STAT_ESME_RSUBMITFAIL`,
+    never forwarded); clean → `OsmoMscClient` forwards to the MSC.
+  - `SpamFilterService.isSpam`: **whitelist → blocklist → AI LLM** (HTTP to agentrouter.org);
+    an AI "spam" hit writes a new `Blocklist` row (self-learning).
+- **Wiring notes for MVNO co-deployment:**
+  - `OsmoMscClient` targets `localhost:2775` — i.e. Filteration-System must run in a network
+    where `localhost:2775` reaches MVNO's `osmo-smsc` (same container network / same host).
+  - **Port collision**: `2775` is MVNO's published SMPP port — Filteration-System must NOT also
+    publish `2775` on the same host (use container networking instead of host publish).
+  - `sms-client` re-points to `:2776` to enter the filter (deferred per org decision — MVNO demo
+    stays standalone until the wiring phase).
+- **Call path gap**: Filteration-System has **no call (non-SMPP) adjudication hook** today — the
+  SipClient→MVNO→decider flow needs a call endpoint (recommendation in the handoff doc). Until
+  then, call verdicts stay with MVNO's `telecom-api` → `ai-filter` proxy (fail-open SLA).
+
 ---
 
 ## 6. Optional `MVNO_PUBLISH_5060` (default-off, env-gated)
@@ -269,6 +298,17 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 
 ## 8. Partner handoff package (files to share with each repository)
 
+### Filteration-System (org decider — SMPP in-band filter)
+| Artifact | Why |
+|---|---|
+| `docs/filteration-system-handoff.md` | **the handoff contract**: SMPP `:2776` bind, `isSpam(sender, receiver, body)` signature, RSUBMITFAIL semantics, whitelist/blocklist/AI-LLM order, self-learning blocklist, `OsmoMscClient` → `localhost:2775` wiring + port-collision note, sms-client `:2775→:2776` re-point, call-adjudication hook request |
+| `docs/INTEGRATION_CONTRACT.md` Section 5 (Filteration-System) | verified topology summary |
+| `configs/osmocom/osmo-smsc.cfg` | the `esme smsclient`/`esme mvno-api-route` routes the filter's MSC client must authenticate to |
+
+**Prove your integration with**: re-point `sms-client` `smpp.port` to `2776`, run
+`./scripts/testing/e2e_runbook.sh` (all 5 cells must stay green) and
+`./scripts/testing/demo_runbook.sh` check 10/10b (SUBMIT_SM path).
+
 ### AI-Filteration-System (classifier provider)
 | Artifact | Why |
 |---|---|
@@ -294,7 +334,7 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 ### sms-client (SMPP ESME)
 | Artifact | Why |
 |---|---|
-| `docs/INTEGRATION_CONTRACT.md` Section 1, Section 5 (sms-client) | SMPP `2775`, `MVNO_SMSC`, ESME accounts, `ai.classify.url` replacement value, intercept REST |
+| `docs/INTEGRATION_CONTRACT.md` Section 1, Section 5 (sms-client) | SMPP `2775` today (→ `2776` when Filteration-System is wired), `MVNO_SMSC`, ESME accounts, dead `ai.classify.url` + `sms.blockSpam=false` caveats, intercept REST |
 | `configs/osmocom/osmo-smsc.cfg` | the `esme smsclient` / `esme mvno-api-route` routes |
 | `docs/TESTING_REFERENCE.md` SMS flows | 2G/5G + IP-SM-GW delivery verification; raw-shell variants in `docs/LIVE_DEMO.md` S6–S8 |
 | `scripts/testing/e2e_runbook.sh` | 5-cell SMS matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) |

@@ -206,6 +206,24 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 
 ---
 
+### Regression family: "5G user plane downlink dead / uplink healthy" (5.8 ↔ 5.9)
+> **Durable-entry rule**: do NOT mint a new issue number per regression of this
+> family. The family shares one signature — SIP works uplink but the GTP-U
+> downlink never emits (`far->gnode == NULL` silent buffering, or stale gNB
+> F-TEID routing) — and one durable runbook defence: the **preflight probe**
+> `scripts/testing/preflight_5g.sh` (reads the LIVE `uesimtun0` IP, drives a
+> UAS REGISTER over the 5G path, asserts iptables `OUTPUT dport 2152` moves)
+> wired into `demo_runbook.sh` [5b] BEFORE any call. A probe failure prints the
+> actionable fix (restart ue-1 for 5.9; restart gNB+UEs for 5.8) instead of a
+> silent stale-IP timeout.
+
+| # | Date | Signature | Root cause | Fix |
+|---|------|-----------|------------|-----|
+| 7.4 | earlier | UL data plane dead after partial gNB recreate | stale NGAP state | recreate gNB |
+| 8.8 | earlier | "No Heartbeat from SMF" | PFCP client addr resolution | restart SMF/UPF pairing |
+| 5.8 | 08-05 | downlink silent after long uptime (ogstun RX=0) | stale gNB F-TEID/GTP-U after interrupted SMF/AMF epoll | `podman restart mvno-ueransim-gnb` + UEs |
+| 5.9 | 08-08 | downlink dead after UE re-register burst (ogstun TX reads reply, never emits GTP-U) | lost `UpdateSmContext` (gNB F-TEID) via SBI HTTP/2 framing error → `far->gnode == NULL` | `podman restart mvno-ueransim-ue-1` |
+
 ### Issue 5.8: 5G User-Plane SIP Path Goes Silent After Long Uptime — Stale gNB GTP-U Downlink (ogstun RX=0)
 * **Symptom**: `demo_runbook.sh` check 5b fails on a multi-day-old stack: the UE's SIP REGISTER to `10.89.0.23:5060` via `uesimtun0` times out even though the UE tunnel exists (`10.45.0.x/32`) and AMF still reports `ran_ue = 3`. Uplink is dead end-to-end: UPF `ogstun` RX stays `0` and the POSTROUTING `MASQUERADE 10.45.0.0/16 !ogstun` rule shows `0 packets` — no UE byte ever reaches the user plane.
 * **Root Cause**: The 5G core + UERANSIM containers had been running ~3 days (`StartedAt 08-03 22:32`); an external signal (compose/restart cycle at 08-05 11:34:43) interrupted the SMF/AMF event loops — both `amf.log` and `smf.log` end with `[core] ERROR: epoll failed (4:Interrupted system call)` at the same millisecond — while the processes survived. SMF/UPF PDU-session state and the **gNB's downlink F-TEID/GTP-U mappings went stale**: after restarting the UEs (fresh registration + new PDU sessions), uplink recovers (ogstun RX moves, MASQUERADE matches) and the UPF transmits SIP replies (ogstun TX increments) but they never reach the UE — the gNB still routes the downlink tunnel to the dead session.

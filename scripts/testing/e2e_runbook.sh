@@ -29,6 +29,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}"
 
+# Re-entrancy guard (evidence race guard): refuse to start while another
+# instance is active, so two runbooks can never truncate/flush the same
+# clean-slate RUN_LOG concurrently. Lock is released on EXIT.
+LOCK_FILE="${TMPDIR:-/tmp}/mvno-e2e-runbook.lock"
+if [ -f "${LOCK_FILE}" ] && kill -0 "$(cat "${LOCK_FILE}" 2>/dev/null)" 2>/dev/null; then
+    echo "[-] Error: another e2e_runbook.sh instance is active (PID $(cat "${LOCK_FILE}")) — refusing to start to protect clean-slate evidence" >&2
+    exit 1
+fi
+echo $$ > "${LOCK_FILE}"
+trap 'rm -f "${LOCK_FILE}"' EXIT
+
 # Evidence layer: clean-slate e2e run log (Aug-8 convention) — the file is
 # truncated at run start and stamped with RUN:<ts>, so a green file contains
 # exactly ONE clean pass and a red file exactly ONE honest failure. Re-runs
