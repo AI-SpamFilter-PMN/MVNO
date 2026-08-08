@@ -14,6 +14,10 @@
 
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "${REPO_ROOT}"
+source "${REPO_ROOT}/scripts/lib/common.sh"   # play_go_beep (audible go-cue)
+
 DURATION="${1:-5}"
 FILENAME="mic_call_$(date +%s).wav"
 TARGET_PATH="state/spool/${FILENAME}"
@@ -27,6 +31,10 @@ echo "  Target:    ${TARGET_PATH}"
 echo ""
 echo "📢 Speak clearly into your laptop microphone now..."
 echo "------------------------------------------------------------------------"
+# Audible go-cue: the two-tone pep sound marks the exact moment recording
+# starts — speak after you hear it (MVNO_NO_BEEP=1 to mute; never fatal).
+play_go_beep
+sleep 1    # reaction beat: first words land INSIDE the capture window
 
 # Record live microphone audio using ffmpeg / pulse / arecord
 if command -v ffmpeg >/dev/null 2>&1; then

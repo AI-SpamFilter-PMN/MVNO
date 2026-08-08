@@ -179,3 +179,37 @@ run_in_flight() {
     fi
     return 1
 }
+
+# ==============================================================================
+# AUDIBLE GO-CUE — "the call is live, start talking now" pep sound
+# ==============================================================================
+# play_go_beep — play a short two-tone cue through the host speakers at the
+# moment the user should START TALKING (start of the SPEAK NOW window / mic
+# capture). Best-effort and NEVER fatal: generates a tiny WAV once with ffmpeg
+# (sine 660->880 Hz, ~0.5 s), then plays via the first working path:
+#   paplay (Pulse/PipeWire socket) -> aplay (ALSA) -> terminal BEL
+# Escape hatch: MVNO_NO_BEEP=1 skips the sound entirely (headless runs).
+# Used by: demo_call.sh dial() and mic_record.sh (both the SPEAK NOW call
+# window and the graduation/cockpit mic captures share this one helper).
+play_go_beep() {
+    [ "${MVNO_NO_BEEP:-0}" = "1" ] && return 0
+    local wav="${TMPDIR:-/tmp}/mvno-go-beep.wav"
+    local pdir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    if [ ! -f "$wav" ] && command -v ffmpeg >/dev/null 2>&1; then
+        # -f lavfi is per-input (a second bare -i would be read as a filename).
+        # NOTE: no extra volume filter — ffmpeg's sine output measures ~-18 dB
+        # max (measured), i.e. audible but gentle, not a full-scale alarm.
+        ffmpeg -y -loglevel error -f lavfi \
+            -i "sine=frequency=660:duration=0.18" -f lavfi \
+            -i "sine=frequency=880:duration=0.30" \
+            -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[out]" -map "[out]" \
+            -ar 44100 -ac 1 "$wav" 2>/dev/null || true
+    fi
+    if [ -S "${pdir}/pulse/native" ] && command -v paplay >/dev/null 2>&1 && [ -f "$wav" ]; then
+        paplay "$wav" >/dev/null 2>&1 || true
+    elif command -v aplay >/dev/null 2>&1 && [ -f "$wav" ]; then
+        aplay -q "$wav" >/dev/null 2>&1 || true
+    else
+        printf '\a' >/dev/null 2>&1 || true    # terminal BEL as last resort
+    fi
+}

@@ -18,6 +18,7 @@
 set -u
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
+source "${REPO_ROOT}/scripts/lib/common.sh"   # play_go_beep (audible go-cue)
 
 CALLER=15553332211
 CALLEE=15559998888
@@ -130,12 +131,18 @@ dial() {
     echo "     into the mic for ~12s — Vosk transcribes YOUR voice:"
     echo "        \"${SCAM_PHRASE}\""
     sleep 3
+    # Audible go-cue: the two-tone pep sound means "the call is live NOW —
+    # start talking" (plays over the host speakers; MVNO_NO_BEEP=1 to mute).
+    play_go_beep
     for s in 12 9 6 3; do
       printf "  >>> SPEAK NOW (%ss window) ...\r" "$s"
       sleep 3
     done
     echo ""
   else
+    # Tone-caller fallback (no mic / headless): still cue audibly so the
+    # operator knows the relay is live and the callee leg is streaming.
+    play_go_beep
     echo "  >>> TALK NOW — the callee streams the canned scam phrase for ~12 s <<<"
     sleep 12
   fi

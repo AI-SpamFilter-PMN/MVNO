@@ -173,6 +173,12 @@ Vosk transcript.
 > `demo_call.sh` then prompts **"SPEAK NOW"** for ~12 s and Vosk transcribes
 > *your* voice. No mic → canned tone caller (deterministic guard).
 >
+> **Audible go-cue**: the moment the speaking window opens (and the instant
+> `mic_record.sh` starts capturing), a short two-tone **pep sound** plays over
+> the host speakers — that is the "the call is live, start talking now" cue
+> (`play_go_beep` in `scripts/lib/common.sh`; `paplay` → `aplay` → terminal
+> BEL fallback; `MVNO_NO_BEEP=1` to mute for headless runs).
+>
 > **Phrase** (realistic, ASR-vetted): *"Your bank account has been blocked,
 > please confirm your details now"* — Vosk hears it almost verbatim, so the
 > `account`/`blocked`/`confirm` keyword anchors always survive. Customize with
