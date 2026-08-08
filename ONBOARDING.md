@@ -253,6 +253,7 @@ never stalls the spool loop.
 |------|-----|
 | `docs/deployment_guide.md` | Full ops runbook, configs, Issue 8.x log |
 | `docs/INTEGRATION_CONTRACT.md` | Single contract: interfaces + API payload schemas (SMS/VOICE_CALL/TRANSCRIPT) + SLA + per-repo integration + partner handoff |
+| `docs/partner/` | **Ready-to-paste integration docs for teammate repos** (`sms-client`, `SipClient`, `Filteration-System`) + `docs/filteration-system-handoff.md` — share these when integrating across the org |
 | `docs/ISSUES.md` | 8.x issue log with root causes/fixes |
 | `docs/architecture_flow.svg` | System diagram |
 | `docs/implementation_guide.md` | Deep dive architecture and configuration guide |

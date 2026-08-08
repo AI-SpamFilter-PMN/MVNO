@@ -219,6 +219,15 @@ Vosk transcript.
 > → mic acoustic feedback can howl in a loud room — the loopback lives only for
 > the ~12 s window and is removed immediately after.
 >
+> **Sound / mic gain** (why it sounds "telephone-grade"): the relay uses **PCMU
+> (G.711u, 8 kHz)** — telephony bandwidth by design; do not expect hi-fi. If a
+> recorded leg is too quiet or noisy, set the mic level first
+> (`pactl set-source-volume @DEFAULT_SOURCE@ 100%`), confirm with
+> `mic_probe.sh` (mean ≈ −35..−20 dB), then re-run. Quick listen:
+> `aplay "$(scripts/testing/newest.sh 'state/spool/archived/*.wav')"`. The
+> **side-tone above** is the live "your mic works" proof; `mic_verify.sh`
+> (graduation, S14) is the hard non-empty-transcript proof.
+>
 > **Phrase** (realistic, ASR-vetted): *"Your bank account has been blocked,
 > please confirm your details now"* — Vosk hears it almost verbatim, so the
 > `account`/`blocked`/`confirm` keyword anchors always survive. Customize with
@@ -797,6 +806,52 @@ make gate                                                       # exit 0 (8/8 or
 ./scripts/testing/sms_matrix.sh >/dev/null && echo "E2E OK"     # exit 0
 ./scripts/testing/live_demo.sh >/dev/null && echo "DEMO OK"   # exit 0
 ```
+
+---
+
+## S15 — Test With a Real External SIP Client (mobile / laptop softphone) · optional
+
+**PURPOSE** — prove the SIP/RTP path from a **real third-party RFC-3261
+softphone** (phone app / Zoiper / MicroSIP / Linphone / Blink, or the teammate
+`SipClient` repo's JavaFX UA) end-to-end against MVNO, including live media
+through RTPEngine. This doubles as the integration test for the `SipClient`
+teammate repo (drop-in: `docs/partner/SipClient-INTEGRATION.md`).
+
+> Ports bind on `*` (verified live): `5066/udp` (SIP) and `30000-30100/udp`
+> (RTP) are reachable from any host on the same LAN. Keep firewall UDP
+> `5066` + `30000-30100` open.
+
+**SETUP** (one provisioned number is enough — e.g. `15553332211`):
+
+```bash
+bash scripts/add-subscriber.sh 15553332211   # seed it if not already present
+hostname -I | awk '{print $1}'               # LAN IP the phone should reach
+```
+
+On the softphone, add an account:
+- **Server / Proxy**: `<this-host-IP>:5066` (UDP)
+- **Username**: the MSISDN (`15553332211`) · **Password**: `testpass` · **Auth**: digest
+- **Realm**: `localhost` · **Codec**: **PCMU only** (G.711u) — disable G.722/OPUS (no transcode, S4)
+- REGISTER. **EXPECT**: `SIP 200 OK` (Kamailio `auth_db`; bad password → 401/403).
+
+**CALL**: dial another registered number (cockpit callee `15559998888` when the
+baresip rig is up, or a second softphone/SipClient). **EXPECT**: `200 OK`
+answer, audio both ways via RTPEngine, a fresh pcap in `state/spool/pcaps/`,
+and (S11 / S5) a live Vosk transcript.
+
+**Verify**:
+```bash
+podman logs mvno-kamailio --since 5m | grep -E 'REGISTER|INVITE|INTERCEPT' | tail
+podman logs baresip-rx | grep -c '200 Answering'            # if callee rig up
+NEW=$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap'); echo "$NEW"
+```
+> Zero-balance / EIR-fraud / AI-block numbers answer with `SIP 403 Forbidden` —
+> correct terminal behavior; treat 403 as final (no retry loop).
+
+> **Why this matters for integration**: MVNO exposes *standard* SIP (RFC 3261 +
+> digest, PCMU relay), so any standards-based client registers and calls with
+> **zero MVNO-side changes** — this is exactly the surface the `SipClient`
+> teammate repo targets.
 
 ---
 
