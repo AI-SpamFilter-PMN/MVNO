@@ -3,6 +3,33 @@
 > Abbreviations: **docs/GLOSSARY.md** — single source of truth
 This document is the authoritative troubleshooting, root-cause analysis, and deployment architecture reference for the MVNO Interception Core. It details every technical issue encountered across Osmocom, Kamailio, RTPEngine, Open5GS, VictoriaMetrics, Grafana, Vector, and UERANSIM, along with empirical verification steps and deployment models (Native, Containerized, and Mixed).
 
+> **Issue Status legend** — every NEW issue (ID above the frontier marker at the
+> bottom of this block) MUST carry a `* **Status**: <enum>` line and a
+> `* **Verified-by**: <evidence>` line. Enums: `LL` live-log verified · `RC`
+> reproduced on cold-start · `AO` audited-only (observation, not reproduced) ·
+> `X` resolved (closed) by a commit hash · `C` closed non-fault (tool mishap /
+> agent artifact — file under §11 Not-Issues, not here). `scripts/check-issues.sh`
+> enforces this gate; legacy entries (≤ frontier) are grandfathered and surface
+> as a WARN backfill queue.
+
+> **Issue Keyword Index (SSOT)** — before filing a new issue, grep these
+> keywords; if the new symptom matches an anchor, EXTEND that issue instead of
+> filing a new number. `check-issues.sh` validates the map (each keyword must
+> map to exactly one existing issue):
+> * `glibc` → Issue 8.30
+> * `baresip` → Issue 8.30
+> * `rootless` → Issue 8.14
+> * `bridge` → Issue 8.21
+> * `watchdog` → Issue 8.39
+> * `proof` → Issue 8.40
+> * `msisdn` → Issue 8.41
+> * `sip-register` → Issue 8.42
+> * `beep` → Issue 8.43
+> * `hlr` → Issue 8.44
+> * `cold-start` → Issue 8.45
+
+<!-- check-issues frontier: Issue 8.45 -->
+
 ---
 
 ## 1. Architectural & Deployment Model Taxonomy
@@ -266,7 +293,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Symptom**: `telecom-api` REST queries returned `balance: 0` for all subscribers, and container logs showed `[SQLITE_READONLY_DIRECTORY] Process does not have permission to create a journal file in the same directory as the database`.
 * **Root Cause**: Single-file bind mount (`- ./state/kamailio.db:/etc/kamailio/kamailio.db:z`) prevented the non-root container process from creating temporary `.db-wal` and `.db-shm` lock/journal files in `/etc/kamailio/`.
 * **Fix**: Updated `docker-compose.yml` to mount the parent directory (`- ./state:/etc/kamailio:z`), allowing SQLite WAL mode to create journal/shm files seamlessly.
-* **Status**: > [!NOTE] Superseded by Issue 8.12 (unified mount `./state/kamailio/kamailio.db`).
+* **Status**: X (superseded by Issue 8.12 — unified mount `./state/kamailio/kamailio.db`)
 
 ### Issue 6.2: `vmagent` Promscrape Configuration Flag Omission
 * **Symptom**: VictoriaMetrics (`:8428`) and Grafana NOC Dashboards (`:3000`) rendered empty metric panels with zero active targets.
@@ -277,7 +304,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Symptom**: Grafana crashes after host reboot with `database is locked` or `disk I/O error`.
 * **Root Cause**: Missing `GF_DATABASE_WAL=true` in `docker-compose.yml` environment variables.
 * **Fix**: Pinned image to `grafana/grafana-oss:11.6.0` and added `GF_DATABASE_WAL=true` in `docker-compose.yml`.
-* **Status**: Unapplied in initial stack compose configuration; applied in 2026-08-01 telemetry alignment.
+* **Status**: X (applied in 2026-08-01 telemetry alignment; not in initial stack compose configuration)
 
 ### Issue 6.4: PromQL Syntax Error in Grafana Stat Cards (`|| vector(0)`)
 * **Symptom**: Grafana Stat Panels displayed "No data" and red parsing error icons, while time-series line graphs below rendered live values.
@@ -349,7 +376,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Symptom**: System journal reported `[pfcp] WARNING: No Heartbeat from SMF` and `[smf] ERROR: Cannot find PFCP-Node: type [1] node_id NULL from [127.0.0.1]:8805`.
 * **Root Cause**: `configs/open5gs/upf.yaml` lacked `pfcp.client.smf` section, defaulting PFCP client heartbeat target to loopback `127.0.0.1:8805` instead of container network hostname `smf`.
 * **Fix**: Added `pfcp.client.smf: - address: smf` to [configs/open5gs/upf.yaml](configs/open5gs/upf.yaml). PFCP heartbeats between SMF and UPF are now associated and healthy across `mvno-net`.
-* **Status**: > [!NOTE] Superseded by Issue 8.10 (SMF acts as sole PFCP client initiator per 3GPP TS 29.244).
+* **Status**: X (superseded by Issue 8.10 — SMF acts as sole PFCP client initiator per 3GPP TS 29.244)
 
 ### Issue 8.9: Open5GS SBI Cleartext HTTP/2 (`no_tls: true`) Configuration Across All NFs
 * **Symptom**: Open5GS NRF, AMF, SMF, and AUSF logged `nghttp2_session_mem_recv() failed (-903: Received bad client magic byte string)` and `Error in the HTTP2 framing layer (16)`.
@@ -589,6 +616,8 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: no fault-injection path existed to prove recovery end-to-end.
 * **Fix**: added `--self-test` mode — `podman stop mvno-ip-sm-gw`, assert the outage took, run one `recover()`, assert `/health` returns 200; safe because `recover()` calls `demo_running()` (lock files + `mvno-live` tmux + pgrep gate/sms_matrix/live_demo/demo_live) and skips when a demo is in flight.
 * **Verification**: `bash scripts/mvno-stack-watchdog.sh --self-test` exits 0 and logs `self-test PASS: bridge outage recovered (restart -> /health 200)`; `make watchdog-self-test` tees to `docs/evidence/watchdog-recovery-<date>.log`.
+* **Status**: X (resolved by abaa766)
+* **Verified-by**: abaa766 — self-test exit-code propagation + live-watchdog race fix; `state/logs/watchdog.log` 2026-08-08 shows bridge restart round 2 → `/health` 200 after a real TERM-strand recovery.
 
 ### Issue 8.40: `cockpit_proof.sh` Stale-Evidence False-PASS Window (Proof Harness)
 
@@ -596,6 +625,8 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: the mark only anchors "newer-than"; it does not clear pre-existing spool artifacts, so a healthy-but-not-fresh run can pass.
 * **Fix**: after tearing down any pre-existing `mvno-live` session and before launch, `rm -f state/spool/live-*.wav state/spool/archived/live-*.txt state/spool/pcaps/*.pcap` (non-interactive mode only, preserving real recordings under `--live-mic`), then require evidence to appear; keep `-newer "$MARK"` as belt-and-suspenders.
 * **Verification**: `make cockpit-proof` twice back-to-back — both must PASS, the second proving no stale file satisfies it.
+* **Status**: X (resolved by b1cd9af)
+* **Verified-by**: b1cd9af — audit false-PASS/false-FAIL risk closure in the proof harness; two consecutive `make proof` runs green.
 
 ### Issue 8.41: `subscriber_proof.sh` Hardcoded Throwaway MSISDN Races (Proof Harness, optional-hardening)
 
@@ -603,27 +634,27 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Root Cause**: a fixed, non-unique throwaway plus no absence-assert after pre-purge.
 * **Fix**: derive a time/random-unique MSISDN suffix at runtime; after pre-purge, assert the throwaway is **absent** from all 5 stores and fail (non-zero) if any row remains, so a leftover from an interrupted run stops the proof instead of proceeding to a probable `add-subscriber` die.
 * **Verification**: two parallel/subsequent `make subscriber-proof` runs both PASS without an "exists" pre-purge failure; a deliberately left-over row makes the proof fail-fast.
+* **Status**: X (resolved by b1cd9af)
+* **Verified-by**: b1cd9af — time-unique throwaway MSISDN + post-purge absent-assert; `docs/evidence/demo-subscriber-2026-08-08.log` shows a clean provision/assert/teardown run.
 
 ### Issue 8.42: `subscriber_proof.sh` SIP-REGISTER String-Match Fragility (Proof Harness, optional low)
 
 * **Symptom**: the UAS assertion greps the exact string `SIP REGISTER 200 OK for subscriber ${THROWAWAY}`; if `sip_traffic_sim.py`'s output format drifts (trailing colon, `SIP/2.0 200 OK` variant), the proof false-FAILs.
 * **Fix** (optional): relax to a looser `REGISTER[^\n]*200 OK` match on the UAS output.
 * **Verification**: `make subscriber-proof` still green.
+* **Status**: X (resolved by b1cd9af)
+* **Verified-by**: b1cd9af — UAS match relaxed to a looser `REGISTER[^\n]*200 OK`; `make subscriber-proof` green after the change.
 
 ### Issue 8.43: Caller Now Gets an Audible Call-Open Beep (Demo UX)
 
 * **Symptom**: at call-open the live-mic speak-window was ambiguous — the operator had to watch the terminal for the `SPEAK NOW` countdown instead of hearing when to start talking.
 * **Fix**: `play_go_beep()` in `scripts/lib/common.sh` generates a 0.48 s 660→880 Hz two-tone once into `${TMPDIR}` via ffmpeg and plays it via `paplay` (Pulse socket) → `aplay` → terminal BEL; fired from `demo_call.sh dial()` at the start of the SPEAK NOW window (and the tone-fallback TALK NOW branch) and from `mic_record.sh` before capture; `MVNO_NO_BEEP=1` mutes for headless runs and the deterministic proofs stay tone-caller-based.
 * **Verification**: with a Pulse socket, `demo_call.sh dial` beeps at the start of the speak-window and the user's speech lands in the near-real-time Vosk path; `MVNO_NO_BEEP=1 make cockpit-proof` twice — both green.
+* **Status**: X (resolved by ec30a12)
+* **Verified-by**: ec30a12 — audible go-cue shipped (feature, not a fault); `MVNO_NO_BEEP=1` proof runs stay deterministic.
 
-> **Audited-and-clear (do NOT re-file as bugs)** — two suspected issues were
-> investigated and refuted:
-> (a) the watchdog `--self-test` "unguarded `podman stop` mid-demo" concern —
-> false: `recover()` calls `demo_running()` (lock files + `mvno-live` tmux +
-> pgrep gate/sms_matrix/live_demo/demo_live) and skips when a demo is in flight;
-> (b) the tshark RTP decode-direction concern — false: compose maps
-> `30000-30100:30000-30100/udp` (both directions), so
-> `-d udp.port==30000-30100,rtp` decodes src and dst frames.
+> **Audited-and-clear**: two suspected issues were investigated and refuted —
+> full reasoning moved to **§11 Not-Issues** (quarantine) so they are not re-filed as bugs.
 
 ### Issue 8.44: True-Cold HLR Crash-Loop — init-db minimal schema vs osmo-hlr v7 (2G leg down)
 * Symptom: on a truly cold start (`make clean` -> `make bootstrap`) `mvno-osmo-hlr`
@@ -648,6 +679,9 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   IPA interfaces up, osmo-msc connected; `make gate` 8/8 and `make proof` 3/3
   PASS on the cold state (fresh evidence in `docs/evidence/e2e-run-*`,
   `demo-cockpit-*`, `demo-subscriber-*`, `watchdog-recovery-*`).
+* Status: X (resolved by d23f43c)
+* Verified-by: d23f43c — init-db writes the exact osmo-hlr v7 schema with a
+  drop-if-broken guard; full cold wipe (`make clean` → `make bootstrap`) green.
 
 ### Issue 8.45: Cold-Start Ordering Gaps in Docs & Setup (make up alone is not enough)
 * Symptom: LIVE_DEMO S1 and ONBOARDING said `make up` only; on a fresh box the
@@ -666,6 +700,10 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * Verification: the documented sequence was executed live end-to-end on a
   wiped state (`make clean` -> `init-db` -> `up` -> `seed-mongo`) with `make
   gate` 8/8 and `make proof` 3/3 green.
+* Status: X (resolved by 9239dc5, refined 5393b61)
+* Verified-by: 9239dc5 (make bootstrap + deploy.sh seed-mongo) and 5393b61
+  (seed-mongo mongodb-readiness poll + README/ONBOARDING order); cold-state
+  verification committed with the gate/proof evidence logs.
 
 
 ---
@@ -696,3 +734,23 @@ This section defines the multi-agent integration boundaries across team reposito
 - **SIP REGISTER Authentication**: Digest authentication (`auth_check()`) using credentials seeded in `kamailio.db`.
 - **SIP INVITE Authentication**: `INVITE` is also challenged (`407 Proxy Authentication Required`, zero-trust Section 1.1) — retry with `Authorization: Digest` (realm `localhost`).
 - **RTP Media Streams**: RTPEngine UDP port range `30000-30100/udp` (G.711u PCMU codec).
+
+---
+
+## 11. Not-Issues (verified non-faults / agent artifacts)
+
+> Quarantine for suspected issues that were investigated and **refuted** — a
+> tool mishap, a probe artifact, or an agent over-claim. Filed here as `C`
+> (closed non-fault) so nobody re-investigates them. `check-issues.sh` treats
+> anything in this section as background, not as an open defect. Every entry
+> must state why it is NOT a fault.
+
+### Not-Issue N-1: Watchdog `--self-test` "unguarded `podman stop` mid-demo" (audited-and-clear)
+* **Claim**: `--self-test` runs `podman stop mvno-ip-sm-gw` unconditionally at the top and could tear down an in-flight demo call.
+* **Why it is NOT a fault**: `recover()` calls `demo_running()` (lock files + `mvno-live` tmux session + pgrep gate/sms_matrix/live_demo/demo_live) and skips recovery when a demo is in flight — the stop → recover path is guarded by design.
+* **Status**: C · audited 2026-08-08 (previously noted under Issue 8.43; moved here so the claim is not re-filed).
+
+### Not-Issue N-2: tshark RTP decode-direction concern (audited-and-clear)
+* **Claim**: `-d udp.port==30000-30100,rtp` might decode 0 frames because the media relay uses only source ports, false-FAILing the proof harness.
+* **Why it is NOT a fault**: compose maps `30000-30100:30000-30100/udp` (1:1, both directions), so `udp.port==30000-30100` matches src and dst — the RTP decode works both ways.
+* **Status**: C · audited 2026-08-08 (moved here from the Issue 8.43 note).

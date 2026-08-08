@@ -8,6 +8,8 @@
 # Included checks (microseconds each, no stack required):
 #   • make check-pins — static IP pin uniqueness guard (F1-class: duplicate
 #     pins surface only as runtime IPAM errors at container start).
+#   • make check-issues — ISSUES.md hygiene gate (dup IDs / candidate
+#     duplicates / Status-enum structure); keeps the issue doc non-redundant.
 #   • shell syntax on scripts/ (bash -n) — cheap local regression net.
 #
 # Deliberately EXCLUDED:
@@ -33,6 +35,14 @@ if ! make check-pins >/dev/null 2>&1; then
   FAILED=1
 else
   echo "✓ check-pins OK (unique static IPs)"
+fi
+
+if ! make check-issues >/dev/null 2>&1; then
+  echo "✗ pre-push FAILED: ISSUES.md hygiene gate (make check-issues)."
+  echo "  Fix duplicate IDs / candidate-duplicate refiles / missing Status before pushing."
+  FAILED=1
+else
+  echo "✓ check-issues OK (dedup + structure + status)"
 fi
 
 SYNTAX_ERR="$(find scripts -name '*.sh' -type f -print0 | xargs -0 -n1 bash -n 2>&1 || true)"

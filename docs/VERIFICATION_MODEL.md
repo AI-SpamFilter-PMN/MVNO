@@ -120,3 +120,30 @@ which both `gate.sh` and `live_demo.sh` delegate to the single
 - The watchdog's `run_in_flight` guard, the cockpit/live_demo collision check
   (both hold the UAS AoR), and the proof harness locks all share the same
   registry — orchestrators are settled by construction, not by convention.
+
+---
+
+## 7. Issue documentation workflow (Status discipline)
+
+Every new entry in **docs/ISSUES.md** must pass the mechanical gate
+(`make check-issues`, also wired into the pre-push hook) — a plan or intent
+alone cannot guarantee non-redundancy or verified genuineness:
+
+1. **Report** — log the raw symptom with `* Status: AO` (audited-only). An
+   observation is never a confirmed issue on its own; a tool mishap or a probe
+   artifact is a `C` (closed non-fault) under **§11 Not-Issues**, not an issue.
+2. **Verify** — capture real evidence (a live log line, a cold-start
+   reproduction, or a probe). Promote to `LL` (live-log verified) or `RC`
+   (reproduced on cold-start); if the symptom evaporates, reclassify as `C`.
+3. **Dedup** — grep the header **Keyword Index (SSOT)**; if the symptom
+   matches an anchor, EXTEND that issue (bump Status, add the new data point)
+   instead of filing a new number. `check-issues.sh` hard-fails on a candidate
+   duplicate (≥2 shared title tokens above the frontier, or a keyword mapping
+   to two anchors) — a planted re-file is the regression test for this.
+4. **Document** — add the block with `* Symptom / * Root Cause / * Fix /
+   * Verification / * Status / * Verified-by`. New entries must use
+   section-max+1 (frontier is `<!-- check-issues frontier: Issue 8.45 -->`;
+   next free ID is 8.46) and a valid Status enum (`LL`/`RC`/`AO`/`X`/`C`).
+5. **Close** — when fixed, flip `* Status: X (resolved by <commit>)` — never
+   delete an entry (ISSUES.md is the authoritative doc). Legacy entries still
+   missing Status surface as the check-issues WARN backfill queue.

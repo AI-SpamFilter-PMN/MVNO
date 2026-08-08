@@ -5,7 +5,7 @@
 # SQLite WAL database initialization, VTY control socket assertions, and REST API testing.
 # ==============================================================================
 
-.PHONY: up down logs ps init-db init-native-db up-native clean rebuild bootstrap test test-sms test-call test-api test-vty gate check-pins graduation
+.PHONY: up down logs ps init-db init-native-db up-native clean rebuild bootstrap test test-sms test-call test-api test-vty gate check-pins check-issues graduation
 
 # Launches all rootless container services using scripts/up.sh
 up:
@@ -188,6 +188,13 @@ gate:
 # runtime IPAM errors at container start). Run before committing compose changes.
 check-pins:
 	./scripts/testing/check_ip_pins.sh
+
+# ISSUES.md hygiene gate — read-only dedup / structure / Status-enum validator
+# (duplicate IDs, candidate-duplicate keyword/token refiles, missing fields
+# above the frontier marker, keyword-index integrity). No stack required;
+# runs in the pre-push hook alongside check-glossary.sh.
+check-issues:
+	bash scripts/check-issues.sh
 
 # ==============================================================================
 # GRADUATION — the fully-live, single-command demo oracle (no CI, by design).
