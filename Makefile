@@ -34,12 +34,15 @@ rebuild: clean init-db
 
 # Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
-	@mkdir -p state/mongodb state/spool/archived state/hlr state/kamailio state/vm-data state/victorialogs state/grafana state/logs/kamailio state/logs/osmocom state/logs/vector
+	@mkdir -p state/mongodb state/spool/archived state/spool/tmp state/spool/metadata state/hlr state/kamailio state/vm-data state/victorialogs state/grafana state/logs/kamailio state/logs/osmocom state/logs/vector
 	@# RTPEngine spool is written by rtpengine (root) and archived by mvno-api
 	@# (container uid 1001, mounted :z — no :U chown). Fresh 755 dirs make the
 	@# Vosk watcher fail to write transcripts/archived WAVs on cold start
 	@# ("Spool directory polling error"). Match the 777 convention of the WAV
-	@# files themselves so every writer (host live_tap, rtpengine, mvno-api) works.
+	@# files themselves so every writer (host live_tap, rtpengine, mvno-api)
+	@# works — three distinct uids in rootless podman, so a shared group is not
+	@# practical; 777 is the pragmatic lab choice. mkdir + chmod must list the
+	@# same dirs so the chmod is meaningful on a true cold start.
 	@chmod 777 state/spool state/spool/archived state/spool/tmp state/spool/metadata 2>/dev/null || true
 	@# WAL/shm are now SHARED with the running kamailio (dir mount) — never delete
 	@# them under a live process; a cold re-init should tear down first.
