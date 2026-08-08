@@ -2616,9 +2616,9 @@ Two approaches were considered for voice call spam handling:
 
 ---
 
-## 14. Graduation Project Live Presentation & Demo Runbook
+## 14. Graduation Project Live Presentation (live_demo.sh)
 
-A complete 13-step interactive presentation runbook for demonstrating the **MVNO 5G SA Core & Interception Gateway**. Executable via `./scripts/testing/demo_runbook.sh`.
+A complete 13-step interactive presentation runbook for demonstrating the **MVNO 5G SA Core & Interception Gateway**. Executable via `./scripts/testing/live_demo.sh`.
 
 ### A. Live Demo Checklist & Commands
 
@@ -2639,16 +2639,16 @@ A complete 13-step interactive presentation runbook for demonstrating the **MVNO
 ### B. Automated Demo Script
 
 ```bash
-./scripts/testing/demo_runbook.sh
+./scripts/testing/live_demo.sh
 ```
 
 ---
 
-## 15. E2E SMS Interworking Runbook (Goal 7) & Deterministic AI-Block
+## 15. E2E SMS Interworking Matrix (sms_matrix.sh, Goal 7) & Deterministic AI-Block
 
 ### 15.1 The 5-Cell E2E Gate
 
-`./scripts/testing/e2e_runbook.sh` is the **certification gate for Goal 7**: it
+`./scripts/testing/sms_matrix.sh` is the **certification gate for Goal 7**: it
 verifies the full 4-cell SMS interworking matrix **plus** the deterministic
 AI-block policy path, asserting on **live metrics** (bridge `/metrics` on
 `localhost:9100`, API `/actuator/prometheus` on `localhost:8080`), not on logs:

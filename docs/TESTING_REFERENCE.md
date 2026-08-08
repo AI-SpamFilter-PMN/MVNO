@@ -1,5 +1,10 @@
 # MVNO Telecom Core — Manual Testing Guide
 
+> **Assertion-count contract**: `docs/VERIFICATION_MODEL.md` is the single
+> source of truth for what each validator asserts (sms_matrix = 5 cells/8 ok,
+> live_demo = 13 items, gate = 2 gates). This reference documents *how* they
+> work; the contract doc defines *what* they certify.
+
 > Abbreviations: **docs/GLOSSARY.md** — single source of truth
 A hands-on, terminal-by-terminal guide for verifying **every** active flow in the MVNO
 private-mobile-network core: **2G SMS, 5G/IMS SMS, 2G↔5G SMS bridging (IP-SM-GW),
@@ -34,9 +39,9 @@ All commands below were **empirically verified** against the running stack
 8. [Flow E — SIP/IMS Voice Call (RTPEngine anchored)](#flow-e--sipims-voice-call-rtpengine-anchored)
 9. [Flows F–J — Telemetry, ASR, Recording, REST & Grafana (condensed)](#flows-fj--telemetry-asr-recording-rest--grafana-condensed)
 10. [Flow K — AI Spam Block (deterministic E2E-BLOCK)](#flow-k--ai-spam-block-deterministic-e2e-block)
-11. [Flow L — Automated E2E Gate (e2e_runbook.sh)](#flow-l--automated-e2e-gate-e2e_runbooksh)
+11. [Flow L — Automated E2E Gate (sms_matrix.sh)](#flow-l--automated-e2e-gate-sms_matrixsh)
 12. [Flow M — Call Recording → ASR Transcription (RTPEngine pcap → WAV → Vosk)](#flow-m--call-recording--asr-transcription-rtpengine-pcap--wav--vosk)
-13. [Flow N — Automated Demo Gate (demo_runbook.sh)](#flow-n--automated-demo-gate-demo_runbooksh)
+13. [Flow N — Automated Demo Gate (live_demo.sh)](#flow-n--automated-demo-gate-live_demosh)
 14. [Flow O — Failure-Path & Resilience Checks](#flow-o--failure-path--resilience-checks)
 15. [Troubleshooting & Known Quirks](#troubleshooting--known-quirks)
 
@@ -117,7 +122,7 @@ Open these terminal tabs and keep them running *before* you start a flow:
 ### Reusable helper — dedicated IMS terminal container
 
 Every 5G/IMS sender or receiver runs as a **dedicated container with its own IP**
-on `mvno_mvno_net` (the proven `e2e_runbook.sh` pattern — mirrors the Goal 6
+on `mvno_mvno_net` (the proven `sms_matrix.sh` pattern — mirrors the Goal 6
 receiver topology and does **not** depend on the UERANSIM 5G user-plane):
 
 ```bash
@@ -603,13 +608,13 @@ podman logs ims-tx55     # expect: "MESSAGE not accepted: 403 Forbidden"
 
 ---
 
-## Flow L — Automated E2E Gate (e2e_runbook.sh)
+## Flow L — Automated E2E Gate (sms_matrix.sh)
 
 **Goal**: run the full 5-cell end-to-end matrix as a single self-verifying gate —
 the same script used to certify Goal 7. It asserts on **live metrics**, not logs.
 
 ```bash
-./scripts/testing/e2e_runbook.sh
+./scripts/testing/sms_matrix.sh
 echo "exit=$?"    # 0 = ALL CELLS PASS
 ```
 
@@ -621,7 +626,7 @@ Cell 2: 2G->5G  ... ok  (bridge 2g5g +1; terminal received)
 Cell 3: 5G->2G  ... ok  (bridge 5g2g +1; MS1 sms.txt has the body)
 Cell 4: 5G->5G  ... ok  (bridge counters untouched)
 Cell 5: AI-BLOCK ... ok (blocked counter +1; sender saw 403; kamailio logged block)
-==== E2E RUNBOOK: ALL CELLS PASS (8 ok) ====   exit=0
+==== SMS MATRIX: ALL CELLS PASS (8 ok) ====   exit=0
 ```
 
 The script spins up its own dedicated terminal containers (10.89.0.54/55/56) and
@@ -709,7 +714,7 @@ verdict is `allow=false, reason='Spam (phishing phrase detected)'` — see LIVE_
 
 ---
 
-## Flow N — Automated Demo Gate (demo_runbook.sh)
+## Flow N — Automated Demo Gate (live_demo.sh)
 
 **Goal**: run the 13-check graduation demo as a single self-verifying gate — the same
 script used to certify the project demo (13/13 passed, two consecutive runs
@@ -724,7 +729,7 @@ increment), SMPP PDU bind + **SUBMIT_SM** (checks 10/10b), VictoriaMetrics PromQ
 Grafana NOC, and overall readiness.
 
 ```bash
-./scripts/testing/demo_runbook.sh
+./scripts/testing/live_demo.sh
 echo "exit=$?"    # 0 = ALL 13 CHECKS PASS
 ```
 
@@ -774,7 +779,7 @@ instead of an infinite loop.
 
 With the 5G recipient still unregistered, inject a 2G→5G row and watch T3:
 
-> **Precondition (Issue 8.37)**: the demo runbook leaves live SIP registrations for
+> **Precondition (Issue 8.37)**: live_demo.sh leaves live SIP registrations for
 > `15559998888` behind in Kamailio's usrloc (ims-uas58 @10.89.0.58 + ue-1's
 > sip_traffic_sim callee @10.89.0.14, plus the 5b UAS @ue-1's current
 > `uesimtun0` IP — e.g. 10.45.0.5 — which persists for its 3600 s expiry even
@@ -1059,7 +1064,7 @@ MS1 (`IMSI 001010000000004`); MS2 exists in the HLR but has no handset.
 (and feed the request from a file/heredoc, not an interactive terminal).
 
 ### 13. Pending SMS rows break the e2e gate's cell 4
-**Symptom**: `demo_runbook.sh` finishes, then `e2e_runbook.sh` cell 4 fails with
+**Symptom**: `live_demo.sh` finishes, then `sms_matrix.sh` cell 4 fails with
 "no nonce challenge" / `rx56 hits=0`.
 **Root cause**: demo check 10b leaves a pending 2G→5G row in `smsc.db`; the bridge
 retries it at poll speed during e2e cell 4, and the relay traffic trips the
@@ -1078,19 +1083,19 @@ has ≥ 1 human-visible artifact; runbook evidence is in `docs/evidence/`:
 
 | Flow | Status | Evidence |
 |---|---|---|
-| A — 2G→2G SMS (SMSC) | ✅ certified | e2e_runbook Cell 1 (8 ok, exit 0) |
-| B — 2G→5G SMS (bridge leg 1) | ✅ certified | e2e_runbook Cell 2 |
-| C — 5G→2G SMS (bridge leg 2) | ✅ certified | e2e_runbook Cell 3 (MS1 sms.txt receipt assert) |
-| D — 5G→5G SMS (IMS) | ✅ certified | e2e_runbook Cell 4 |
-| E — SIP/IMS Voice Call (RTPEngine) | ✅ certified | demo_runbook item 5 (rtpengine_bytes_total delta) |
+| A — 2G→2G SMS (SMSC) | ✅ certified | sms_matrix Cell 1 (8 ok, exit 0) |
+| B — 2G→5G SMS (bridge leg 1) | ✅ certified | sms_matrix Cell 2 |
+| C — 5G→2G SMS (bridge leg 2) | ✅ certified | sms_matrix Cell 3 (MS1 sms.txt receipt assert) |
+| D — 5G→5G SMS (IMS) | ✅ certified | sms_matrix Cell 4 |
+| E — SIP/IMS Voice Call (RTPEngine) | ✅ certified | live_demo item 5 (rtpengine_bytes_total delta) |
 | F — RTPEngine metrics | ✅ certified | `docs/evidence/flow-f-j-telemetry.txt` |
-| G — Vosk ASR (spool) | ✅ certified | demo_runbook items 5c/9 (transcript archived ≤25 s) |
+| G — Vosk ASR (spool) | ✅ certified | live_demo items 5c/9 (transcript archived ≤25 s) |
 | H — Live-mic recording + transcription | ✅ certified | `docs/evidence/live-mic-rerun-2026-08-06.txt` (distinct real voice ≠ canned phrase, two-leg WAVs, AI filter verdicts allow=true Clean / allow=false Spam, speaker-proof monitor capture) |
-| I — Interception Gateway REST API | ✅ certified | demo_runbook items 4/7/8 (balance 100, EIR, allow:false) |
+| I — Interception Gateway REST API | ✅ certified | live_demo items 4/7/8 (balance 100, EIR, allow:false) |
 | J — Grafana NOC & VictoriaMetrics | ✅ certified | `count(up)` = 9/9; `docs/evidence/grafana-mvno-unified-noc.json` |
-| K — AI Spam Block (E2E-BLOCK) | ✅ certified | e2e_runbook Cell 5; demo_runbook item 7 — **deterministic mock classifier** (AI model integration = roadmap item; see Flow K) |
+| K — AI Spam Block (E2E-BLOCK) | ✅ certified | sms_matrix Cell 5; live_demo item 7 — **deterministic mock classifier** (AI model integration = roadmap item; see Flow K) |
 | L — Automated E2E Gate | ✅ certified | `docs/evidence/e2e-run-2026-08-06.log` (5 cells, 8 ok, exit 0) |
-| M — Call Recording → ASR | ✅ certified | demo_runbook item 5c (pcap → WAV → Vosk ≤25 s) |
+| M — Call Recording → ASR | ✅ certified | live_demo item 5c (pcap → WAV → Vosk ≤25 s) |
 | N — Automated Demo Gate | ✅ certified | `docs/evidence/demo-run-2026-08-06b.log` (13/13, exit 0) |
 | O — Failure-Path & Resilience | ✅ certified | O.1 sabotage → FAIL → recovery → PASS; `docs/evidence/o2-bounded-retry.txt` |
 
@@ -1102,11 +1107,11 @@ Infrastructure fixes landed during the audit (see `docs/ISSUES.md`):
   `command: ["--config", "/etc/vector/vector.toml"]` in `docker-compose.yml` and a
   non-aborting timestamp parse (VRL `??` coalesce). The temporary
   `telecom_events.json` file sink was removed 2026-08-08 — VictoriaLogs is the
-  authoritative sink (demo_runbook item 3 asserts on it via LogsQL, not a file
+  authoritative sink (live_demo item 3 asserts on it via LogsQL, not a file
   tail).
-- **demo_runbook item 5c** now guards against empty RTPEngine recording frames
+- **live_demo item 5c** now guards against empty RTPEngine recording frames
   (skip-and-retry, ≥1 KiB) — deterministic across consecutive runs.
-- **demo_runbook item 5b** no longer certifies on ogstun byte counters alone:
+- **live_demo item 5b** no longer certifies on ogstun byte counters alone:
   it now runs a full scripted UAS+caller dialog over the 5G user plane and
   requires an answered `SIP/2.0 200 OK` plus RTP media (the old check passed on
   `100 trying` only). Verified in `docs/evidence/demo-run-2026-08-06b.log`.
@@ -1116,7 +1121,7 @@ Infrastructure fixes landed during the audit (see `docs/ISSUES.md`):
   speech, transcripts differ, speaker-proof monitor capture).
 
 *End of manual testing guide. All flows verified against the running stack
-(2026-08-06; e2e_runbook.sh 5 cells/8 ok and demo_runbook.sh 13/13 certified
+(2026-08-06; sms_matrix.sh 5 cells/8 ok and live_demo.sh 13/13 certified
 green on consecutive runs; the LIVE_DEMO.md from-zero demo fully verified with live-mic
 baresip voice, two-leg tshark→WAV→Vosk spam verdicts, raw SMPP/sqlite3/nc+digest
 SMS paths, and the E2E-BLOCK 403 path). The live-mic flow H claim was re-run on

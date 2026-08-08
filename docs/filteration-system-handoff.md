@@ -74,7 +74,7 @@ sms-client) or document a mapping layer — a bare URL swap does not activate bl
 
 ## 4. Deterministic fallback layer (REQUIRED for the demo gates)
 
-The e2e gate (`e2e_runbook.sh` Goal 7) and demo runbook check 9b assert deterministic
+The e2e gate (`sms_matrix.sh` Goal 7) and live_demo check 9b assert deterministic
 blocks. The replacement MUST keep an equivalent deterministic rule layer or prove the
 model blocks these exact inputs, otherwise the gates break:
 
@@ -84,9 +84,9 @@ model blocks these exact inputs, otherwise the gates break:
 
 ## 5. Acceptance criteria (definition of done for the wiring)
 
-1. `smpp.port=2776` in sms-client; `e2e_runbook.sh` **5/5 cells green** (2G→2G, 2G→5G,
+1. `smpp.port=2776` in sms-client; `sms_matrix.sh` **5/5 cells green** (2G→2G, 2G→5G,
    5G→2G, 5G→5G, AI-block 403).
-2. `demo_runbook.sh` check 9b: scam speech → `allow:false` + `mvno_vosk_blocked_total`
+2. `live_demo.sh` check 9b: scam speech → `allow:false` + `mvno_vosk_blocked_total`
    increments; check 9d: clean call → `allow:true`.
 3. Kill the filter mid-run → calls/SMS **still pass** (fail-open, `mvno_ai_failopen_total` moves).
 4. `make test-sms` + `make test-call` green with the org service in the loop.
@@ -97,4 +97,4 @@ model blocks these exact inputs, otherwise the gates break:
 - `docker-compose.yml` service `ai-filter` (lines ~543) — the mock to replace (keeps
   deterministic fallback layer).
 - `telecom-api/.../filter/AiFilterService.java` — exact outbound semantics.
-- `scripts/testing/e2e_runbook.sh` — the assertions the decider must keep green.
+- `scripts/testing/sms_matrix.sh` — the assertions the decider must keep green.

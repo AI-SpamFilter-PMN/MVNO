@@ -129,7 +129,7 @@ test-call:
 		-H "X-API-Key: mvno-demo-key-2026" \
 		-d '{"caller":"15551234567","callee":"15557654321","call_id":"test-123","imei":"356938035643809"}' | python3 -m json.tool
 
-# Deterministic oracle gate: 5G preflight probe + e2e runbook (8 cells incl.
+# Deterministic oracle gate: 5G preflight probe + sms_matrix (8 cells incl.
 # AI-block). Source of truth for stack verification — see docs/INTEGRATION_CONTRACT.md.
 gate:
 	./scripts/testing/gate.sh
@@ -158,7 +158,7 @@ check-pins:
 #
 # Expected duration (2026-08-08, warm-recycle lab): ~4–7 min total (see
 # docs/evidence/GRADUATION.md §Timing). Stage markers print so it never looks
-# hung. Env: GRADUATION=1 is exported for the runbook caller-leg hardening.
+# hung. Env: GRADUATION=1 is exported for the live_demo caller-leg hardening.
 # ==============================================================================
 graduation: init-db seed-mongo
 	@echo "══════════════════════════════════════════════════════════════"

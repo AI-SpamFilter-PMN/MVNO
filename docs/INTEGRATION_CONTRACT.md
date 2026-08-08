@@ -35,7 +35,7 @@ for the demo**: it returns `allow:false` / `reason:"Spam (E2E deterministic bloc
 whenever the request body contains the marker `E2E-BLOCK`, else `allow:true`
 (`reason:"Clean content"`). The marker works for **all three event types** (SMS content,
 VOICE_CALL metadata, TRANSCRIPT text alike) because the mock is event-type agnostic.
-The e2e runbook's AI-block cell (Goal 7) asserts this path for SMS. The mock also parses
+The sms_matrix's AI-block cell (Goal 7) asserts this path for SMS. The mock also parses
 `Transfer-Encoding: chunked` bodies (Spring `RestClient` sends chunked, without
 `Content-Length`); a real FastAPI classifier handles chunked natively and needs no
 such workaround.
@@ -237,7 +237,7 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 - For the MVNO demo the **inline `mvno-ai-filter` mock is authoritative** and now
   implements a **deterministic AI-block rule** (`E2E-BLOCK` marker → `allow:false`),
   added config-only in `docker-compose.yml` and **verified end-to-end** by the Goal 7
-  `e2e_runbook.sh` AI-block cell (Kamailio 403 + `mvno_sms_blocked_total` increment,
+  `sms_matrix.sh` AI-block cell (Kamailio 403 + `mvno_sms_blocked_total` increment,
   two consecutive green runs). No external classifier or API key is required.
 - **Drop-in criteria** (to replace the mock in the live demo):
   - Must expose `POST /api/v1/classify` on `0.0.0.0:8000` inside the `mvno_net` network.
@@ -245,7 +245,7 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   - Must classify within the 5s read window (target ≤ 500ms per the SLA contract).
   - Package as container image `mvno-ai-filter:1.0.0`; attach to `mvno_net` in `docker-compose.yml`.
   - Verify with `make test-sms` and `make test-call`.
-  - Full-stack regression oracle: `make gate` (`scripts/testing/gate.sh` — 5G preflight probe + e2e runbook, 8 cells incl. the AI-block cell asserting the live Kamailio block line and `mvno_sms_blocked_total`).
+  - Full-stack regression oracle: `make gate` (`scripts/testing/gate.sh` — 5G preflight probe + sms_matrix, 8 cells incl. the AI-block cell asserting the live Kamailio block line and `mvno_sms_blocked_total`).
 - **Deterministic fallback layer (REQUIRED for the demo and the gates):**  - The e2e Goal-7 AI-block cell asserts the `E2E-BLOCK` marker → `allow:false` and the demo's
     post-call scam-block story asserts phishing-keyword blocking on `TRANSCRIPT` events
     (word-boundary, lowercase: `won`, `prize`, `claim`, `free`, `urgent`, `account`, `blocked`,
@@ -255,7 +255,7 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
     which keeps the `account`/`blocked`/`confirm` anchors; the older phrase
     "You have won a prize, call us now" → Vosk heard `you have won an prize called us out`).
   - The replacement MUST keep an equivalent deterministic rule layer (marker + keyword list) OR
-    prove the model blocks those exact inputs — otherwise `e2e_runbook.sh` and `demo_runbook.sh`
+    prove the model blocks those exact inputs — otherwise `sms_matrix.sh` and `live_demo.sh`
     check 9 break and the demo's blocked-call story is unverifiable.
 - **TRANSCRIPT events are post-call analytics only**: verdicts never retro-block an in-flight call;
     they increment `mvno_vosk_blocked_total` and appear in the mvno-api log.
@@ -317,8 +317,8 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 | `configs/osmocom/osmo-smsc.cfg` | the `esme smsclient`/`esme mvno-api-route` routes the filter's MSC client must authenticate to |
 
 **Prove your integration with**: re-point `sms-client` `smpp.port` to `2776`, run
-`./scripts/testing/e2e_runbook.sh` (all 5 cells must stay green) and
-`./scripts/testing/demo_runbook.sh` check 10/10b (SUBMIT_SM path).
+`./scripts/testing/sms_matrix.sh` (all 5 cells must stay green) and
+`./scripts/testing/live_demo.sh` check 10/10b (SUBMIT_SM path).
 
 ### AI-Filteration-System (classifier provider)
 | Artifact | Why |
@@ -327,9 +327,9 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 | `docker-compose.yml` service `ai-filter` (lines ~543) | reference mock implementation to replace (incl. deterministic keyword/E2E-BLOCK fallback layer) |
 | `telecom-api/.../filter/AiFilterService.java` | exact outbound call semantics (`AI_FILTER_URL`, timeouts, circuit breaker) |
 | `telecom-api/src/test/java/.../AiFilterSlaTimeoutTest.java` | SLA behavior the model must satisfy |
-| `scripts/testing/e2e_runbook.sh` Goal 7 cell | the AI-block assertion the model must keep green |
+| `scripts/testing/sms_matrix.sh` Goal 7 cell | the AI-block assertion the model must keep green |
 
-**Prove your integration with**: `make test-sms` + `make test-call`; `./scripts/testing/e2e_runbook.sh` (Goal 7 AI-block cell must stay green — requires your container to keep the deterministic `E2E-BLOCK`/keyword rules); `./scripts/testing/demo_runbook.sh` check 9b (scam speech → `allow:false` + `mvno_vosk_blocked_total` increment).
+**Prove your integration with**: `make test-sms` + `make test-call`; `./scripts/testing/sms_matrix.sh` (Goal 7 AI-block cell must stay green — requires your container to keep the deterministic `E2E-BLOCK`/keyword rules); `./scripts/testing/live_demo.sh` check 9b (scam speech → `allow:false` + `mvno_vosk_blocked_total` increment).
 
 ### SipClient (voice user agent)
 | Artifact | Why |
@@ -340,7 +340,7 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 | `docs/TESTING_REFERENCE.md` voice flows | end-to-end call + RTP + recording verification steps (Flow E, T6/T7/T8); raw-shell baresip variant in `docs/LIVE_DEMO.md` S3 |
 | `scripts/testing/sip_traffic_sim.py` | reference UA — your client must reproduce its REGISTER/407→digest→INVITE→RTP behavior |
 
-**Prove your integration with**: `./scripts/testing/demo_runbook.sh` check 5 (replace the sim caller with your client: REGISTER 200 OK, call answered, `rtpengine_bytes_total` moves) and check 6 (your client must surface the 403 Forbidden from a zero-balance call). Also Flow E T6/T7 for the full media dialog.
+**Prove your integration with**: `./scripts/testing/live_demo.sh` check 5 (replace the sim caller with your client: REGISTER 200 OK, call answered, `rtpengine_bytes_total` moves) and check 6 (your client must surface the 403 Forbidden from a zero-balance call). Also Flow E T6/T7 for the full media dialog.
 
 ### sms-client (SMPP ESME)
 | Artifact | Why |
@@ -348,7 +348,7 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 | `docs/INTEGRATION_CONTRACT.md` Section 1, Section 5 (sms-client) | SMPP `2775` today (→ `2776` when Filteration-System is wired), `MVNO_SMSC`, ESME accounts, dead `ai.classify.url` + `sms.blockSpam=false` caveats, intercept REST |
 | `configs/osmocom/osmo-smsc.cfg` | the `esme smsclient` / `esme mvno-api-route` routes |
 | `docs/TESTING_REFERENCE.md` SMS flows | 2G/5G + IP-SM-GW delivery verification; raw-shell variants in `docs/LIVE_DEMO.md` S6–S8 |
-| `scripts/testing/e2e_runbook.sh` | 5-cell SMS matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) |
+| `scripts/testing/sms_matrix.sh` | 5-cell SMS matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) |
 | `scripts/testing/send_smpp_sms.py` | reference ESME — your client must reproduce BIND_TRANSCEIVER + SUBMIT_SM against `127.0.0.1:2775` |
 
-**Prove your integration with**: `./scripts/testing/demo_runbook.sh` check 10 (binary BIND_TRANSCEIVER) + check 10b (SUBMIT_SM ESME_ROK) — replace the harness with your client; `./scripts/testing/e2e_runbook.sh` (all 5 cells, incl. the AI-block 403 path).
+**Prove your integration with**: `./scripts/testing/live_demo.sh` check 10 (binary BIND_TRANSCEIVER) + check 10b (SUBMIT_SM ESME_ROK) — replace the harness with your client; `./scripts/testing/sms_matrix.sh` (all 5 cells, incl. the AI-block 403 path).

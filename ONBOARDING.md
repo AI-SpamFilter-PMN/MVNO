@@ -61,7 +61,7 @@ Manual equivalents:
 
 > `espeak-ng` + `ffmpeg` are used by `demo_call.sh setup` to synthesize the
 > canned callee scam phrase ("You have won a prize, call us now or your account
-> will be closed") into an 8 kHz WAV. `demo_runbook.sh` then proves the REAL path
+> will be closed") into an 8 kHz WAV. `live_demo.sh` then proves the REAL path
 > (baresip → Kamailio → RTPEngine → pcap → live_tap → Vosk) end-to-end — no TTS in
 > the 9b verdict; it re-arches the live recorded call. `deploy.sh` installs them.
 

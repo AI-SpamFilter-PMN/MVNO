@@ -19,7 +19,7 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 | **Kernel: `/dev/net/tun`** | required | 5G SA UPF + UERANSIM pass `/dev/net/tun` + `NET_ADMIN` + `SYS_PTRACE` — unavailable on Docker Desktop (macOS/Windows). |
 | **Kernel: SCTP** | required (`sctp` module loadable) | AMF↔gNB NGAP (`:38412`) and the 2G `osmo-stp` M3UA/SIGTRAN both ride SCTP. On macOS/Windows SCTP does not exist. Linux: `sudo modprobe sctp`. |
 | **Kernel: multicast** | required for the 2G virtual-Um path | `osmocom-bb virtphy` ↔ `osmo-bts-virtual` use UDP multicast `239.193.23.1:4729`; some cloud/VM bridges disable multicast. |
-| **Host CLI tools** | `sqlite3`, `nc`, `curl`, `python3`, `podman` | `make init-db` needs `sqlite3`; `vty.sh` needs `nc`; the demo runbook needs `curl`+`python3`. |
+| **Host CLI tools** | `sqlite3`, `nc`, `curl`, `python3`, `podman` | `make init-db` needs `sqlite3`; `vty.sh` needs `nc`; live_demo.sh needs `curl`+`python3`. |
 
 ## 2. Not supported (will fail or be limited)
 
@@ -53,5 +53,5 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 ./scripts/preflight.sh        # verify host (must be ✓ ALL CLEAR or ! WARN)
 make init-db                  # SQLite subscriber DBs
 make up                       # 31 containers, offline-first
-bash scripts/testing/demo_runbook.sh   # 13-step end-to-end gate
+bash scripts/testing/live_demo.sh   # 13-step end-to-end gate
 ```

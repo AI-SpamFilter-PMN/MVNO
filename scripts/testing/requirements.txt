@@ -1,6 +1,6 @@
 # Python Dependencies for MVNO Core Testing & Traffic Simulation
 #
-# NOTE: All testing/traffic scripts (scripts/testing/*.py and the demo_runbook
+# NOTE: All testing/traffic scripts (scripts/testing/*.py and the live_demo
 # inline python3 -c blocks) use the PYTHON STANDARD LIBRARY ONLY (socket, struct,
 # hashlib, argparse, urllib, json, wave, math, os, sys). No third-party wheels
 # are required — verified by grep: zero `import requests` / `import smpplib`.

@@ -163,6 +163,6 @@ if [ "${#FAILURES[@]}" -gt 0 ]; then
   echo "RESULT: PARTIAL — troubleshoot per ONBOARDING.md Section 11"
   exit 1
 else
-  echo "RESULT: READY — run ./scripts/demo_runbook.sh (13-check gate) to certify"
+  echo "RESULT: READY — run ./scripts/testing/live_demo.sh (13-check gate) to certify"
   exit 0
 fi

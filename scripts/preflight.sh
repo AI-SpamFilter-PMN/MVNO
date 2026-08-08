@@ -66,7 +66,7 @@ fi
 # ─── 3. Host CLI tools ───────────────────────────────────────────────────────
 for tool in sqlite3 nc curl python3; do
   if command -v "${tool}" >/dev/null 2>&1; then ok "${tool} present"
-  else fail "${tool} not found (required by make init-db / vty.sh / demo_runbook)"; fi
+  else fail "${tool} not found (required by make init-db / vty.sh / live_demo)"; fi
 done
 
 # ─── 3b. Demo toolchain (live-demo S1–S10: calls, ASR, pcap, audio) ─────────

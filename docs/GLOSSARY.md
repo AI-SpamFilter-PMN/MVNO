@@ -26,7 +26,7 @@ listed — see the pinned ALLOWLIST in `scripts/check-glossary.sh`.
 | **DTLS** | Datagram TLS | Secures RTP (WebRTC/ICE media paths) |
 | **DTMF** | Dual-Tone Multi-Frequency | Touch-tone keypad signals during calls [C] |
 | **DTO** | Data Transfer Object | API payload carrier (Java records) |
-| **E2E** | End-to-End | Full-path tests/demo cells (e2e_runbook) |
+| **E2E** | End-to-End | Full-path tests/demo cells (sms_matrix) |
 | **E2E-BLOCK** | Deterministic AI-block SMS marker | Body text that forces `allow=false` → 403, no delivery |
 | **EEA** | EPS Encryption Algorithm | 4G ciphering — EEA0 = null cipher (no confidentiality) |
 | **EIR** | Equipment Identity Register | Device IMEI tracking and SIM swap detection [C] |

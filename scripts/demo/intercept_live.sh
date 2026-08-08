@@ -41,7 +41,7 @@ echo ""
 
 # --- 1. the interception call itself ------------------------------------------
 # Counter source: the actuator /prometheus endpoint (IMMEDIATE — the same
-# source e2e_runbook.sh reads). VictoriaMetrics lags by the vmagent scrape
+# source sms_matrix.sh reads). VictoriaMetrics lags by the vmagent scrape
 # interval (15-30 s), which would show a stale "0 → 0" right after a block.
 BEFORE="$(curl -s http://localhost:8080/actuator/prometheus \
   | awk '/^mvno_sms_blocked_total /{print $2}' | head -1)"

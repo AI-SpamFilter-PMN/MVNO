@@ -102,7 +102,7 @@ curl -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/s
 # 6. Test interception & execute automated presentation runbook
 make test-sms    # HTTP SMS policy intercept endpoint verification
 make test-call   # HTTP voice call policy intercept endpoint verification (EIR & balance)
-./scripts/testing/demo_runbook.sh  # Complete 13-step graduation project live presentation
+./scripts/testing/live_demo.sh  # Complete 13-step graduation project live presentation
 ```
 
 ### Method B: Native (systemd)
@@ -157,8 +157,8 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | 9 | **SMS-over-NAS** | 5G NAS SMS routing architecture contract (Mock / Roadmap item). |
 | 10 | **MongoDB Seed** | Atomic init script (`scripts/seed-mongo.sh`) provisions 3 UEs into `open5gs.subscribers` avoiding WebUI admin hash bug. |
 | 11 | **IP-SM-GW 2G↔5G SMS Bridge** | TS 23.204 interworking bridge (`mvno-ip-sm-gw`): polls 2G SMSC store-and-forward DB and relays to 5G/IMS via SIP MESSAGE; backhauls 5G SMS to SMSC via SMPP submit_sm. Both legs verified end-to-end. |
-| 12 | **Deterministic AI Spam Block** | Inline `ai-filter` mock returns `allow:false` when the payload contains `E2E-BLOCK`; Kamailio replies `403 SMS Intercepted / Blocked`, `mvno_sms_blocked_total` increments, message never delivered. Certified by the e2e runbook AI-block cell. |
-| 13 | **E2E SMS Interworking Gate** | `scripts/testing/e2e_runbook.sh`: 5-cell matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) asserting on live metrics; **exit 0 = all cells green** (two consecutive certified runs). |
+| 12 | **Deterministic AI Spam Block** | Inline `ai-filter` mock returns `allow:false` when the payload contains `E2E-BLOCK`; Kamailio replies `403 SMS Intercepted / Blocked`, `mvno_sms_blocked_total` increments, message never delivered. Certified by the sms_matrix AI-block cell. |
+| 13 | **E2E SMS Interworking Gate** | `scripts/testing/sms_matrix.sh`: 5-cell matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) asserting on live metrics; **exit 0 = all cells green** (two consecutive certified runs). |
 
 ---
 

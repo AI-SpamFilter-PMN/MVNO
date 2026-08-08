@@ -2,7 +2,7 @@
 
 > **Abbreviations**: `docs/GLOSSARY.md` is the single source of truth. Every
 > block below was **verified live against the running stack** (2026-08-08);
-> automated proof = `demo_runbook.sh` (13 items) + `e2e_runbook.sh` (8 cells)
+> automated proof = `live_demo.sh` (13 items) + `sms_matrix.sh` (8 cells)
 > — S10. One terminal (T-B) at the repo root does almost everything; T-A holds
 > the 2G Mobile Station (MS) for receipts. Paste each block **verbatim** and read
 > the EXPECT line.
@@ -420,11 +420,11 @@ sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"   # drain (gate 
 `src_addr=15551234567, dest_addr=15557654321` and a non-NULL `content_gsm7`.
 > **Why `user_data`, not `text`**: OsmoSMSC stores the payload GSM-7-packed in
 > `user_data` (BLOB); the `text` column stays empty. Decode it the same way
-> `ip_sm_gw.gsm7_decode` does (see `demo_runbook.sh` nonce check) — e.g.
+> `ip_sm_gw.gsm7_decode` does (see `live_demo.sh` nonce check) — e.g.
 > `python3 -c "from ip_sm_gw import gsm7_decode; print(gsm7_decode(bytes.fromhex('<hex>')))"`.
 
 **FALLBACK** — PDU anatomy + injector internals: `docs/TESTING_REFERENCE.md`
-Flows B & §Injectors; automated: `demo_runbook.sh` items 10/10b.
+Flows B & §Injectors; automated: `live_demo.sh` items 10/10b.
 
 ---
 
@@ -489,7 +489,7 @@ details: `docs/TESTING_REFERENCE.md` Flow J.
 
 ---
 
-## S10 — Runbook Gates  ·  ~15 min
+## S10 — Validation Gates  ·  ~15 min
 
 **PURPOSE** — the automated proof: the e2e SMS matrix (5 cells / 8 ok) then the
 full 13-item demo, both exiting 0, both teed to `docs/evidence/` logs.
@@ -498,16 +498,16 @@ full 13-item demo, both exiting 0, both teed to `docs/evidence/` logs.
 
 ```bash
 sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"   # drain leftover rows
-./scripts/testing/e2e_runbook.sh ; echo "e2e exit=$?"             # ALL CELLS PASS, exit=0
-./scripts/testing/demo_runbook.sh ; echo "demo exit=$?"           # ALL 13 PASSED, exit=0
+./scripts/testing/sms_matrix.sh ; echo "e2e exit=$?"             # ALL CELLS PASS, exit=0
+./scripts/testing/live_demo.sh ; echo "demo exit=$?"           # ALL 13 PASSED, exit=0
 podman rm -f baresip-rx baresip-tx    # demo cleanup (baresip is demo-only)
 ```
-**EXPECT** — `E2E RUNBOOK: ALL CELLS PASS (8 ok)` / `exit=0`; demo
+**EXPECT** — `SMS MATRIX: ALL CELLS PASS (8 ok)` / `exit=0`; demo
 `ALL 13 DEMO ITEMS PASSED` / `exit=0`; fresh logs
 `docs/evidence/e2e-run-<date>.log` and `docs/evidence/demo-run-<date>.log`
 (each run appends its day's file).
 
-> **Note on `demo_runbook.sh` item 9b**: the fresh-transcript `grep` for scam
+> **Note on `live_demo.sh` item 9b**: the fresh-transcript `grep` for scam
 > keywords is itself WER-dependent (see S5). Its EXPECT is written
 > permissively for that cell; the **deterministic** transcript rule proof is
 > S5's direct `curl`. If 9b flakes on a live re-arch, re-run it or cite the S5
@@ -548,8 +548,8 @@ depending on the partner repo's state.
 
 ```bash
 bash scripts/check-glossary.sh                                    # exit 0 (docs lint)
-./scripts/testing/e2e_runbook.sh >/dev/null && echo "E2E OK"     # exit 0
-./scripts/testing/demo_runbook.sh >/dev/null && echo "DEMO OK"   # exit 0
+./scripts/testing/sms_matrix.sh >/dev/null && echo "E2E OK"     # exit 0
+./scripts/testing/live_demo.sh >/dev/null && echo "DEMO OK"   # exit 0
 ```
 
 ---
@@ -603,7 +603,7 @@ Demo-only rigs (created by runbooks, not part of the 32-container core):
 `baresip-rx/tx` @ `10.89.0.60/.61` (S4). All three IP pairs are **static by
 convention** (passed as `--ip` on `podman run`) — if one is occupied, reuse the
 same address plan (they are only used by demo containers). `.54–.56` are the
-e2e runbook's transient receivers (`ims_rx54/55/56`) and `.58–.61` the demo
+sms_matrix's transient receivers (`ims_rx54/55/56`) and `.58–.61` the demo
 rigs — **do not reuse these for static services** (`make check-pins` guards
 uniqueness in compose, not the runbook rigs).
 
@@ -611,7 +611,7 @@ uniqueness in compose, not the runbook rigs).
 
 | Address | Allocator | Notes |
 |---|---|---|
-| UE user-plane IPs `10.45.0.2 – 10.45.0.254` | SMF session pool (`smf.yaml`; `.1` = ogstun gateway excluded, Issue 5.7) | Re-allocated on **every** UE attach; `demo_runbook.sh` [5b] reads ue-1's `uesimtun0` IPv4 live (Issue 5.9 runbook fix). Current (2026-08-08): ue-1=10.45.0.5, ue-2=10.45.0.2, ue-3=10.45.0.4 |
+| UE user-plane IPs `10.45.0.2 – 10.45.0.254` | SMF session pool (`smf.yaml`; `.1` = ogstun gateway excluded, Issue 5.7) | Re-allocated on **every** UE attach; `live_demo.sh` [5b] reads ue-1's `uesimtun0` IPv4 live (Issue 5.9 runbook fix). Current (2026-08-08): ue-1=10.45.0.5, ue-2=10.45.0.2, ue-3=10.45.0.4 |
 | `10.45.0.1/16` | UPF `ogstun` N6 gateway (static config) | `ip addr replace … dev ogstun`; UE default route via this |
 | SIP transport ports `:5070/:5071`, `:5090/:5091` | `sip_traffic_sim.py` `--listen-port` | Per-role convention, fixed in runbooks |
 | Kamailio source IP of UE calls | UPF SNAT (`MASQUERADE 10.45.0.0/16 !ogstun`) | UE calls appear from `10.89.0.14`, not the UE IP (Issue 8.20) |
