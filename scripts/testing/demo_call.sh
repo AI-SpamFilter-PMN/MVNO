@@ -18,7 +18,7 @@
 set -u
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
-source "${REPO_ROOT}/scripts/lib/common.sh"   # play_go_beep (audible go-cue)
+source "${REPO_ROOT}/scripts/lib/common.sh"   # play_go_beep (go-cue) + side_tone_on/off (mic-monitor)
 
 CALLER=15553332211
 CALLEE=15559998888
@@ -124,6 +124,9 @@ ctrl_cmd() {
 }
 
 dial() {
+  # Ctrl-C hygiene: if the operator interrupts the SPEAK NOW window, the
+  # side-tone loopback must not linger (idempotent — no-op on normal exit).
+  trap side_tone_off EXIT
   echo "=== demo_call.sh dial: ${CALLER} -> ${CALLEE} ==="
   ctrl_cmd "{\"command\":\"dial\",\"params\":\"sip:${CALLEE}@${SIP_HOST}:5060\"}"
   if [ "$PULSE_OK" -eq 1 ] && [ -t 0 ]; then
@@ -134,11 +137,18 @@ dial() {
     # Audible go-cue: the two-tone pep sound means "the call is live NOW —
     # start talking" (plays over the host speakers; MVNO_NO_BEEP=1 to mute).
     play_go_beep
+    # Live side-tone: host-only mic -> speakers loopback so the operator hears
+    # their own voice in real time while speaking (like a phone earpiece). The
+    # recorded call path (baresip-tx -> RTP -> RTPEngine -> pcap/WAV) is
+    # untouched, so evidence stays honest. MVNO_NO_SIDETONE=1 disables; never
+    # active in the tone-caller/headless branch below.
+    side_tone_on
     for s in 12 9 6 3; do
       printf "  >>> SPEAK NOW (%ss window) ...\r" "$s"
       sleep 3
     done
     echo ""
+    side_tone_off
   else
     # Tone-caller fallback (no mic / headless): still cue audibly so the
     # operator knows the relay is live and the callee leg is streaming.

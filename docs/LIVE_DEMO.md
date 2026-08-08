@@ -209,6 +209,16 @@ Vosk transcript.
 > `paplay`/`aplay` at call time — all of them are `preflight.sh` DEMO_TOOLS
 > (S1), and a box without Pulse still degrades to the BEL, never a hard fail.
 >
+> **Live side-tone (hear yourself)**: with a real mic + Pulse, the SPEAK NOW
+> window also starts a host-side `pactl` `module-loopback` (`side_tone_on` in
+> `scripts/lib/common.sh`) — your own voice is routed back to the speakers in
+> real time while you speak, like a phone earpiece. This is a **host-only
+> monitor**: the recorded call path (baresip-tx → RTP → RTPEngine → pcap/WAV)
+> is untouched, so the evidence stays honest. `MVNO_NO_SIDETONE=1` disables it,
+> and it is never active in headless/tone-caller runs. Caveat: mic → speakers
+> → mic acoustic feedback can howl in a loud room — the loopback lives only for
+> the ~12 s window and is removed immediately after.
+>
 > **Phrase** (realistic, ASR-vetted): *"Your bank account has been blocked,
 > please confirm your details now"* — Vosk hears it almost verbatim, so the
 > `account`/`blocked`/`confirm` keyword anchors always survive. Customize with

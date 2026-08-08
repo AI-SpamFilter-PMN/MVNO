@@ -16,7 +16,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
-source "${REPO_ROOT}/scripts/lib/common.sh"   # play_go_beep (audible go-cue)
+source "${REPO_ROOT}/scripts/lib/common.sh"   # play_go_beep (go-cue) + side_tone_on/off (mic-monitor)
+# Ctrl-C hygiene: never leave the side-tone loopback running if interrupted
+# (idempotent — no-op on normal exit).
+trap side_tone_off EXIT
 
 DURATION="${1:-5}"
 FILENAME="mic_call_$(date +%s).wav"
@@ -34,6 +37,10 @@ echo "------------------------------------------------------------------------"
 # Audible go-cue: the two-tone pep sound marks the exact moment recording
 # starts — speak after you hear it (MVNO_NO_BEEP=1 to mute; never fatal).
 play_go_beep
+# Live side-tone: hear your own mic on the speakers while recording (host-only
+# monitor; the captured WAV is the pure mic, so evidence stays honest).
+# MVNO_NO_SIDETONE=1 disables; never active in headless proof runs.
+side_tone_on
 sleep 1    # reaction beat: first words land INSIDE the capture window
 
 # Record live microphone audio using ffmpeg / pulse / arecord
@@ -51,6 +58,7 @@ if [ -f "${TARGET_PATH}" ]; then
   chmod 777 "${TARGET_PATH}"
 fi
 echo "✓ Microphone recording captured successfully: ${TARGET_PATH}"
+side_tone_off
 echo ""
 echo "⏳ Waiting 4 seconds for Native Vosk ASR engine to process audio..."
 sleep 4

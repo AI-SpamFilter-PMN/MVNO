@@ -247,3 +247,50 @@ play_go_beep() {
         printf '\a' >/dev/null 2>&1 || true    # terminal BEL as last resort
     fi
 }
+
+# ==============================================================================
+# SIDE-TONE / MIC-MONITOR LOOPBACK — hear your own live voice while speaking
+# ==============================================================================
+# side_tone_on / side_tone_off — a host-side PulseAudio loopback
+# (`pactl load-module module-loopback`) that routes the live mic source back to
+# the speakers in real time, so the operator hears THEMSELVES while speaking
+# into the mic for a live call (like a phone earpiece). This is a HOST cue
+# ONLY: the call media path (baresip-tx captures the mic -> RTP -> RTPEngine ->
+# pcap/WAV) is untouched, so the recorded evidence stays honest. Never active
+# in headless/deterministic runs (the tone-caller branch has no mic) and never
+# fatal: a missing pactl or pulse socket just skips the feature. Escape hatch:
+# MVNO_NO_SIDETONE=1. CAVEAT: mic -> speakers -> mic acoustic feedback can howl
+# in a loud room — the loopback is deliberately short-lived (only the ~12 s
+# SPEAK NOW window) and removed immediately after.
+# Used by: demo_call.sh dial() real-mic branch.
+SIDETONE_STATE="${TMPDIR:-/tmp}/mvno-sidetone-module"
+
+side_tone_on() {
+    [ "${MVNO_NO_SIDETONE:-0}" = "1" ] && return 0
+    local pdir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    command -v pactl >/dev/null 2>&1 || return 0
+    [ -S "${pdir}/pulse/native" ] || return 0
+    # idempotent: if the loopback module we already hold is still loaded, do nothing
+    if [ -f "$SIDETONE_STATE" ]; then
+        local held="$(cat "$SIDETONE_STATE" 2>/dev/null)"
+        if [ -n "$held" ] && pactl list short modules 2>/dev/null | awk -v i="$held" '$1==i {found=1} END {exit !found}'; then
+            return 0
+        fi
+    fi
+    local idx
+    idx="$(pactl load-module module-loopback 2>/dev/null | tr -d '[:space:]')"
+    [ -n "$idx" ] && printf '%s' "$idx" > "$SIDETONE_STATE"
+    echo "  🔁 side-tone ON (module-loopback #${idx:-?}) — you hear your own mic live"
+}
+
+side_tone_off() {
+    local idx=""
+    [ -f "$SIDETONE_STATE" ] && idx="$(cat "$SIDETONE_STATE" 2>/dev/null)"
+    if [ -n "$idx" ]; then
+        pactl unload-module "$idx" >/dev/null 2>&1 || true
+        rm -f "$SIDETONE_STATE"
+        echo "  🔁 side-tone OFF (loopback removed)"
+    fi
+    # NOTE: deliberately no blanket `pactl unload-module module-loopback` sweep
+    # — a pre-existing user loopback must never be removed by the demo.
+}
