@@ -1100,8 +1100,10 @@ Infrastructure fixes landed during the audit (see `docs/ISSUES.md`):
 - **vector pipeline**: the vector container ran the image's default `vector.yaml`
   (demo_logs generator) — `vector.toml` was never loaded; fixed with an explicit
   `command: ["--config", "/etc/vector/vector.toml"]` in `docker-compose.yml` and a
-  non-aborting timestamp parse (VRL `??` coalesce). `telecom_events.json` now
-  streams real parsed events (demo_runbook item 3 asserts on it).
+  non-aborting timestamp parse (VRL `??` coalesce). The temporary
+  `telecom_events.json` file sink was removed 2026-08-08 — VictoriaLogs is the
+  authoritative sink (demo_runbook item 3 asserts on it via LogsQL, not a file
+  tail).
 - **demo_runbook item 5c** now guards against empty RTPEngine recording frames
   (skip-and-retry, ≥1 KiB) — deterministic across consecutive runs.
 - **demo_runbook item 5b** no longer certifies on ogstun byte counters alone:

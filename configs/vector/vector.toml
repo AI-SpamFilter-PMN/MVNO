@@ -44,12 +44,6 @@ if contains(to_string!(.message), "INVITE") {
 }
 '''
 
-[sinks.file_sink]
-type = "file"
-inputs = ["parse_telecom_events"]
-path = "/var/log/vector/telecom_events.json"
-encoding.codec = "json"
-
 # ==============================================================================
 # LOG SINK — VictoriaLogs (ROADMAP item 3: persistent log ingestion).
 # Vector's elasticsearch sink in bulk mode is the documented VictoriaLogs

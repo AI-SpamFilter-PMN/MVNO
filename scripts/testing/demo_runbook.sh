@@ -102,13 +102,19 @@ echo -e "${GREEN}✓ 5G SA Subscriber audit complete — 3/3 UEs Registered${NC}
 # ==============================================================================
 # [3/13] VECTOR CONTAINER LOG AGGREGATION PIPELINE
 # ==============================================================================
-# Technical Verification: Checks live stdout log sink of mvno-vector container.
-# Protocol / Component: Vector VRL Regex Parsing Engine (timberio/vector:0.44.0).
-# Validation Criteria: Verifies VRL (Vector Remap Language) streams and parses real-time
-# Kamailio SIP, OsmoSMSC, and Gateway stdout log lines into structured JSON streams.
+# Technical Verification: Queries the VictoriaLogs persistent sink for recent
+# VRL-parsed rows. Protocol / Component: Vector VRL Regex Parsing Engine
+# (timberio/vector:0.44.0) -> VictoriaLogs elasticsearch-bulk sink (LogsQL).
+# Validation Criteria: Verifies VRL (Vector Remap Language) streams and parses
+# real-time Kamailio SIP, OsmoSMSC, and Gateway stdout log lines into structured
+# JSON rows in VictoriaLogs (the authoritative sink; the former temporary file
+# sink telecom_events.json was removed 2026-08-08).
 # ==============================================================================
-echo -e "${YELLOW}[3/13] ⚡ Auditing Vector Container Log Aggregation (VRL JSON sink)...${NC}"
-events=$(podman exec mvno-vector tail -n 5 /var/log/vector/telecom_events.json 2>/dev/null || true)
+echo -e "${YELLOW}[3/13] ⚡ Auditing Vector Container Log Aggregation (VRL JSON -> VictoriaLogs)...${NC}"
+events=$(curl -s 'http://127.0.0.1:9428/select/logsql/query' \
+    --data-urlencode 'query=event_type:*' \
+    --data-urlencode '_time=now-30m' \
+    --data-urlencode 'limit=5' 2>/dev/null || true)
 echo "$events" | python3 -c "
 import json, sys
 ok = 0
@@ -118,8 +124,8 @@ for line in sys.stdin:
         json.loads(line)
         ok += 1
 assert ok >= 1, 'no parseable JSON events'
-print(f'  ✓ {ok} recent JSON event line(s) parsed by VRL')" || fail "Vector VRL sink produced no parseable telecom events"
-pass "Vector VRL JSON log aggregation active"
+print(f'  ✓ {ok} recent VRL-parsed event row(s) in VictoriaLogs')" || fail "VictoriaLogs returned no parseable VRL events (vector->VL pipeline)"
+pass "Vector VRL JSON log aggregation -> VictoriaLogs active"
 
 # ==============================================================================
 # [4/13] PREPAID SUBSCRIBER LEDGER BALANCE LOOKUP
