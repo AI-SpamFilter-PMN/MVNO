@@ -28,7 +28,9 @@ read -r -d '' SUBSCRIBERS_JSON <<'EOF'
 [
   { "imsi": "001010000000001", "msisdn": "15551234567", "k": "465B5CE8B199B49FAA5F0A2EE238A6BC", "op": "E8ED289DEBA952E4283B54E88E6183CA" },
   { "imsi": "001010000000002", "msisdn": "15557654321", "k": "465B5CE8B199B49FAA5F0A2EE238A6BD", "op": "E8ED289DEBA952E4283B54E88E6183CB" },
-  { "imsi": "001010000000003", "msisdn": "15559998888", "k": "465B5CE8B199B49FAA5F0A2EE238A6BE", "op": "E8ED289DEBA952E4283B54E88E6183CC" }
+  { "imsi": "001010000000003", "msisdn": "15559998888", "k": "465B5CE8B199B49FAA5F0A2EE238A6BE", "op": "E8ED289DEBA952E4283B54E88E6183CC" },
+  { "imsi": "001010000000004", "msisdn": "15554443322" },
+  { "imsi": "001010000000005", "msisdn": "15557778888" }
 ]
 EOF
 
@@ -129,4 +131,4 @@ echo "  ✓ Kamailio done"
 
 echo ""
 echo "=== Unified Provisioning Complete ==="
-echo "All 3 subscribers provisioned across Open5GS, OsmoHLR, and Kamailio."
+echo "All 5 subscribers provisioned across Open5GS, OsmoHLR, and Kamailio."

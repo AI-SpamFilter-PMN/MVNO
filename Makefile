@@ -35,7 +35,11 @@ rebuild: clean init-db
 # Initializes SQLite WAL subscriber databases and creates seed subscriber test records
 init-db:
 	@mkdir -p state/mongodb state/spool/archived state/hlr state/kamailio state/vm-data state/victorialogs state/grafana state/logs/kamailio state/logs/osmocom state/logs/vector
-	@rm -f state/kamailio/kamailio.db-shm state/kamailio/kamailio.db-wal 2>/dev/null || true
+	@# WAL/shm are now SHARED with the running kamailio (dir mount) — never delete
+	@# them under a live process; a cold re-init should tear down first.
+	@if ! podman ps --format '{{.Names}}' 2>/dev/null | grep -q '^mvno-kamailio$$'; then \
+		rm -f state/kamailio/kamailio.db-shm state/kamailio/kamailio.db-wal 2>/dev/null || true; \
+	fi
 	@sqlite3 state/kamailio/kamailio.db \
 		"CREATE TABLE IF NOT EXISTS version (id INTEGER PRIMARY KEY, table_name TEXT UNIQUE, table_version INTEGER);" \
 		"INSERT OR IGNORE INTO version VALUES (1, 'version', 1), (2, 'location', 9), (3, 'subscriber', 7);" \
@@ -52,15 +56,15 @@ init-db:
 			imei TEXT, imsi TEXT, blocked INTEGER DEFAULT 0 \
 		);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15551234567', 'mvno.local', 'testpass', '', '', '15551234567', 100);" \
+			VALUES ('15551234567', 'localhost', 'testpass', '', '', '15551234567', 100);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15557654321', 'mvno.local', 'testpass', '', '', '15557654321', 0);" \
+			VALUES ('15557654321', 'localhost', 'testpass', '', '', '15557654321', 100);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15559998888', 'mvno.local', 'testpass', '', '', '15559998888', 100);" \
+			VALUES ('15559998888', 'localhost', 'testpass', '', '', '15559998888', 100);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15554443322', 'mvno.local', 'testpass', '', '', '15554443322', 100);" \
+			VALUES ('15554443322', 'localhost', 'testpass', '', '', '15554443322', 100);" \
 		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15553332211', 'mvno.local', 'testpass', '', '', '15553332211', 100);" \
+			VALUES ('15553332211', 'localhost', 'testpass', '', '', '15553332211', 100);" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
 	@sqlite3 state/hlr/hlr.db \
@@ -68,6 +72,8 @@ init-db:
 		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (1, '001010000000001', '15551234567');" \
 		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (2, '001010000000002', '15557654321');" \
 		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (3, '001010000000003', '15559998888');" \
+		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (4, '001010000000004', '15554443322');" \
+		"INSERT OR IGNORE INTO subscriber (id, imsi, msisdn) VALUES (5, '001010000000005', '15557778888');" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
 
