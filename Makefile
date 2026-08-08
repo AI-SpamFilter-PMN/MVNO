@@ -64,16 +64,21 @@ init-db:
 			balance INTEGER DEFAULT 100, \
 			imei TEXT, imsi TEXT, blocked INTEGER DEFAULT 0 \
 		);" \
-		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15551234567', 'localhost', 'testpass', '', '', '15551234567', 100);" \
-		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15557654321', 'localhost', 'testpass', '', '', '15557654321', 0);" \
-		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15559998888', 'localhost', 'testpass', '', '', '15559998888', 100);" \
-		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15554443322', 'localhost', 'testpass', '', '', '15554443322', 100);" \
-		"INSERT OR IGNORE INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
-			VALUES ('15553332211', 'localhost', 'testpass', '', '', '15553332211', 100);" \
+		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
+			VALUES ('15551234567', 'localhost', 'testpass', '', '', '15551234567', 100) \
+			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
+		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
+			VALUES ('15557654321', 'localhost', 'testpass', '', '', '15557654321', 0) \
+			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
+		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
+			VALUES ('15559998888', 'localhost', 'testpass', '', '', '15559998888', 100) \
+			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
+		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
+			VALUES ('15554443322', 'localhost', 'testpass', '', '', '15554443322', 100) \
+			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
+		"INSERT INTO subscriber (username, domain, password, ha1, ha1b, msisdn, balance) \
+			VALUES ('15553332211', 'localhost', 'testpass', '', '', '15553332211', 100) \
+			ON CONFLICT(msisdn) DO UPDATE SET balance=excluded.balance;" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
 	@sqlite3 state/hlr/hlr.db \
