@@ -66,5 +66,16 @@ say "REGISTER 200 OK over 5G user plane (uesimtun0 ${UE_IP})"
 [ "${DL_AFTER}" -gt "${DL_BEFORE}" ] || fail "GTP-U downlink did NOT emit: OUTPUT 2152 ${DL_BEFORE}->${DL_AFTER} (Issue 5.9 signature — uplink OK, DL buffered). Fix: podman restart mvno-ueransim-ue-1 (fresh PFCP session carries the gNB F-TEID)"
 say "GTP-U downlink emitted: OUTPUT 2152 ${DL_BEFORE}->${DL_AFTER} pkts"
 
-echo -e "\033[0;32m[preflight-5g] PASS — 5G user plane UP (REGISTER 200 OK + GTP-U DL ${DL_BEFORE}->${DL_AFTER})\033[0m"
+# --- 7. NRF registration assertion (ROADMAP item 5: SBI advertisement eval) --
+# All control-plane NFs must be registered with the NRF (Nnrf_NFM discovery,
+# HTTP/2 h2c on nrf:7777 — queried via mvno-grafana, the curl-capable probe
+# container on mvno_net). Catches advertise/uri config drift before demos.
+# UPF is intentionally NOT NRF-registered: smf.yaml uses a static PFCP peer
+# (client.upf: address: upf) for deterministic UPF selection — see ROADMAP 5.
+if ! NRF_TYPES=$(python3 "${SCRIPT_DIR}/nrf_registration.py"); then
+    fail "NRF registration assertion failed: ${NRF_TYPES}"
+fi
+say "NRF registrations OK (9 NFs): ${NRF_TYPES} — UPF via static PFCP peer (smf.yaml), not NRF-advertised"
+
+echo -e "\033[0;32m[preflight-5g] PASS — 5G user plane UP (REGISTER 200 OK + GTP-U DL ${DL_BEFORE}->${DL_AFTER} + NRF 9/9)\033[0m"
 exit 0

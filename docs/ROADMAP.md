@@ -34,6 +34,7 @@ This document outlines upcoming architectural enhancements, operational backlog 
 ### 5. Open5GS SBI Advertisement Evaluation
 - **Current State**: Service advertisement parameters (`advertise: <hostname>`) in Open5GS NF YAML configs are maintained in committed `main`.
 - **Roadmap Item**: Perform test-driven evaluation of SBI advertisement parameters with NRF registration tests across custom bridge networks.
+- **Evaluated (Aug 8 2026)**: Nnrf_NFM discovery (`GET /nnrf-nfm/v1/nf-instances`, HTTP/2 h2c on `nrf:7777`) queried from `mvno-grafana` — **9 NFs registered**: AMF, AUSF, BSF, NRF, NSSF, PCF, SMF, UDM, UDR. **UPF intentionally NOT NRF-registered**: `smf.yaml` uses a static PFCP peer (`client.upf: address: upf`) for deterministic UPF selection — user plane verified working (GTP-U DL) without UPF discovery. NRF registration assertion added to `preflight_5g.sh` (section 7) and enforced by `make gate` — catches advertise/uri drift before demos.
 
 ---
 
