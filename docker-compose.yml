@@ -571,12 +571,21 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - VOSK_MODEL_PATH=/opt/vosk-model-en-us-0.22
+      # Vosk model: default to the SMALL model (vosk-model-small-en-us-0.15) for the
+      # 5-repo demo day — it frees ~1.5-2 GiB peak RAM and loads ~30-60x faster, and is
+      # accurate enough for the demo's word/phrase scam-flagging. Override via .env
+      # (VOSK_MODEL_PATH + VOSK_MODEL_SRC) to the LARGE model for accuracy-heavy segments.
+      - VOSK_MODEL_PATH=${VOSK_MODEL_PATH:-/opt/vosk-model-small-en-us-0.15}
       - JAVA_TOOL_OPTIONS=-Xmx768m
+      # Filteration-System decider: override ai-filter.url at deploy time so the
+      # real decider replaces the inline mock for the graduation demo.
+      #   AI_FILTER_URL=http://filteration-system:8000/api/v1/classify
+      - AI_FILTER_URL=${AI_FILTER_URL:-http://ai-filter:8000/api/v1/classify}
     volumes:
       - ./state/kamailio:/etc/kamailio:z
       - ./state/spool:/var/spool/rtpengine:z
-      - ./vendor/vosk/vosk-model-en-us-0.22:/opt/vosk-model-en-us-0.22:ro,z
+      # Model source dir maps to the container path selected above (default small).
+      - ${VOSK_MODEL_SRC:-./vendor/vosk/vosk-model-small-en-us-0.15}:/opt/vosk-model-small-en-us-0.15:ro,z
     healthcheck:
       test: ["CMD-SHELL", "timeout 3 bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
       interval: 30s
