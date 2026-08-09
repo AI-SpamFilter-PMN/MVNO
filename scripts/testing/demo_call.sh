@@ -133,9 +133,10 @@ dial() {
   echo "=== demo_call.sh dial: ${CALLER} -> ${CALLEE} ==="
   ctrl_cmd "{\"command\":\"dial\",\"params\":\"sip:${CALLEE}@${SIP_HOST}:5060\"}"
   if [ "$PULSE_OK" -eq 1 ] && [ -t 0 ]; then
-    echo "  ⏳ The caller leg is LIVE on your microphone. In ~3s SPEAK THE SCAM PHRASE"
-    echo "     into the mic for ~12s — Vosk transcribes YOUR voice:"
-    echo "        \"${SCAM_PHRASE}\""
+    echo "  ⏳ The caller leg is LIVE on your microphone. In ~3s SPEAK FREELY for ~12s"
+    echo "     (whatever comes to mind — Vosk transcribes YOUR voice; the callee leg"
+    echo "     streams the scam phrase so a block verdict is guaranteed either way):"
+    echo "        optional phrase: \"${SCAM_PHRASE}\""
     sleep 3
     # Audible go-cue: the two-tone pep sound means "the call is live NOW —
     # start talking" (plays over the host speakers; MVNO_NO_BEEP=1 to mute).

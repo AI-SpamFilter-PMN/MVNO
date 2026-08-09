@@ -14,6 +14,10 @@
 #      files are deleted until the cap is met.
 #   3. Dry-run mode (-n) only reports what would be removed.
 #
+# EXEMPT: state/review/ (flag-for-review evidence) is OUTSIDE state/spool/ and
+# is never touched here — flagged call audio/transcripts/pcaps are retained
+# until a Filteration-System admin clears them (scripts/review/flag_call.sh).
+#
 # Usage: ./scripts/spool-evict.sh [-n] [pcaps-dir] [archived-dir]
 #   -n  dry-run (print what would be deleted, change nothing)
 #

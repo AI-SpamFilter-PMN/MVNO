@@ -43,14 +43,22 @@ play_go_beep
 side_tone_on
 sleep 1    # reaction beat: first words land INSIDE the capture window
 
-# Record live microphone audio using ffmpeg / pulse / arecord
+# Record live microphone audio using ffmpeg / pulse / arecord.
+# ATOMIC-LANDING (Vosk watcher race): NativeVoskService polls the spool every
+# 3s and processes any *.wav whose mtime age > 3s — a short capture is decoded
+# MID-WRITE (transiently invalid header -> "File of unsupported format" ->
+# EMPTY transcript, the exact mic_verify failure of 2026-08-09). The watcher's
+# filter is endsWith(".wav"), so record to a ".part" name (invisible to it),
+# then rename atomically — the watcher can only ever see a complete file.
+REC_PART="${TARGET_PATH}.part"
 if command -v ffmpeg >/dev/null 2>&1; then
-  ffmpeg -y -loglevel quiet -f pulse -i default -ar 16000 -ac 1 -t "${DURATION}" "${TARGET_PATH}" 2>/dev/null || \
-  ffmpeg -y -loglevel quiet -f alsa -i default -ar 16000 -ac 1 -t "${DURATION}" "${TARGET_PATH}" 2>/dev/null || \
-  arecord -f S16_LE -r 16000 -c 1 -d "${DURATION}" "${TARGET_PATH}" 2>/dev/null
+  ffmpeg -y -loglevel quiet -f pulse -i default -ar 16000 -ac 1 -t "${DURATION}" -f wav "${REC_PART}" 2>/dev/null || \
+  ffmpeg -y -loglevel quiet -f alsa -i default -ar 16000 -ac 1 -t "${DURATION}" -f wav "${REC_PART}" 2>/dev/null || \
+  arecord -f S16_LE -r 16000 -c 1 -d "${DURATION}" "${REC_PART}" 2>/dev/null
 else
-  arecord -f S16_LE -r 16000 -c 1 -d "${DURATION}" "${TARGET_PATH}" 2>/dev/null
+  arecord -f S16_LE -r 16000 -c 1 -d "${DURATION}" "${REC_PART}" 2>/dev/null
 fi
+mv -f "${REC_PART}" "${TARGET_PATH}"
 
 # The Vosk watcher may archive (move) the WAV during our own sleep — tolerate
 # the race: chmod only if the file is still in the spool root.

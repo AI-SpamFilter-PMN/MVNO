@@ -99,8 +99,12 @@ capture_probe() {
     # stderr is kept (not /dev/null) so a failure shows the REAL Pulse error;
     # exit 124 = timeout kill (device busy hang) vs 1 = open/stream error.
     # Capture from the explicit source name (never the `default` alias).
+    # ATOMIC-LANDING: the Vosk spool watcher (NativeVoskService) polls *.wav
+    # with mtime-age > 3s and can decode a SHORT capture mid-write — landing
+    # via .part + atomic rename (watcher filter endsWith(".wav")) guarantees
+    # it only ever reads a complete file (see mic_record.sh for the same fix).
     timeout 15 ffmpeg -y -loglevel error -f pulse -i "${CAPTURE_SRC}" -ar 16000 -ac 1 \
-        -t 3 "${PROBE_WAV}" 2>"${FFMPEG_ERR}"
+        -t 3 -f wav "${PROBE_WAV}.part" 2>"${FFMPEG_ERR}" && mv -f "${PROBE_WAV}.part" "${PROBE_WAV}"
 }
 if capture_probe; then
   chmod 777 "${PROBE_WAV}" 2>/dev/null || true
@@ -139,7 +143,7 @@ else
     echo "  (real error: ${FF_ERR:-none captured}). Check 'pactl list sources"
     echo "  short' and 'wpctl status' — the default source must be a live"
     echo "  input, not a monitor, and not held by another client."
-    rm -f "${FFMPEG_ERR}"
+    rm -f "${FFMPEG_ERR}" "${PROBE_WAV}.part"
     fatal "3 s Pulse capture failed after retry"
   fi
 fi

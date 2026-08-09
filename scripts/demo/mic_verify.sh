@@ -64,7 +64,8 @@ echo ""
 
 # --- [1] fresh capture via mic_record.sh --------------------------------------
 CAPTURE_WAV="state/spool/mic_call_${RUN_TS}.wav"
-echo "  📢 SPEAK NOW — say the demo phrase for ${DURATION} s:"
+echo "  📢 SPEAK NOW — say anything for ${DURATION} s (free-form, from your mind):"
+echo "     the callee scam phrase is only a hint if you want it:"
 echo "     \"Your bank account has been blocked, please confirm your details now\""
 echo "------------------------------------------------------------------------"
 bash scripts/testing/mic_record.sh "${DURATION}" >/dev/null 2>&1 || \
