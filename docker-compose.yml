@@ -581,6 +581,9 @@ services:
       # real decider replaces the inline mock for the graduation demo.
       #   AI_FILTER_URL=http://filteration-system:8000/api/v1/classify
       - AI_FILTER_URL=${AI_FILTER_URL:-http://ai-filter:8000/api/v1/classify}
+      # Filteration-System voice-filter endpoint (real-order decider contract):
+      #   POST /api/v1/voice/filter {callerId, receiverId, transcript}
+      - FILTERATION_VOICE_URL=${FILTERATION_VOICE_URL:-http://filteration-system:8000/api/v1/voice/filter}
     volumes:
       - ./state/kamailio:/etc/kamailio:z
       - ./state/spool:/var/spool/rtpengine:z

@@ -43,6 +43,13 @@ ai-filter:
   connect-timeout-seconds: ${AI_FILTER_CONNECT_TIMEOUT_SECONDS:1}
   read-timeout-seconds: ${AI_FILTER_READ_TIMEOUT_SECONDS:5}
 
+# Filteration-System real-order voice classifier. Defaults to the dedicated
+# Filteration-System endpoint; falls back to ai-filter.url when unset/blank.
+# Bound in AiFilterService via @Value("${filteration.voice.url:}").
+filteration:
+  voice:
+    url: ${FILTERATION_VOICE_URL:http://filteration-system:8000/api/v1/voice/filter}
+
 # ------------------------------------------------------------------------------
 # Gateway API-Key Authentication (Zero-Trust Section 1.2)
 # ------------------------------------------------------------------------------

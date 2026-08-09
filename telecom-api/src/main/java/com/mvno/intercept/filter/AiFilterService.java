@@ -184,32 +184,74 @@ public class AiFilterService {
      * @return InterceptResponse decision (allow: true/false).
      */
     public InterceptResponse classifyTranscript(final String callId, final String transcript) {
+        // The spool-only path carries no caller/callee MSISDN: rtpengine WAV names
+        // (call-<epoch>%<host>-<hash>.wav) do not encode the SIP Call-ID, so the
+        // post-call transcript cannot be tied back to a subscriber MSISDN. We pass
+        // null for both identities (deliberately NOT fabricating a value) and send
+        // only the transcript to the external filters. Callers that DO hold the
+        // MSISDNs should use classifyTranscript(callId, transcript, caller, callee).
+        return classifyTranscript(callId, transcript, null, null);
+    }
+
+    /**
+     * Post-call transcript classification with the real caller/callee MSISDNs bound
+     * to the Filteration-System contract {@code {callerId, receiverId, transcript}}.
+     *
+     * @param callId       Recording identifier (not the subscriber MSISDN).
+     * @param transcript   Vosk ASR transcribed speech text.
+     * @param callerMsisdn Calling party E.164 MSISDN (may be {@code null} when the
+     *                     transcript-only path cannot resolve it).
+     * @param calleeMsisdn Terminating party E.164 MSISDN (may be {@code null}).
+     * @return InterceptResponse decision (allow: true/false).
+     */
+    public InterceptResponse classifyTranscript(final String callId, final String transcript,
+                                                final String callerMsisdn, final String calleeMsisdn) {
+        return classifyTranscriptInternal(callId, transcript, callerMsisdn, calleeMsisdn);
+    }
+
+    private InterceptResponse classifyTranscriptInternal(final String callId, final String transcript,
+                                                         final String callerMsisdn, final String calleeMsisdn) {
         // Step 1: Fast-path check — if circuit breaker is OPEN, fail-open immediately (~0.1ms)
         if (isCircuitOpen()) {
             return failOpen("circuit_open", "AI filter circuit open — SLA allow");
         }
 
-        // Step 1b: local deterministic scam-keyword flag (ALWAYS on, independent of
-        // any external filter). This is the "flag without blocking" contract: a hit
-        // flags the transcript for review but never hard-blocks a live call.
+        // Step 1b: local deterministic scam-keyword FLAG (always on, independent of
+        // any external filter). A hit is a REVIEW FLAG only: it fires the counter
+        // and is recorded as evidence, but it NEVER decides alone and NEVER blocks.
+        // The Filteration-System is the authority that decides who gets blocked.
+        // So this path records the flag and then CONTINUES to the decider below —
+        // it does not short-circuit, so a scam-flagged transcript still reaches
+        // Filteration-System's {callerId, receiverId, transcript} verdict.
         final String scamWord = scanScamKeywords(transcript);
         if (scamWord != null) {
             meterRegistry.counter("mvno.vosk.scamflag", "word", scamWord).increment();
-            logger.info("Scam-keyword flag (non-blocking) [{}]: '{}' hit '{}'", callId, transcript, scamWord);
-            // FLAG, do NOT block: the call must proceed (allow=true). The
-            // scam-word match is a REVIEW flag only; counter mvno.vosk.scamflag
-            // + this reason mark it for flag_call/Filteration-System. Never
-            // allow=false here (that would be a hard drop, contradicting the
-            // "flag the scam words WITHOUT blocking the call" contract).
-            return new InterceptResponse(true, "scam-keyword-review: " + scamWord);
+            logger.info("Scam-keyword flag (non-blocking) [{}]: '{}' hit '{}' — forwarded to Filteration-System decider",
+                    callId, transcript, scamWord);
+            // NOTE: no early return here. The flagged transcript proceeds to
+            // tryVoiceFilter (Step 2); the decider returns DROP_CALL / ALLOW_CALL.
         }
+
+        // Step 1c: remember whether the local matcher flagged this call, so that
+        // if the decider is unreachable we still surface the review flag (fail-open
+        // allow=true — never block on a single heuristic when the decider is down).
+        final boolean locallyFlagged = scamWord != null;
 
         // Step 2: try the Filteration-System real contract first (integrate w/ others),
         // falling back to the legacy /api/v1/classify contract, then to fail-open.
         // Filteration-System: POST /api/v1/voice/filter {callerId, receiverId, transcript}
         //                     -> {isMalicious, action:"DROP_CALL"/"ALLOW_CALL"}
-        InterceptResponse fromVoiceFilter = tryVoiceFilter(callId, transcript);
+        // The caller/callee MSISDNs are threaded from the call CDR metadata (null
+        // when the spool-only path cannot resolve them). tryVoiceFilter sends the
+        // REAL subscriber MSISDNs — never the recording hash nor a fabricated id.
+        InterceptResponse fromVoiceFilter = tryVoiceFilter(callerMsisdn, calleeMsisdn, transcript);
         if (fromVoiceFilter != null) {
+            // Filteration-System is authoritative: DROP_CALL blocks, ALLOW_CALL allows.
+            // A locally flagged call that the decider allows still carries a review
+            // hint in the reason so flag_call/ops can inspect it.
+            if (locallyFlagged && fromVoiceFilter.allow()) {
+                return new InterceptResponse(true, fromVoiceFilter.reason() + " (scam-keyword-review: " + scamWord + ")");
+            }
             return fromVoiceFilter;
         }
 
@@ -232,14 +274,24 @@ public class AiFilterService {
                 consecutiveFailures.set(0);
                 return new InterceptResponse(result.allow(), result.reason());
             }
-            return failOpen("empty_response", "AI filter returned empty response — SLA allow");
+            // Decider (voice filter) unreachable AND legacy returns empty: surface
+            // the local review flag rather than a bare SLA allow, if we flagged it.
+            return failOpen("empty_response", locallyFlagged
+                    ? ("AI filter empty — scam-keyword-review: " + scamWord)
+                    : "AI filter returned empty response — SLA allow");
 
         } catch (final RestClientException e) {
             recordFailure(e);
-            return failOpen("unreachable", "AI filter unreachable — SLA allow");
+            // Decider(s) unreachable on a locally-flagged call: still fail-open
+            // (allow=true) but preserve the review flag, never block on one heuristic.
+            return failOpen("unreachable", locallyFlagged
+                    ? ("AI filter unreachable — scam-keyword-review: " + scamWord)
+                    : "AI filter unreachable — SLA allow");
         } catch (final Exception e) {
             logger.error("Unexpected error in Transcript AI classification: {}", e.getMessage(), e);
-            return failOpen("internal", "Gateway internal error — SLA allow");
+            return failOpen("internal", locallyFlagged
+                    ? ("Gateway internal error — scam-keyword-review: " + scamWord)
+                    : "Gateway internal error — SLA allow");
         }
     }
 
@@ -249,12 +301,21 @@ public class AiFilterService {
      * than throwing) when the service is unreachable or not yet deployed, so the
      * caller can fall back to the legacy ai-filter contract. This keeps the demo
      * working even though Filteration-System may not be running yet.
+     *
+     * <p><b>Contract:</b> requests {@code {callerId, receiverId, transcript}} where
+     * {@code callerId} is the CALLING MSISDN and {@code receiverId} the CALLED
+     * MSISDN. These are threaded from the call CDR metadata ({@code callerMsisdn},
+     * {@code calleeMsisdn}); when the transcript-only path cannot resolve them they
+     * are {@code null} and are sent as empty strings — the recording hash is never
+     * substituted for a real MSISDN.
      */
-    private InterceptResponse tryVoiceFilter(final String callId, final String transcript) {
+    private InterceptResponse tryVoiceFilter(final String callerMsisdn,
+                                             final String calleeMsisdn,
+                                             final String transcript) {
         try {
             final Map<String, Object> body = Map.of(
-                "callerId", callId,
-                "receiverId", "",
+                "callerId", callerMsisdn == null ? "" : callerMsisdn,
+                "receiverId", calleeMsisdn == null ? "" : calleeMsisdn,
                 "transcript", transcript
             );
             final VoiceFilterResponse resp = restClient.post()

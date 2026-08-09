@@ -39,9 +39,12 @@ class ScamKeywordFlagTest {
 
         // The whole point: local matcher works even with an unreachable filter,
         // AND it must FLAG (not block) — allow stays true so the call proceeds.
+        // The Filteration-System is the authority that decides who gets blocked;
+        // when it is unreachable here, the local flag fails open (allow=true) and
+        // the review flag is preserved in the reason.
         final InterceptResponse won = svc.classifyTranscript("call-1", "you have won a prize, call us now");
         assertTrue(won.allow(), "scam 'won'/'prize' must NOT block (flag-only): allow must be true");
-        assertTrue(won.reason().startsWith("scam-keyword-review"), "reason should name the review flag");
+        assertTrue(won.reason().contains("scam-keyword-review"), "reason should name the review flag");
         assertTrue(won.reason().contains("won"), "reason should name the offending word");
 
         final InterceptResponse verify = svc.classifyTranscript("call-2",
