@@ -1,0 +1,383 @@
+wal
+wal
+Using container engine: podman
+mongodb ready — seeding 5G subscribers
+Upserting 3 5G SA UERANSIM subscribers into Open5GS MongoDB...
+Warning: NumberLong: specifying a number as argument is deprecated and may lead to loss of precision, pass a string instead
+Seeded subscriber IMSI: 001010000000001 (MSISDN: 15551234567)
+Warning: NumberLong: specifying a number as argument is deprecated and may lead to loss of precision, pass a string instead
+Seeded subscriber IMSI: 001010000000002 (MSISDN: 15557654321)
+Warning: NumberLong: specifying a number as argument is deprecated and may lead to loss of precision, pass a string instead
+Seeded subscriber IMSI: 001010000000003 (MSISDN: 15559998888)
+✓ 5G SA Subscriber MongoDB seeding complete.
+══════════════════════════════════════════════════════════════
+🎓 GRADUATION DEMO — fully-live, single-command (no CI)
+══════════════════════════════════════════════════════════════
+[1/6] DB seed (init-db + seed-mongo) — idempotent, done above
+[2/6] live-mic precondition probe (FATAL if no audible mic)...
+========================================================================
+ 🎙️  LIVE-MIC PRECONDITION PROBE (make graduation stage 0/5)
+========================================================================
+[32m  ✓ audio socket /run/user/1000/pulse/native[0m
+[32m  ✓ capture source present: alsa_input.pci-0000_05_00.6.analog-stereo[0m
+
+  📢 Recording 3 s of ambient audio to verify the mic is live...
+  capture: state/spool/mic_probe_1786278808.wav
+  volumedetect: mean=-26.6 dB  max=-13.0 dB  (threshold -50 dB)
+[32m  ✓ capture is audible (mean -26.6 dB > -50 dB)[0m
+
+  ⏳ Waiting for Native Vosk ASR to transcribe the probe capture...
+[32m  ✓ ASR pipeline live — probe transcript: 'the'[0m
+    (soft check: ambient/quiet room may legitimately transcribe empty;
+     mic_verify.sh hard-asserts non-empty with the SPEAK prompt.)
+
+✅ MIC PROBE PASSED — live mic present, audible, ASR reachable.
+   Headline proof (fresh capture → non-empty transcript) runs at stage 4/5.
+[3/6] deterministic teardown → cold state...
+ Container mvno-grafana Stopping 
+ Container mvno-udr Stopping 
+ Container mvno-ausf Stopping 
+ Container mvno-rtpengine Stopping 
+ Container mvno-neon-local Stopping 
+ Container mvno-smf Stopping 
+ Container mvno-open5gs-webui Stopping 
+ Container mvno-vmagent Stopping 
+ Container mvno-ip-sm-gw Stopping 
+ Container mvno-nssf Stopping 
+ Container mvno-udm Stopping 
+ Container mvno-pcf Stopping 
+ Container mvno-2g-ms2 Stopping 
+ Container mvno-2g-ms Stopping 
+ Container mvno-bsf Stopping 
+ Container mvno-ai-filter Stopping 
+ Container mvno-vector Stopping 
+ Container mvno-api Stopping 
+ Container mvno-ueransim-ue-2 Stopping 
+ Container mvno-mongodb-exporter Stopping 
+ Container mvno-ueransim-ue-1 Stopping 
+ Container mvno-ueransim-ue-3 Stopping 
+ Container mvno-bsf Stopped 
+ Container mvno-bsf Removing 
+ Container mvno-bsf Removed 
+ Container mvno-ueransim-ue-3 Stopped 
+ Container mvno-ueransim-ue-3 Removing 
+ Container mvno-vmagent Stopped 
+ Container mvno-vmagent Removing 
+ Container mvno-vmagent Removed 
+ Container mvno-udr Stopped 
+ Container mvno-udr Removing 
+ Container mvno-neon-local Stopped 
+ Container mvno-neon-local Removing 
+ Container mvno-udr Removed 
+ Container mvno-ausf Stopped 
+ Container mvno-ausf Removing 
+ Container mvno-ausf Removed 
+ Container mvno-neon-local Removed 
+ Container mvno-ueransim-ue-3 Removed 
+ Container mvno-mongodb-exporter Stopped 
+ Container mvno-mongodb-exporter Removing 
+ Container mvno-grafana Stopped 
+ Container mvno-grafana Removing 
+ Container mvno-ueransim-ue-1 Stopped 
+ Container mvno-ueransim-ue-1 Removing 
+ Container mvno-udm Stopped 
+ Container mvno-udm Removing 
+ Container mvno-grafana Removed 
+ Container mvno-pcf Stopped 
+ Container mvno-pcf Removing 
+ Container mvno-pcf Removed 
+ Container mvno-ueransim-ue-1 Removed 
+ Container mvno-udm Removed 
+ Container mvno-ueransim-ue-2 Stopped 
+ Container mvno-ueransim-ue-2 Removing 
+ Container mvno-rtpengine Stopped 
+ Container mvno-rtpengine Removing 
+ Container mvno-ueransim-ue-2 Removed 
+ Container mvno-ueransim-gnb Stopping 
+ Container mvno-rtpengine Removed 
+ Container mvno-mongodb-exporter Removed 
+ Container mvno-ueransim-gnb Stopped 
+ Container mvno-ueransim-gnb Removing 
+ Container mvno-nssf Stopped 
+ Container mvno-nssf Removing 
+ Container mvno-nssf Removed 
+ Container mvno-ueransim-gnb Removed 
+ Container mvno-amf Stopping 
+ Container mvno-smf Stopped 
+ Container mvno-smf Removing 
+ Container mvno-smf Removed 
+ Container mvno-upf Stopping 
+ Container mvno-amf Stopped 
+ Container mvno-amf Removing 
+ Container mvno-amf Removed 
+ Container mvno-vector Stopped 
+ Container mvno-vector Removing 
+ Container mvno-vector Removed 
+ Container mvno-victorialogs Stopping 
+ Container mvno-upf Stopped 
+ Container mvno-upf Removing 
+ Container mvno-upf Removed 
+ Container mvno-nrf Stopping 
+ Container mvno-victorialogs Stopped 
+ Container mvno-victorialogs Removing 
+ Container mvno-nrf Stopped 
+ Container mvno-nrf Removing 
+ Container mvno-victorialogs Removed 
+ Container mvno-api Stopped 
+ Container mvno-api Removing 
+ Container mvno-api Removed 
+ Container mvno-nrf Removed 
+ Container mvno-ip-sm-gw Stopped 
+ Container mvno-ip-sm-gw Removing 
+ Container mvno-ip-sm-gw Removed 
+ Container mvno-kamailio Stopping 
+ Container mvno-2g-ms Stopped 
+ Container mvno-2g-ms Removing 
+ Container mvno-2g-ms Removed 
+ Container mvno-kamailio Stopped 
+ Container mvno-kamailio Removing 
+ Container mvno-kamailio Removed 
+ Container mvno-victoriametrics Stopping 
+ Container mvno-victoriametrics Stopped 
+ Container mvno-victoriametrics Removing 
+ Container mvno-victoriametrics Removed 
+ Container mvno-ai-filter Stopped 
+ Container mvno-ai-filter Removing 
+ Container mvno-2g-ms2 Stopped 
+ Container mvno-2g-ms2 Removing 
+ Container mvno-ai-filter Removed 
+ Container mvno-2g-ms2 Removed 
+ Container mvno-2g-core Stopping 
+ Container mvno-2g-core Stopped 
+ Container mvno-2g-core Removing 
+ Container mvno-2g-core Removed 
+ Container mvno-osmosmsc Stopping 
+ Container mvno-open5gs-webui Stopped 
+ Container mvno-open5gs-webui Removing 
+ Container mvno-open5gs-webui Removed 
+ Container mvno-mongodb Stopping 
+ Container mvno-mongodb Stopped 
+ Container mvno-mongodb Removing 
+ Container mvno-mongodb Removed 
+ Container mvno-osmosmsc Stopped 
+ Container mvno-osmosmsc Removing 
+ Container mvno-osmosmsc Removed 
+ Container mvno-osmo-hlr Stopping 
+ Container mvno-osmo-hlr Stopped 
+ Container mvno-osmo-hlr Removing 
+ Container mvno-osmo-hlr Removed 
+ Network mvno_mvno_net Removing 
+ Network mvno_mvno_net Removed 
+[4/6] deterministic cold-start (UID + image/tag gate)...
+All required images present. Launching offline container stack...
+ Network mvno_mvno_net Creating 
+ Network mvno_mvno_net Creating 
+ Network mvno_mvno_net Created 
+ Network mvno_mvno_net Created 
+ Container mvno-neon-local Creating 
+ Container mvno-mongodb-exporter Creating 
+ Container mvno-rtpengine Creating 
+ Container mvno-victoriametrics Creating 
+ Container mvno-api Creating 
+ Container mvno-victorialogs Creating 
+ Container mvno-mongodb Creating 
+ Container mvno-osmo-hlr Creating 
+ Container mvno-ai-filter Creating 
+ Container mvno-mongodb-exporter Created 
+ Container mvno-victorialogs Created 
+ Container mvno-vector Creating 
+ Container mvno-neon-local Created 
+ Container mvno-victoriametrics Created 
+ Container mvno-kamailio Creating 
+ Container mvno-grafana Creating 
+ Container mvno-vmagent Creating 
+ Container mvno-api Created 
+ Container mvno-ai-filter Created 
+ Container mvno-mongodb Created 
+ Container mvno-nrf Creating 
+ Container mvno-open5gs-webui Creating 
+ Container mvno-vector Created 
+ Container mvno-kamailio Created 
+ Container mvno-nrf Created 
+ Container mvno-amf Creating 
+ Container mvno-ausf Creating 
+ Container mvno-pcf Creating 
+ Container mvno-upf Creating 
+ Container mvno-udm Creating 
+ Container mvno-nssf Creating 
+ Container mvno-udr Creating 
+ Container mvno-bsf Creating 
+ Container mvno-open5gs-webui Created 
+ Container mvno-vmagent Created 
+ Container mvno-grafana Created 
+ Container mvno-rtpengine Created 
+ Container mvno-osmo-hlr Created 
+ Container mvno-osmosmsc Creating 
+ Container mvno-bsf Created 
+ Container mvno-amf Created 
+ Container mvno-ueransim-gnb Creating 
+ Container mvno-nssf Created 
+ Container mvno-upf Created 
+ Container mvno-smf Creating 
+ Container mvno-udr Created 
+ Container mvno-pcf Created 
+ Container mvno-smf Created 
+ Container mvno-osmosmsc Created 
+ Container mvno-2g-core Creating 
+ Container mvno-ip-sm-gw Creating 
+ Container mvno-ueransim-gnb Created 
+ Container mvno-ueransim-ue-3 Creating 
+ Container mvno-ueransim-ue-1 Creating 
+ Container mvno-ueransim-ue-2 Creating 
+ Container mvno-udm Created 
+ Container mvno-ausf Created 
+ Container mvno-2g-core Created 
+ Container mvno-2g-ms Creating 
+ Container mvno-2g-ms2 Creating 
+ Container mvno-ueransim-ue-1 Created 
+ Container mvno-2g-ms2 Created 
+ Container mvno-ueransim-ue-2 Created 
+ Container mvno-2g-ms Created 
+ Container mvno-ip-sm-gw Created 
+ Container mvno-ueransim-ue-3 Created 
+ Container mvno-rtpengine Starting 
+ Container mvno-victoriametrics Starting 
+ Container mvno-osmo-hlr Starting 
+ Container mvno-mongodb Starting 
+ Container mvno-ai-filter Starting 
+ Container mvno-neon-local Starting 
+ Container mvno-mongodb-exporter Starting 
+ Container mvno-api Starting 
+ Container mvno-victorialogs Starting 
+ Container mvno-mongodb Started 
+ Container mvno-mongodb Waiting 
+ Container mvno-mongodb Waiting 
+ Container mvno-victoriametrics Started 
+ Container mvno-grafana Starting 
+ Container mvno-kamailio Starting 
+ Container mvno-vmagent Starting 
+ Container mvno-victorialogs Started 
+ Container mvno-vector Starting 
+ Container mvno-mongodb-exporter Started 
+ Container mvno-api Started 
+ Container mvno-rtpengine Started 
+ Container mvno-neon-local Started 
+ Container mvno-osmo-hlr Started 
+ Container mvno-osmosmsc Starting 
+ Container mvno-vmagent Started 
+ Container mvno-ai-filter Started 
+ Container mvno-grafana Started 
+ Container mvno-vector Started 
+ Container mvno-osmosmsc Started 
+ Container mvno-2g-core Starting 
+ Container mvno-kamailio Started 
+ Container mvno-ip-sm-gw Starting 
+ Container mvno-ip-sm-gw Started 
+ Container mvno-2g-core Started 
+ Container mvno-2g-ms2 Starting 
+ Container mvno-2g-ms Starting 
+ Container mvno-2g-ms Started 
+ Container mvno-2g-ms2 Started 
+ Container mvno-mongodb Healthy 
+ Container mvno-nrf Starting 
+ Container mvno-mongodb Healthy 
+ Container mvno-open5gs-webui Starting 
+ Container mvno-nrf Started 
+ Container mvno-udr Starting 
+ Container mvno-nssf Starting 
+ Container mvno-ausf Starting 
+ Container mvno-amf Starting 
+ Container mvno-pcf Starting 
+ Container mvno-upf Starting 
+ Container mvno-bsf Starting 
+ Container mvno-udm Starting 
+ Container mvno-open5gs-webui Started 
+ Container mvno-bsf Started 
+ Container mvno-upf Started 
+ Container mvno-smf Starting 
+ Container mvno-nssf Started 
+ Container mvno-amf Started 
+ Container mvno-ueransim-gnb Starting 
+ Container mvno-ausf Started 
+ Container mvno-udm Started 
+ Container mvno-ueransim-gnb Started 
+ Container mvno-ueransim-ue-2 Starting 
+ Container mvno-ueransim-ue-1 Starting 
+ Container mvno-ueransim-ue-3 Starting 
+ Container mvno-udr Started 
+ Container mvno-pcf Started 
+ Container mvno-ueransim-ue-2 Started 
+ Container mvno-ueransim-ue-1 Started 
+ Container mvno-ueransim-ue-3 Started 
+ Container mvno-smf Started 
+[5/6] 8-cell oracle gate (5G preflight + e2e + AI-BLOCK)...
+[0;36m==== MVNO DETERMINISTIC GATE ====[0m
+[0;36m--- gate 0/3: subscriber topology drift check (check-subscribers.sh) ---[0m
+==== SUBSCRIBER TOPOLOGY DRIFT GUARD (single source: scripts/lib/common.sh) ====
+  canonical MSISDNs: 15551234567 15557654321 15559998888 15554443322 15557778888 15553332211  (throwaway: 15551234999, smsc: 15550000000)
+  ✓ no stray MSISDN literals — every '1555*' in scripts/ + Makefile is canonical
+  ✓ Makefile init-db seeds 15551234567
+  ✓ Makefile init-db seeds 15557654321
+  ✓ Makefile init-db seeds 15559998888
+  ✓ Makefile init-db seeds 15554443322
+  ✓ Makefile init-db seeds 15557778888
+  ✓ Makefile init-db seeds 15553332211
+  ✓ zero-balance contract: 15557654321 seeded balance 0
+  ✓ funded contract: 15551234567 seeded balance 100
+  ✓ watchdog derives bridge AoRs from MVNO_MSISDN_2G (single source)
+
+✅ SUBSCRIBER TOPOLOGY CONSISTENT (10 checks)
+[0;32m  gate 0/3 PASS: subscriber constants consistent across scripts + seeds[0m
+[0;36m--- gate 1/3: 5G user-plane preflight (preflight_5g.sh) ---[0m
+[0;36m[preflight-5g][0m ue-1 live 5G IP: 10.45.0.2
+[0;36m[preflight-5g][0m GTP-U DL baseline (iptables OUTPUT 2152): 0 pkts
+[0;36m[preflight-5g][0m REGISTER 200 OK over 5G user plane (uesimtun0 10.45.0.2)
+[0;36m[preflight-5g][0m GTP-U downlink emitted: OUTPUT 2152 0->2 pkts
+[0;36m[preflight-5g][0m NRF registrations OK (9 NFs): AMF AUSF BSF NRF NSSF PCF SMF UDM UDR — UPF via static PFCP peer (smf.yaml), not NRF-advertised
+[0;32m[preflight-5g] PASS — 5G user plane UP (REGISTER 200 OK + GTP-U DL 0->2 + NRF 9/9)[0m
+[0;32m  gate 1/3 PASS: 5G user plane UP[0m
+[0;36m--- gate 2/3: e2e SMS interworking (sms_matrix.sh) ---[0m
+RUN:2026-08-09T15:34:19+0300 — clean-slate evidence (previous contents discarded)
+[0;36m==== GOAL 7 : End-to-End SMS Interworking (4-cell + AI-block) ====[0m
+[0;36m==== Preflight ====[0m
+[0;32m  ok  bridge /metrics reachable[0m
+[0;32m  ok  mvno-api metrics reachable[0m
+[0;36m==== Cell 1: 2G->2G  (15557778888 -> 15554443322, 2G SMSC direct) ====[0m
+[0;32m  ok  delivered via 2G SMSC; bridge counters unchanged (2g5g=0,5g2g=0)[0m
+[0;32m  ok  MS1 handset receipt in sms.txt (1x 'E2E 2G2G 153419')[0m
+[0;36m==== Cell 2: 2G->5G  (15554443322 -> 15551234567, smsc.db poll -> SIP relay) ====[0m
+[0;32m  ok  delivered 2G->5G via bridge+Kamailio (2g5g +1); terminal got 'E2E 2G5G 153419'[0m
+[0;36m==== Cell 3: 5G->2G  (15551234567 -> 15554443322, bridge relay -> SMPP) ====[0m
+[0;32m  ok  delivered 5G->2G via bridge+SMPP (5g2g +1); MS1 sms.txt has 'E2E 5G2G 153419'[0m
+[0;36m==== Cell 4: 5G->5G  (15551234567 -> 15557654321, Kamailio twin relay) ====[0m
+[0;32m  ok  relayed 5G->5G via Kamailio; terminal got 'E2E 5G5G 153419'; bridge untouched (2g5g=1,5g2g=1)[0m
+[0;36m==== Cell 5: AI-BLOCK  (E2E-BLOCK marker -> 403, counter++, no delivery) ====[0m
+[0;32m  ok  blocked by AI core (blocked 0->1, sender saw 403, receiver untouched, kamailio logged block)[0m
+
+[0;32m==== SMS MATRIX: ALL CELLS PASS (8 ok) ====[0m
+[0;32m  gate 2/3 PASS: e2e 4-cell + AI-block green[0m
+[0;32m==== GATE PASS — MVNO stack deterministic-verified ====[0m
+[6/6] HEADLINE: forced fresh mic capture → non-empty this-run transcript...
+========================================================================
+ 🎙️  LIVE-MIC TRANSCRIPTION VERIFICATION (make graduation stage 4/5)
+========================================================================
+  This is the headline proof: YOUR fresh mic capture, transcribed now.
+
+  📢 SPEAK NOW — say anything for 4 s (free-form, from your mind):
+     the callee scam phrase is only a hint if you want it:
+     "Your bank account has been blocked, please confirm your details now"
+------------------------------------------------------------------------
+[32m  ✓ fresh capture: state/spool/mic_call_1786278935.wav (127928 bytes)[0m
+  ⏳ Waiting for Vosk ASR to transcribe this capture (poll 1 s)...
+[32m  ✓ transcript archived: state/spool/archived/mic_call_1786278935.txt[0m
+  transcript file: state/spool/archived/mic_call_1786278935.txt
+  transcript text: "the teams"
+[32m  ✓ NON-EMPTY transcript for THIS run's fresh capture (HEADLINE PROOF ✓)[0m
+  ⚠  no demo keyword heard (ASR variance is tolerated) — transcript is still non-empty
+  ai-filter verdict on YOUR voice: {"allow": true, "reason": "Clean content"}
+
+✅ MIC VERIFY PASSED — genuine fresh capture + non-empty this-run transcript.
+[7/7] anti-theater: VictoriaLogs row assertion for this run's block...
+  ✓ interception row landed in VictoriaLogs
+
+🎉 GRADUATION PASS — cold start + 8-cell gate + live-mic headline + VL proof, all green
