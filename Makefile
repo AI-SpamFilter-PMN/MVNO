@@ -228,7 +228,7 @@ check-issues:
 #   make watchdog-log        tail the watchdog log
 #   make watchdog-status     systemd unit status
 # ─────────────────────────────────────────────────────────────────────────────
-.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test check-subs bootstrap-check neon-clone flag-watch-once flag-watch-install flag-watch-uninstall live-tap-install live-tap-uninstall
+.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test check-subs bootstrap-check neon-clone flag-watch-once flag-watch-install flag-watch-uninstall live-tap-install live-tap-uninstall user-demo user-sms user-call
 
 watchdog-install:
 	@mkdir -p $(HOME)/.config/systemd/user
@@ -299,6 +299,24 @@ live-tap-uninstall:
 	@rm -f $(HOME)/.config/systemd/user/mvno-live-tap.service
 	@systemctl --user daemon-reload
 	@echo "✓ live-tap uninstalled"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# USER-DRIVEN live demo (vs the AUTO `make graduation` deterministic gate).
+# These scripts take LIVE, dynamic inputs from the operator — a typed SMS body
+# (any flow), or their own voice on a live call — reusing the tested
+# primitives (send_rest_sms.sh, demo_call.sh, mic_record.sh, live-tap).
+#   make user-demo            interactive menu (order: up -> probe -> sms -> call)
+#   make user-sms FLOW=2g-2g  send a user-typed SMS body through the given flow
+#   make user-call            place a live-mic call to 15559998888
+# ─────────────────────────────────────────────────────────────────────────────
+user-demo:
+	@bash scripts/demo/user_demo.sh
+
+user-sms:
+	@bash scripts/demo/user_sms.sh "$(BODY)" "$(FLOW)"
+
+user-call:
+	@bash scripts/demo/user_call.sh "$(CALLEE)"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Proof harness — repeatable run-evidence (LIVE_DEMO "Evidence squares").
