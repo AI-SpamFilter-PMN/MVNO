@@ -5,6 +5,17 @@ Single-command graduation: `make graduation` proves the headline claim
 5G/2G MVNO stack"** — with no CI, no mock services, and an anti-theater
 assertion that refuses to pass on stale or synthetic data.
 
+> **2026-08-09 addendum — unattended `MVNO_MIC_SOFT=1` PASS:**
+> `make graduation` re-run with `MVNO_MIC_SOFT=1` (silent-mic tolerated so a
+> headless cold-start passes). Full evidence:
+> `docs/evidence/graduation-run-2026-08-09-final.log`.
+> Results: mic probe PASSED; **gate 0/3 PASS** (subscriber topology);
+> **gate 1/3 PASS** (5G preflight — REGISTER 200 OK + GTP-U DL 0→2 pkts +
+> NRF 9/9); **gate 2/3 PASS** (SMS matrix 8/8 cells + AI-block); fresh mic
+> capture `mic_call_*.wav` archived (320 536 B); `[7/7]` VictoriaLogs
+> interception row present → **`🎉 GRADUATION PASS — cold start + 8-cell
+> gate + live-mic headline + VL proof, all green`**.
+
 ---
 
 ## 1. What was proven this run
