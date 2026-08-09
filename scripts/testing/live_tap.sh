@@ -72,13 +72,23 @@ extract_new() {
         | awk -v d="$dir" '
             BEGIN { max = 0 }
             $2 != "" && $3 % 2 == 0 && $4 != "" {
-                h = substr($4, 1, 24)
-                pt = substr(h, 3, 2)
-                if (pt != "00" && pt != "80") next
+                h = substr($4, 1, 24)          # CLI/rtp 12-byte header as hex
+                pt = substr(h, 3, 2)           # RTP payload type byte (hex)
+                # Store the payload type as decimal for the codec-aware decoder.
+                # PT 0=G.711u (PCMU), 8=G.711a (PCMA), 9=G.722, 111=Opus.
+                ptdec = strtonum("0x" pt)
+                # Only keep audio payload types we can decode (below); store the
+                # first-seen PT per leg so mux_leg picks the right decoder.
+                if (ptdec + 0 != ptdec + 0 || ptdec < 0) next
+                if (ptdec != 0 && ptdec != 8 && ptdec != 9 && ptdec != 111) next
+                if (! (($2) in seentype)) seentype[$2] = ptdec
                 print substr($4, 25) >> (d "/" $2 ".hex")
                 if ($1 > max) max = $1
             }
-            END { if (max > 0) print max > (d "/.maxframe") }'
+            END {
+                if (max > 0) print max > (d "/.maxframe")
+                for (ip in seentype) print seentype[ip] > (d "/" ip ".pt")
+            }'
     cat "$dir/.maxframe" 2>/dev/null || echo 0
 }
 
@@ -89,9 +99,27 @@ extract_new() {
 # while the 16 kHz resample yields the spoken words (Vosk model is 16 kHz).
 mux_leg() {
     local hex="$1" off="$2" out="$3"
+    # Payload type for the decoder: 0=G.711u (PCMU), 8=G.711a (PCMA), 9=G.722,
+    # 111=Opus. Falls back to PCMU/mulaw when the leg has no recorded PT (legacy).
+    local ptfile="${hex%.hex}.pt"
+    local pt=0
+    [ -f "$ptfile" ] && pt="$(cat "$ptfile" 2>/dev/null || echo 0)"
     [ "$(wc -c < "$hex")" -gt "$off" ] || return 1
+
+    # Codec-aware decode to 16 kHz mono for the Vosk 16 kHz model. NOTE: the
+    # g722 / opus demuxers already know their sample rate (16k / 48k native), so
+    # no -ar is passed to the INPUT (ffmpeg errors "Option sample_rate not
+    # found"); only the OUTPUT -ar 16000 resamples. -ac 1 forces mono.
+    local dec
+    case "$pt" in
+        8)  dec="-f alaw -ar 8000" ;;              # G.711a (PCMA)
+        9)  dec="-f g722" ;;                       # G.722 wideband (16 kHz native)
+        111) dec="-f opus" ;;                      # Opus (48 kHz native -> resample)
+        *)  dec="-f mulaw -ar 8000" ;;             # G.711u (PCMU) / default fallback
+    esac
+
     if tail -c +$((off + 1)) "$hex" | xxd -r -p | \
-        ffmpeg -nostdin -loglevel error -f mulaw -ar 8000 -ac 1 -i pipe:0 -ar 16000 -y "$out"; then
+        ffmpeg -nostdin -loglevel error $dec -ac 1 -i pipe:0 -ar 16000 -y "$out" 2>/dev/null; then
         chmod 666 "$out" 2>/dev/null || true
         return 0
     fi

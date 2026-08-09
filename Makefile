@@ -228,7 +228,7 @@ check-issues:
 #   make watchdog-log        tail the watchdog log
 #   make watchdog-status     systemd unit status
 # ─────────────────────────────────────────────────────────────────────────────
-.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test check-subs bootstrap-check neon-clone flag-watch-once flag-watch-install flag-watch-uninstall
+.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test check-subs bootstrap-check neon-clone flag-watch-once flag-watch-install flag-watch-uninstall live-tap-install live-tap-uninstall
 
 watchdog-install:
 	@mkdir -p $(HOME)/.config/systemd/user
@@ -284,6 +284,21 @@ flag-watch-uninstall:
 	@rm -f $(HOME)/.config/systemd/user/mvno-flag-watch.service
 	@systemctl --user daemon-reload
 	@echo "✓ flag-watch uninstalled"
+
+live-tap-install:
+	@mkdir -p $(HOME)/.config/systemd/user
+	@sed 's|@REPO@|$(CURDIR)|g' configs/systemd/mvno-live-tap.service \
+		> $(HOME)/.config/systemd/user/mvno-live-tap.service
+	@systemctl --user daemon-reload
+	@systemctl --user enable --now mvno-live-tap.service
+	@echo "✓ live-tap installed + started (systemd --user): rtpengine pcap → Vosk spool, 1s poll"
+	@echo "  → check: systemctl --user status mvno-live-tap.service"
+
+live-tap-uninstall:
+	@systemctl --user disable --now mvno-live-tap.service 2>/dev/null || true
+	@rm -f $(HOME)/.config/systemd/user/mvno-live-tap.service
+	@systemctl --user daemon-reload
+	@echo "✓ live-tap uninstalled"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Proof harness — repeatable run-evidence (LIVE_DEMO "Evidence squares").

@@ -1,0 +1,27 @@
+[Unit]
+Description=MVNO live RTP->Vosk tap daemon — converts rtpengine pcaps to Vosk spool WAV in real time
+Documentation=docs/REALTIME_AUDIO.md
+Documentation=docs/LIVE_DEMO.md
+# Bridges the main project network calls (baresip -> Kamailio -> RTPEngine -> pcap)
+# into the NativeVoskService spool watcher. Without this daemon, real call audio
+# stays as pcap and Vosk never transcribes it (only hand-fed demo WAVs do). Follows
+# the stack: only useful while rtpengine + mvno-api are up.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# @REPO@ is substituted by `make live-tap-install`
+WorkingDirectory=@REPO@
+ExecStart=/usr/bin/bash @REPO@/scripts/testing/live_tap.sh daemon
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PCAP_DIR=@REPO@/state/spool/pcaps
+Environment=SPOOL_DIR=@REPO@/state/spool
+Environment=POLL_SECS=1
+Environment=CHUNK_SECS=4
+Environment=IDLE_FINALIZE=3
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
