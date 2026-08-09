@@ -58,7 +58,13 @@ SOURCES="$(pactl list sources short 2>/dev/null || true)"
 INPUTS="$(printf '%s\n' "${SOURCES}" | grep -iE 'alsa_input|analog-stereo|microphone' | grep -viE '\.monitor' || true)"
 if [ -n "${INPUTS}" ]; then
   DEFAULT_SRC="$(pactl info 2>/dev/null | awk -F': ' '/Default Source/{print $2}' || true)"
-  pass "capture source present: ${DEFAULT_SRC:-$(printf '%s\n' "${INPUTS}" | head -1 | awk '{print $2}')}"
+  # The default source can point at a .monitor (sink loopback) — never a live
+  # input. Capture from the real source name explicitly: the Pulse `default`
+  # alias resolution can also race (hang) during PipeWire source switches.
+  CAPTURE_SRC="${DEFAULT_SRC}"
+  printf '%s' "${CAPTURE_SRC}" | grep -q '\.monitor' && CAPTURE_SRC="$(printf '%s\n' "${INPUTS}" | head -1 | awk '{print $2}')"
+  [ -n "${CAPTURE_SRC}" ] || CAPTURE_SRC="$(printf '%s\n' "${INPUTS}" | head -1 | awk '{print $2}')"
+  pass "capture source present: ${CAPTURE_SRC}"
 else
   echo "  ✗ no capture input found (only loopbacks/monitors or nothing):"
   printf '%s\n' "${SOURCES}" | head -8 | sed 's/^/      /'
@@ -73,10 +79,27 @@ echo ""
 echo "  📢 Recording 3 s of ambient audio to verify the mic is live..."
 rm -f "${PROBE_WAV}"
 FFMPEG_ERR="$(mktemp)"
+
+# Stale demo-owned side-tone loopback (left by a SIGKILLed demo_call dial or a
+# crashed cockpit) holds the mic open, which makes `ffmpeg -f pulse` HANG with
+# exit 124 and no stderr — the exact failure seen after mid-demo kills. The
+# module is demo-owned (state file under TMPDIR) so it is safe to sweep here;
+# a pre-existing USER loopback is never touched.
+SIDETONE_ST="${TMPDIR:-/tmp}/mvno-sidetone-module"
+if [ -f "${SIDETONE_ST}" ]; then
+  held="$(cat "${SIDETONE_ST}" 2>/dev/null)"
+  if [ -n "${held}" ] && pactl list short modules 2>/dev/null | awk -v i="${held}" '$1==i {found=1} END {exit !found}'; then
+    pactl unload-module "${held}" >/dev/null 2>&1 \
+      && echo "  ✓ removed stale demo side-tone loopback #${held} (was holding the mic)"
+  fi
+  rm -f "${SIDETONE_ST}"
+fi
+
 capture_probe() {
     # stderr is kept (not /dev/null) so a failure shows the REAL Pulse error;
     # exit 124 = timeout kill (device busy hang) vs 1 = open/stream error.
-    timeout 15 ffmpeg -y -loglevel error -f pulse -i default -ar 16000 -ac 1 \
+    # Capture from the explicit source name (never the `default` alias).
+    timeout 15 ffmpeg -y -loglevel error -f pulse -i "${CAPTURE_SRC}" -ar 16000 -ac 1 \
         -t 3 "${PROBE_WAV}" 2>"${FFMPEG_ERR}"
 }
 if capture_probe; then

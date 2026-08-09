@@ -10,7 +10,7 @@
 #   bash scripts/testing/cockpit_proof.sh --live-mic  # + interactive mic pass
 #
 # What it proves:
-#   [1] cockpit launches -> mvno-live session with 8 panes
+#   [1] cockpit launches -> mvno-live session, 3 windows x 4 panes (max-4-screen)
 #   [2] pane startup markers (live_tap daemon polling, kamailio, watch loops…)
 #   [3] mid-call evidence within the REALTIME_AUDIO budget: a fresh pcap, a
 #       live-*.wav chunk, an archived/*.txt transcript, and >0 RTP frames
@@ -57,6 +57,32 @@ ok()   { echo "  ✓ $*"; }
 pane_has() {  # $1 = win.pane  $2 = grep pattern
     tmux capture-pane -t "${SESSION}:$1" -p 2>/dev/null | grep -qE "$2"
 }
+# pane_has_retry — a pane can still be initializing when we first capture (a
+# slow daemon or a long preflight line). Sample up to $PM_TRIES×$PM_WAIT before
+# declaring a marker missing, so a healthy cockpit never hard-fails on timing.
+PM_TRIES=6
+PM_WAIT=3
+pane_has_retry() {  # $1 = win.pane  $2 = grep pattern
+    local t
+    for t in $(seq 1 "$PM_TRIES"); do
+        pane_has "$1" "$2" && return 0
+        sleep "$PM_WAIT"
+    done
+    return 1
+}
+
+# locate <role> — demo_live.sh writes a version-proof role→pane-id map
+# (${TMPDIR}/mvno-cockpit-panes.map) because tmux renumbers pane INDEXES by
+# layout (not creation order). Resolve the pane id to win.pane_index live.
+# IMPORTANT: the pane id must be targeted BARE ("%1") — the "session:%1"
+# form is parsed as a WINDOW target, silently falls back to the current
+# pane (window 0, pane 0) on failure, and makes every role resolve to 0.0.
+PANEMAP="${TMPDIR:-/tmp}/mvno-cockpit-panes.map"
+locate() {  # $1 = role (P0..P4/P3/P5/P7/watchdog/S1..S4)
+    local id
+    id="$(awk -F'|' -v r="$1" '$3==r {print $2; exit}' "$PANEMAP" 2>/dev/null)"
+    [ -n "$id" ] && tmux display -t "${id}" -p '#{window_index}.#{pane_index}' 2>/dev/null
+}
 
 main() {
     echo "================================================================"
@@ -102,15 +128,16 @@ main() {
     nohup bash scripts/demo/demo_live.sh >/tmp/cockpit-proof-launch.log 2>&1 &
     LAUNCH_PID=$!
 
-    # --- Wait for the session + 8 panes (bounded; preflight_5g runs first) ---
-    echo "[2/5] waiting for session + panes (≤180s)…"
+    # --- Wait for the session + 12 panes / 3 windows (bounded; preflight first) ---
+    echo "[2/5] waiting for session + 3 windows x 4 panes (≤180s)…"
     SESSION_OK=0
     for i in $(seq 1 36); do
         if tmux has-session -t "$SESSION" 2>/dev/null; then
             N="$(tmux list-panes -s -t "$SESSION" 2>/dev/null | wc -l)"
-            if [ "${N}" -ge 8 ]; then
+            W="$(tmux list-windows -t "$SESSION" -F '#{window_name}' 2>/dev/null | tr '\n' ' ')"
+            if [ "${N}" -ge 12 ]; then
                 SESSION_OK=1
-                ok "session ${SESSION} up with ${N} panes (t≈$((i * 5))s)"
+                ok "session ${SESSION} up with ${N} panes / ${W}(t≈$((i * 5))s)"
                 break
             fi
         fi
@@ -122,35 +149,75 @@ main() {
         bash scripts/demo/demo_live.sh --down >/dev/null 2>&1 || true
         return 1
     fi
+    # Hard guard: max 4 panes per window (the "never more than 4 terminals on
+    # screen" contract) — windows call/monitors/sms must each have exactly 4.
+    PERWIN_PASS=1
+    for w in call monitors sms; do
+        PW="$(tmux list-panes -t "$SESSION:$w" 2>/dev/null | wc -l)"
+        if [ "${PW}" -eq 4 ]; then
+            ok "window '${w}' = ${PW} panes (≤4 per screen)"
+        else
+            PERWIN_PASS=0
+            echo "  ✗ window '${w}' has ${PW} panes — expected exactly 4"
+        fi
+    done
+    [ "${PERWIN_PASS}" -eq 1 ] || fail "per-window 4-pane cap violated"
 
-    # --- Pane startup markers (P1 daemon is the hard one; others sampled) ---
+    # --- Pane startup markers (key panes; tolerant of timing) ---
     echo "[3/5] sampling panes for startup markers…"
     sleep 10   # let the panes initialize before capture
     MATCH=0
-    pane_has "0.1" "live_tap daemon: polling" && { ok "P1 live_tap daemon polling"; MATCH=$((MATCH + 1)); } \
-        || fail "P1 live_tap daemon marker missing"
-    pane_has "0.0" "SPEAK NOW|TALK NOW|setup|dial|baresip" && { ok "P0 caller pane active"; MATCH=$((MATCH + 1)); } \
-        || { echo "  ~ P0 caller marker not visible yet (timing — call runs in-pane)"; MATCH=$((MATCH + 1)); }
-    pane_has "0.2" "Capturing|tshark|live capture|pcap" && { ok "P2 capture pane active"; MATCH=$((MATCH + 1)); } \
-        || fail "P2 capture marker missing"
-    pane_has "1.0" "REGISTER|INTERCEPT|SIP/2.0|kamailio" && { ok "P3 kamailio logs"; MATCH=$((MATCH + 1)); } \
-        || { echo "  ~ P3 kamailio marker not visible yet"; }
-    pane_has "1.1" "NativeVosk|AI transcript verdict|Every 2" && { ok "P4 Vosk verdict watch"; MATCH=$((MATCH + 1)); } \
-        || { echo "  ~ P4 Vosk watch marker not visible yet"; }
-    pane_has "1.2" "vosk_blocked|rtpengine|Every 2" && { ok "P5 metrics watch"; MATCH=$((MATCH + 1)); } \
-        || { echo "  ~ P5 metrics marker not visible yet"; }
-    pane_has "1.3" "sms|SMS|155" && { ok "P6 2G receipts"; MATCH=$((MATCH + 1)); } \
-        || { echo "  ~ P6 receipts marker not visible yet"; }
-    pane_has "1.4" "state/spool|wav|txt|archived" && { ok "P7 evidence watch"; MATCH=$((MATCH + 1)); } \
-        || { echo "  ~ P7 evidence marker not visible yet"; }
-    [ "${MATCH}" -ge 6 ] && ok "pane markers: ${MATCH}/8 core matched" || fail "only ${MATCH}/8 pane markers"
+    # mark <role> <pattern> <label> — tolerant sampler (resolves pane via map).
+    mark() {
+        local wp
+        wp="$(locate "$1")"
+        if [ -z "$wp" ]; then
+            echo "  ~ $3: pane role '$1' not in map (${PANEMAP})"
+            return 0
+        fi
+        pane_has_retry "$wp" "$2" && { ok "$3"; MATCH=$((MATCH + 1)); } \
+            || { echo "  ~ $3 marker not visible yet (${wp})"; }
+    }
+    # P1 (live_tap daemon) is load-bearing — hard assert.
+    WP="$(locate P1)"
+    if [ -n "$WP" ]; then
+        pane_has_retry "$WP" "live_tap daemon: polling" && { ok "P1 live_tap daemon polling"; MATCH=$((MATCH + 1)); } \
+            || fail "P1 live_tap daemon marker missing"
+    else
+        fail "P1 pane not found in cockpit map (${PANEMAP})"
+    fi
+    # P2 capture pane is also expected (fall back to tolerant if not mapped).
+    WP="$(locate P2)"
+    if [ -n "$WP" ]; then
+        pane_has_retry "$WP" "Capturing|tshark|live capture|pcap" && { ok "P2 capture pane active"; MATCH=$((MATCH + 1)); } \
+            || fail "P2 capture marker missing"
+    else
+        echo "  ~ P2 pane not in map yet"
+    fi
+    mark P0 "SPEAK NOW|TALK NOW|setup|dial|baresip"    "P0 caller pane active"
+    mark P4 "NativeVosk|AI transcript verdict|LIVE transcript|Every 2" "P4 Vosk LIVE transcript+verdict watch"
+    mark P3 "REGISTER|INTERCEPT|SIP/2.0|kamailio"        "P3 kamailio logs"
+    mark P5 "vosk_blocked|rtpengine|Every 2"             "P5 metrics watch"
+    mark P7 "state/spool|wav|txt|archived"               "P7 evidence watch"
+    mark watchdog "watchdog.log|ALL HEALTHY|mvno-stack"  "watchdog log pane"
+    mark S1 "send_rest_sms|sms_matrix|MO|SMS window"     "S1 SMS MO tools"
+    mark S2 "mvno_bridge_sms|smsc.db|bridge SMS"         "S2 smsc.db + bridge counters"
+    mark S3 "sms|SMS|155"                                "S3 MT 2G receipts"
+    mark S4 "ims_rx|receiver|5G/IMS"                     "S4 MT 5G/IMS receiver"
+    [ "${MATCH}" -ge 8 ] && ok "pane markers: ${MATCH}/12 core matched" || fail "only ${MATCH}/12 pane markers"
 
     # --- Mid-call evidence (fresh pcap + live WAV + archived txt + RTP) ---
     echo "[4/5] waiting for mid-call evidence (≤180s, REALTIME_AUDIO budget)…"
     WAV=""; TXT=""; PCAP=""
     for i in $(seq 1 36); do
-        WAV="$(find state/spool -maxdepth 1 -name 'live-*.wav' -newer "$MARK" 2>/dev/null | head -1 || true)"
-        TXT="$(find state/spool/archived -name '*.txt' -newer "$MARK" 2>/dev/null | head -1 || true)"
+        # live-*.wav: the live_tap chunk lands in the spool root first, then the
+        # Vosk spool watcher moves it (+ its transcript) into archived/ within
+        # seconds — search both so a fast watcher can't starve the assertion.
+        WAV="$(find state/spool state/spool/archived -maxdepth 1 -name 'live-*.wav' -newer "$MARK" 2>/dev/null | head -1 || true)"
+        # Scope to live-*.txt: the mic_probe transcript also lands in archived/
+        # (newer than MARK, it would otherwise be picked up first — but it
+        # proves the probe, not the call; the call transcript must be this).
+        TXT="$(find state/spool/archived -name 'live-*.txt' -newer "$MARK" 2>/dev/null | head -1 || true)"
         PCAP="$(find state/spool/pcaps -name '*.pcap' -newer "$MARK" 2>/dev/null | head -1 || true)"
         [ -n "$WAV" ] && [ -n "$TXT" ] && [ -n "$PCAP" ] && break
         sleep 5

@@ -33,9 +33,12 @@ NET=("--network" "mvno_mvno_net")
 SCAM_PHRASE="${SCAM_PHRASE:-Your bank account has been blocked, please confirm your details now}"
 
 # Portable host PulseAudio socket (XDG runtime dir; fall back to uid-based path).
+# MVNO_FORCE_TONE=1 — deterministic/headless runs (cockpit-proof, CI) must
+# never depend on the operator's mic: force the canned tone caller even when a
+# live Pulse socket exists.
 PULSE_OK=0
 PULSE_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-if [ -S "${PULSE_DIR}/pulse/native" ]; then
+if [ -S "${PULSE_DIR}/pulse/native" ] && [ "${MVNO_FORCE_TONE:-0}" != "1" ]; then
   PULSE_OK=1
 fi
 
