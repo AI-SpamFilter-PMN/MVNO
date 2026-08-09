@@ -481,7 +481,7 @@ podman logs mvno-kamailio --since 3m | grep -iE 'INVITE|ACK|BYE' | head
 podman rm -f ims-uas58 ims-caller59
 ```
 
-> Legacy smoke test (no media): `python3 scripts/testing/sip_traffic_sim.py`
+> Legacy smoke test (no media): `python3 /scripts/sip_traffic_sim.py`
 > (defaults: host `127.0.0.1:5066`, registers the callee, sends one digest INVITE).
 > This still works from the host for a quick `407 → 100 → 200` check, but the full
 > media dialog above is the certified flow.
@@ -869,7 +869,7 @@ EOF
 
 Containers (packaged `mvno-baresip:1.0.0` rig — no host baresip / shared libs
 / pulse mounts; the image is built from `configs/baresip/Dockerfile`, see
-`scripts/demo_call.sh setup` and `scripts/bootstrap.sh`):
+`scripts/testing/demo_call.sh setup` and `scripts/bootstrap.sh`):
 
 ```bash
 PULSE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/pulse/native"
