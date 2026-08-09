@@ -81,6 +81,27 @@ class ScamKeywordFlagTest {
     }
 
     @Test
+    @DisplayName("SMS scam content is FLAGGED (allow true) via mvno.vosk.scamflag — user-driven path")
+    void smsScamFlagNonBlocking() {
+        final MeterRegistry reg = new SimpleMeterRegistry();
+        final AiFilterService svc = new AiFilterService(
+                RestClient.builder().build(),
+                "http://127.0.0.1:1/api/v1/classify",
+                "",
+                reg);
+        final com.mvno.intercept.subscriber.SMSInterceptRequest sms =
+                new com.mvno.intercept.subscriber.SMSInterceptRequest(
+                        "15557778888", "15554443322",
+                        "your bank account has been blocked, please verify your details");
+
+        final InterceptResponse v = svc.classifySms(sms);
+        assertTrue(v.allow(), "SMS scam body must NOT block (allow true)");
+        assertTrue(v.reason().startsWith("scam-keyword-review"), "reason flags for review");
+        assertTrue(reg.get("mvno.vosk.scamflag").counter().count() > 0,
+                "scamflag metric fired for the SMS content");
+    }
+
+    @Test
     @DisplayName("fail-open: scam flagged but call NOT blocked even when external filter is down")
     void scamFailOpenDoesNotBlock() {
         final MeterRegistry reg = new SimpleMeterRegistry();

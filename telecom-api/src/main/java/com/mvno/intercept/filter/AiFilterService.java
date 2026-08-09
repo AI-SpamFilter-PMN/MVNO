@@ -75,6 +75,16 @@ public class AiFilterService {
             return failOpen("circuit_open", "AI filter circuit open — SLA allow");
         }
 
+        // Step 1b: local deterministic scam-keyword flag (SMS too). A hit is a
+        // REVIEW FLAG (allow=true, NEVER a hard block) + mvno.vosk.scamflag.
+        if (req != null && req.content() != null) {
+            final String scamWord = scanScamKeywords(req.content());
+            if (scamWord != null) {
+                meterRegistry.counter("mvno.vosk.scamflag", "word", scamWord).increment();
+                return new InterceptResponse(true, "scam-keyword-review: " + scamWord);
+            }
+        }
+
         try {
             // Step 2: Build JSON classification request payload for SMS
             final Map<String, Object> body = Map.of(
