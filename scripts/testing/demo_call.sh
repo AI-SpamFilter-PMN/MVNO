@@ -2,7 +2,7 @@
 # demo_call.sh — baresip call rig for LIVE_DEMO S3 (one-liner wrapper)
 #
 #   bash scripts/testing/demo_call.sh setup   # speech file + baresip UAs (~15 s)
-#   bash scripts/testing/demo_call.sh dial    # real call: callee streams the scam phrase; TALK NOW for ~12 s
+#   bash scripts/testing/demo_call.sh dial    # real call: callee streams the scam phrase; TALK NOW for ~10 s
 #   bash scripts/testing/demo_call.sh hangup  # hang up (dial already hangs up; safety net)
 #
 # PORTABLE BY DESIGN: both UAs run from the packaged `mvno-baresip` image, so
@@ -133,7 +133,7 @@ dial() {
   echo "=== demo_call.sh dial: ${CALLER} -> ${CALLEE} ==="
   ctrl_cmd "{\"command\":\"dial\",\"params\":\"sip:${CALLEE}@${SIP_HOST}:5060\"}"
   if [ "$PULSE_OK" -eq 1 ] && [ -t 0 ]; then
-    echo "  ⏳ The caller leg is LIVE on your microphone. In ~3s SPEAK FREELY for ~12s"
+    echo "  ⏳ The caller leg is LIVE on your microphone. In ~3s SPEAK FREELY for ~10s"
     echo "     (whatever comes to mind — Vosk transcribes YOUR voice; the callee leg"
     echo "     streams the scam phrase so a block verdict is guaranteed either way):"
     echo "        optional phrase: \"${SCAM_PHRASE}\""
@@ -147,9 +147,9 @@ dial() {
     # untouched, so evidence stays honest. MVNO_NO_SIDETONE=1 disables; never
     # active in the tone-caller/headless branch below.
     side_tone_on
-    for s in 12 9 6 3; do
+    for s in 10 9 8 7 6 5 4 3 2 1; do
       printf "  >>> SPEAK NOW (%ss window) ...\r" "$s"
-      sleep 3
+      sleep 1
     done
     echo ""
     side_tone_off
@@ -157,8 +157,8 @@ dial() {
     # Tone-caller fallback (no mic / headless): still cue audibly so the
     # operator knows the relay is live and the callee leg is streaming.
     play_go_beep
-    echo "  >>> TALK NOW — the callee streams the canned scam phrase for ~12 s <<<"
-    sleep 12
+    echo "  >>> TALK NOW — the callee streams the canned scam phrase for ~10 s <<<"
+    sleep 10
   fi
   ctrl_cmd '{"command":"hangup"}'
   sleep 2

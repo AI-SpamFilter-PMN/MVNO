@@ -8,7 +8,7 @@
 # operator must actually speak into the mic and ASR must hear words.
 #
 # Flow:
-#   [1] SPEAK NOW prompt → 4 s live capture (mic_record.sh, fresh ts-stamped)
+#   [1] SPEAK NOW prompt → 10 s live capture (mic_record.sh, fresh ts-stamped)
 #   [2] Wait for the Vosk spool watcher to archive <stem>.txt for THAT wav
 #   [3] HARD assert: transcript file exists AND text is non-empty
 #   [4] SOFT keyword check: ≥1 of the ai-filter TRANSCRIPT rule keywords
@@ -21,7 +21,7 @@
 #   On ANY failure: diagnostic dump (volumedetect, watcher log tail, spool
 #   listing) so a supervisor can see exactly what went wrong.
 #
-# Usage:   bash scripts/demo/mic_verify.sh [capture_seconds]   (default 4)
+# Usage:   bash scripts/demo/mic_verify.sh [capture_seconds]   (default 10)
 # Exit:    0 = fresh capture transcribed non-empty; 1 = FAIL (with diagnostics)
 # ==============================================================================
 
@@ -30,7 +30,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 
-DURATION="${1:-4}"
+DURATION="${1:-10}"
 KEYWORDS="account|blocked|confirm|urgent|won|prize|free|claim"
 # ts marker of THIS run — the assert must match exactly this capture
 RUN_TS="$(date +%s)"
@@ -68,10 +68,14 @@ echo "  📢 SPEAK NOW — say anything for ${DURATION} s (free-form, from your 
 echo "     the callee scam phrase is only a hint if you want it:"
 echo "     \"Your bank account has been blocked, please confirm your details now\""
 echo "------------------------------------------------------------------------"
-bash scripts/testing/mic_record.sh "${DURATION}" >/dev/null 2>&1 || \
+# Surface mic_record.sh's LIVE transcription output so the operator sees the
+# words appearing as ASR catches up (that was previously swallowed by >/dev/null).
+# stderr stays quiet to keep ffmpeg pipe noise out of the SPEAK footprint.
+bash scripts/testing/mic_record.sh "${DURATION}" 2>/dev/null || \
   fatal "mic_record.sh failed — capture not produced"
-# The Vosk watcher archives the WAV during mic_record.sh's own 4 s sleep, so
-# the fresh capture may already be in state/spool/archived/ — search both.
+# The Vosk watcher archives the WAV during mic_record.sh's own ASR wait
+# (≈2×duration+6s), so the fresh capture may already be in state/spool/archived/
+# — search both.
 CAPTURE_WAV=""
 for cand in "state/spool/mic_call_${RUN_TS}.wav" \
             "state/spool/archived/mic_call_${RUN_TS}.wav" \
@@ -81,17 +85,30 @@ done
 [ -n "${CAPTURE_WAV}" ] || fatal "no fresh mic capture found in state/spool/ or archived/"
 pass "fresh capture: ${CAPTURE_WAV} ($(stat -c%s "${CAPTURE_WAV}" 2>/dev/null) bytes)"
 
-# --- [2] wait for THIS file's transcript --------------------------------------
+# --- [2] wait for THIS file's transcript — LIVE "till now" stream -------------
+# Poll every 1 s, print a rolling "listening… Ns" so the operator sees the
+# window live, and the INSTANT the watcher archives <stem>.txt for THIS capture,
+# show the transcript immediately (not only once at the end — the "live
+# transcription, till now" requirement, previously buried by >/dev/null).
 STEM="$(basename "${CAPTURE_WAV%.wav}")"
 TXT=""
-echo "  ⏳ Waiting for Vosk ASR to transcribe this capture (poll 1 s)..."
-for _ in $(seq 1 30); do
+echo "  ⏳ Transcriber running — what the mic has captured so far (refreshes 1 s):"
+for i in $(seq 1 60); do
   if [ -f "state/spool/archived/${STEM}.txt" ]; then
+    # LIVE: the moment THIS capture's words are recognized, show them now and
+    # stop polling — Vosk writes the whole transcript once, so this is the
+    # operator-facing "till now" result in real time.
     TXT="state/spool/archived/${STEM}.txt"
+    printf "\r  \033[2K  LIVE so far (after ~%ss): \"%s\"\n" "${i}" \
+        "$(python3 -c "import json,sys;print(json.load(open('${TXT}')).get('text',''))" 2>/dev/null || cat "${TXT}")"
     break
   fi
+  # keep the operator oriented: elapsed seconds of the capture window
+  printf "\r  \033[2K  listening… %s s of a %s s window" "${i}" "${DURATION}"
   sleep 1
 done
+echo ""
+# the final transcript (Vosk writes it once, whole) is re-shown in step [3]
 if [ -n "${TXT}" ]; then
   pass "transcript archived: ${TXT}"
 else

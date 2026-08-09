@@ -21,7 +21,7 @@ source "${REPO_ROOT}/scripts/lib/common.sh"   # play_go_beep (go-cue) + side_ton
 # (idempotent — no-op on normal exit).
 trap side_tone_off EXIT
 
-DURATION="${1:-5}"
+DURATION="${1:-10}"
 FILENAME="mic_call_$(date +%s).wav"
 TARGET_PATH="state/spool/${FILENAME}"
 TXT_PATH="state/spool/archived/${FILENAME%.wav}.txt"
@@ -68,26 +68,33 @@ fi
 echo "✓ Microphone recording captured successfully: ${TARGET_PATH}"
 side_tone_off
 echo ""
-echo "⏳ Waiting 4 seconds for Native Vosk ASR engine to process audio..."
-sleep 4
-
+# ASR wait scales with capture length — a longer WAV takes Vosk longer to
+# decode + archive (watcher polls every 3s). Allow ~2×duration + margin so
+# the 16 kHz clip is fully transcribed before we give up.
+ASR_WAIT="$(( DURATION * 2 + 6 ))"
+echo "⏳ Waiting up to ${ASR_WAIT} s for Native Vosk ASR to transcribe this capture..."
+elapsed=0
+while [ "${elapsed}" -lt "${ASR_WAIT}" ]; do
+  if [ -f "${TXT_PATH}" ]; then
+    echo "------------------------------------------------------------------------"
+    echo "🎉 Vosk ASR Live Transcription Result (${TXT_PATH}):"
+    echo ""
+    cat "${TXT_PATH}"
+    echo ""
+    exit 0
+  fi
+  printf "\r  live so far (%ss/%ss): listening…" "${elapsed}" "${ASR_WAIT}"
+  sleep 1
+  elapsed="$(( elapsed + 1 ))"
+done
+echo ""
 echo "------------------------------------------------------------------------"
 if [ -f "${TXT_PATH}" ]; then
   echo "🎉 Vosk ASR Live Transcription Result (${TXT_PATH}):"
   echo ""
   cat "${TXT_PATH}"
-  echo ""
 else
-  echo "[-] Waiting 2 more seconds for ASR background thread..."
-  sleep 2
-  if [ -f "${TXT_PATH}" ]; then
-    echo "🎉 Vosk ASR Live Transcription Result (${TXT_PATH}):"
-    echo ""
-    cat "${TXT_PATH}"
-    echo ""
-  else
-    echo "[-] File ${TXT_PATH} is still processing in background."
-    echo "    Check status with: cat ${TXT_PATH}"
-  fi
+  echo "[-] File ${TXT_PATH} is still processing in background."
+  echo "    Check status with: cat ${TXT_PATH}"
 fi
 echo "========================================================================"

@@ -237,8 +237,8 @@ main() {
 
     # --- Interactive mic pass (opt-in; silence-tolerant) ---
     if [ "${MODE}" = "--live-mic" ]; then
-        echo "[4b] interactive mic pass — SPEAK NOW (${MIC_DUR:-5}s)…"
-        bash scripts/testing/mic_record.sh "${MIC_DUR:-5}" >/dev/null 2>&1 || true
+        echo "[4b] interactive mic pass — SPEAK NOW (${MIC_DUR:-10}s)…"
+        bash scripts/testing/mic_record.sh "${MIC_DUR:-10}" >/dev/null 2>&1 || true
         # The Vosk spool watcher ARCHIVES (moves) the WAV within seconds of
         # landing — search both the spool root and the archive so a fresh
         # capture is found wherever the watcher left it.

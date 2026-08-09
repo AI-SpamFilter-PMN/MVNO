@@ -278,9 +278,30 @@ side_tone_on() {
         fi
     fi
     local idx
+    # Damped side-tone: load the loopback then immediately pull its sink-input
+    # volume DOWN to {MVNO_SIDETONE_VOL}% (default 25). The raw module-loopback
+    # feeds the mic back to the speakers at 100%, which on a laptop (speakers
+    # centimetres from the mic) howls — a huge high-pitch burst that rings down
+    # and drowns your own (quieter) voice. Cutting the *monitor* gain below the
+    # feedback threshold kills the howl while you still hear yourself to pace.
+    # The recorded WAV / RTP leg is the PURE mic (separate capture), so the
+    # audience hears your voice at full clarity regardless of this monitor level.
+    SIDETONE_VOL="${MVNO_SIDETONE_VOL:-25}"
     idx="$(pactl load-module module-loopback 2>/dev/null | tr -d '[:space:]')"
-    [ -n "$idx" ] && printf '%s' "$idx" > "$SIDETONE_STATE"
-    echo "  🔁 side-tone ON (module-loopback #${idx:-?}) — you hear your own mic live"
+    if [ -n "$idx" ]; then
+        printf '%s' "$idx" > "$SIDETONE_STATE"
+        # damp the loopback's own sink-input (matched by its Owner Module, which
+        # under PipeWire is the reliable id — there is no application.name) to a
+        # LOW monitor level, below the feedback-howl threshold. Pure/audible
+        # cue, no nested-quote gymnastics; idempotent.
+        si="$(pactl list sink-inputs 2>/dev/null | awk -v mi="$idx" '
+            /Sink Input #/   {id=$3}
+            $0 == "	Owner Module: " mi {print id; exit}')"
+        # id comes back as "#N" — strip the '#' (pactl wants the bare number)
+        si="${si#\#}"
+        [ -n "$si" ] && pactl set-sink-input-volume "$si" "${SIDETONE_VOL}%" 2>/dev/null || true
+        echo "  🔁 side-tone ON (loopback #${idx}, monitor ${SIDETONE_VOL}%) — audible cue, no howl"
+    fi
 }
 
 side_tone_off() {
