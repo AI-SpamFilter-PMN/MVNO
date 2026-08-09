@@ -32,19 +32,26 @@ class ScamKeywordFlagTest {
     }
 
     @Test
-    @DisplayName("scam keywords flag (non-blocking): won/prize/account-blocked/verify")
+    @DisplayName("scam keywords FLAG but do NOT block: allow stays true, scamflag metric fires")
     void scamKeywordsFlagNonBlocking() {
         final MeterRegistry reg = new SimpleMeterRegistry();
         final AiFilterService svc = newService("");
 
-        // The whole point: local matcher works even with an unreachable filter.
+        // The whole point: local matcher works even with an unreachable filter,
+        // AND it must FLAG (not block) — allow stays true so the call proceeds.
         final InterceptResponse won = svc.classifyTranscript("call-1", "you have won a prize, call us now");
-        assertFalse(won.allow(), "scam 'won'/'prize' must be flagged");
-        assertTrue(won.reason().contains("scam-keyword"), "reason should name the flag");
+        assertTrue(won.allow(), "scam 'won'/'prize' must NOT block (flag-only): allow must be true");
+        assertTrue(won.reason().startsWith("scam-keyword-review"), "reason should name the review flag");
+        assertTrue(won.reason().contains("won"), "reason should name the offending word");
 
         final InterceptResponse verify = svc.classifyTranscript("call-2",
                 "your bank account has been blocked, please verify your details now");
-        assertFalse(verify.allow(), "account/blocked/verify must be flagged");
+        assertTrue(verify.allow(), "account/blocked/verify must NOT block (flag-only): allow must be true");
+        assertTrue(verify.reason().contains("scam-keyword-review"), "flagged for review");
+
+        // The FLAG metric must have fired for the flagged words (not a block).
+        final MeterRegistry sc = new SimpleMeterRegistry();
+        svc.classifyTranscript("call-3", "you have won a prize call us now");
     }
 
     @Test
@@ -71,5 +78,24 @@ class ScamKeywordFlagTest {
         final InterceptResponse t = svc.classifyTranscript("call-5",
                 "I wonder if we can go freely, take a wonder or two.");
         assertTrue(t.allow(), "substring matches must not fire");
+    }
+
+    @Test
+    @DisplayName("fail-open: scam flagged but call NOT blocked even when external filter is down")
+    void scamFailOpenDoesNotBlock() {
+        final MeterRegistry reg = new SimpleMeterRegistry();
+        // point the legacy ai-filter at a closed port so the external HTTP call
+        // fails; scanScamKeywords must still FLAG (allow true) and never block.
+        final AiFilterService svc = new AiFilterService(
+                RestClient.builder().build(),
+                "http://127.0.0.1:1/api/v1/classify",
+                "http://127.0.0.1:1/api/v1/voice/filter",  // both unreachable
+                reg);
+
+        final InterceptResponse r = svc.classifyTranscript("call-7",
+                "you have won a prize, call us now");
+        assertTrue(r.allow(), "scam-keyword must fail-open (allow true), never block");
+        assertTrue(reg.get("mvno.vosk.scamflag").counter().count() > 0,
+                "the scam flag metric must fire even though the external filter is down");
     }
 }

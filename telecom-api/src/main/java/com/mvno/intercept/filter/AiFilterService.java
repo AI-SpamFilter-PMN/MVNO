@@ -185,8 +185,13 @@ public class AiFilterService {
         final String scamWord = scanScamKeywords(transcript);
         if (scamWord != null) {
             meterRegistry.counter("mvno.vosk.scamflag", "word", scamWord).increment();
-            logger.info("Scam-keyword flag [{}]: '{}' hit '{}'", callId, transcript, scamWord);
-            return new InterceptResponse(false, "scam-keyword: " + scamWord);
+            logger.info("Scam-keyword flag (non-blocking) [{}]: '{}' hit '{}'", callId, transcript, scamWord);
+            // FLAG, do NOT block: the call must proceed (allow=true). The
+            // scam-word match is a REVIEW flag only; counter mvno.vosk.scamflag
+            // + this reason mark it for flag_call/Filteration-System. Never
+            // allow=false here (that would be a hard drop, contradicting the
+            // "flag the scam words WITHOUT blocking the call" contract).
+            return new InterceptResponse(true, "scam-keyword-review: " + scamWord);
         }
 
         // Step 2: try the Filteration-System real contract first (integrate w/ others),
