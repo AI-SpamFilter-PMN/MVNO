@@ -353,7 +353,10 @@ graduation: init-db seed-mongo
 	@echo "[4/6] deterministic cold-start (UID + image/tag gate)..."
 	@./scripts/up.sh
 	@echo "[5/6] 8-cell oracle gate (5G preflight + e2e + AI-BLOCK)..."
-	@GRADUATION=1 ./scripts/testing/gate.sh
+	# Demo path: allow the preflight's BOUNDED Issue-5.9/7.3 auto-recovery (restart
+	# ue-1 for fresh PFCP / atomic UE recreate) so the live single-command demo
+	# self-heals the known downlink-buffered race. `make gate` stays deterministic.
+	@GRADUATION=1 PREFLIGHT_AUTO_RECOVER=1 ./scripts/testing/gate.sh
 	@echo "[6/6] HEADLINE: forced fresh mic capture → non-empty this-run transcript..."
 	@bash scripts/demo/mic_verify.sh
 	@echo "[7/7] anti-theater: VictoriaLogs row assertion for this run's block..."
