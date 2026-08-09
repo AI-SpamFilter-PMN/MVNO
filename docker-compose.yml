@@ -686,6 +686,90 @@ services:
         ipv4_address: 10.89.0.44
     restart: unless-stopped
 
+  # ─── Filteration-System Voice Decider (POST /api/v1/voice/filter) ───
+  # LIVE voice-filter decider for telecom-api. AiFilterService.tryVoiceFilter
+  # POSTs {callerId, receiverId, transcript} here and REQUIRES a real verdict
+  # {isMalicious, action: DROP_CALL|ALLOW_CALL} instead of failing open. This
+  # decider implements the org-documented deterministic layer
+  # (docs/filteration-system-handoff.md §4) so the verdict is real, deterministic
+  # and reproducible offline — no dependency on an external AI gateway that would
+  # otherwise throw and fail-open. Physical decision authority can be swapped for
+  # the Filteration-System Spring Boot app by re-pointing FILTERATION_VOICE_URL.
+  filteration-system:
+    image: python:3.11-alpine
+    container_name: mvno-filteration-system
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command:
+      - python3
+      - -c
+      - |
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import json, re
+        WORDS = ["won", "prize", "claim", "free", "urgent", "account",
+                 "blocked", "confirm", "verify", "transfer", "password", "bank"]
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                # Keep a plain request trace (e.g. "RX "POST /api/v1/voice/filter" 200")
+                # in `podman logs`; default http.server log_message writes to stderr.
+                print("RX " + " ".join(str(x) for x in a), flush=True)
+            def _verdict(self, transcript):
+                # Deterministic demo layer (handoff.md §4); VOICE-E2E-BLOCK is the
+                # authoritative marker for deterministic blocked calls.
+                t = (transcript or "").lower()
+                if 'VOICE-E2E-BLOCK' in (transcript or "").upper():
+                    return True
+                return any(re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", t) for w in WORDS)
+            def do_POST(self):
+                if self.path != '/api/v1/voice/filter':
+                    self.send_error(404)
+                    return
+                if self.headers.get('Transfer-Encoding', '').lower() == 'chunked':
+                    raw = b''
+                    while True:
+                        line = self.rfile.readline().strip()
+                        if not line:
+                            break
+                        size = int(line, 16)
+                        if size == 0:
+                            self.rfile.readline()
+                            break
+                        raw += self.rfile.read(size)
+                        self.rfile.readline()
+                else:
+                    length = int(self.headers.get('Content-Length', 0))
+                    raw = self.rfile.read(length) if length > 0 else b''
+                print("BODY " + raw.decode('utf-8', errors='replace'), flush=True)
+                try:
+                    payload = json.loads(raw or b'{}')
+                    transcript = payload.get('transcript') or ''
+                except Exception:
+                    transcript = ''
+                is_malicious = self._verdict(transcript)
+                action = 'DROP_CALL' if is_malicious else 'ALLOW_CALL'
+                body = json.dumps({'isMalicious': is_malicious, 'action': action}).encode()
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def do_GET(self):
+                if self.path == '/health':
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(b'OK')
+                    return
+                self.send_error(404)
+        ThreadingHTTPServer(('0.0.0.0', 8000), H).serve_forever()
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.65
+    restart: unless-stopped
+
   # ─── Vector Log Shipper ───
   vector:
     image: timberio/vector:0.44.0-alpine
