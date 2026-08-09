@@ -122,7 +122,17 @@ TRANSCRIPT="$(python3 -c "import json,sys;print(json.load(open('${TXT}')).get('t
 echo "  transcript file: ${TXT}"
 echo "  transcript text: \"${TRANSCRIPT}\""
 if [ -z "${TRANSCRIPT// }" ]; then
-  fatal "transcript is EMPTY for this run's capture — no speech heard. Speak louder / closer,"
+    if [ "${MVNO_MIC_SOFT:-0}" = "1" ]; then
+        # Unattended / CI / automated cold-start mode: nobody is at the mic, so a
+        # silent capture is expected and is NOT a failure. The real "see YOUR
+        # words" demo is the USER-driven path (user_call.sh / user_sms.sh / the
+        # interactive runner), which requires an operator to actually speak.
+        echo "  ⚠  transcript is EMPTY for this run's capture (silent mic in unattended mode)" >&2
+        echo "     → NOT a failure (MVNO_MIC_SOFT=1). For the live 'see your words' demo," >&2
+        echo "       run the USER-driven path: make user-demo (or make user-call)." >&2
+        exit 0
+    fi
+    fatal "transcript is EMPTY for this run's capture — no speech heard. Speak louder / closer,"
 fi
 pass "NON-EMPTY transcript for THIS run's fresh capture (HEADLINE PROOF ✓)"
 
