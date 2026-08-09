@@ -41,7 +41,7 @@ class NativeVoskServiceVerdictTest {
     }
 
     @Test
-    @DisplayName("Blocked transcript verdict increments mvno.vosk.classified + mvno.vosk.blocked")
+    @DisplayName("Blocked transcript verdict increments classified + blocked + flagged")
     void blockedVerdictIncrementsBlockedCounter() {
         final MeterRegistry reg = new SimpleMeterRegistry();
         final NativeVoskService service = newService(reg, false, "Spam (phishing phrase detected)");
@@ -51,10 +51,12 @@ class NativeVoskServiceVerdictTest {
 
         assertEquals(1.0, reg.get("mvno.vosk.classified").counter().count());
         assertEquals(1.0, reg.get("mvno.vosk.blocked").counter().count());
+        // Flag-for-review semantics: every blocked verdict is also a review flag
+        assertEquals(1.0, reg.get("mvno.vosk.flagged").counter().count());
     }
 
     @Test
-    @DisplayName("Allowed transcript verdict increments classified but never blocked")
+    @DisplayName("Allowed transcript verdict increments classified but never blocked/flagged")
     void allowedVerdictDoesNotIncrementBlocked() {
         final MeterRegistry reg = new SimpleMeterRegistry();
         final NativeVoskService service = newService(reg, true, "Clean content");
@@ -64,6 +66,7 @@ class NativeVoskServiceVerdictTest {
 
         assertEquals(1.0, reg.get("mvno.vosk.classified").counter().count());
         assertEquals(0.0, reg.get("mvno.vosk.blocked").counter().count());
+        assertEquals(0.0, reg.get("mvno.vosk.flagged").counter().count());
     }
 
     @Test
@@ -76,5 +79,6 @@ class NativeVoskServiceVerdictTest {
 
         assertEquals(0.0, reg.get("mvno.vosk.classified").counter().count());
         assertEquals(0.0, reg.get("mvno.vosk.blocked").counter().count());
+        assertEquals(0.0, reg.get("mvno.vosk.flagged").counter().count());
     }
 }

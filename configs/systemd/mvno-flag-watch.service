@@ -1,0 +1,18 @@
+[Unit]
+Description=MVNO flag-for-review watcher — tails mvno-api TRANSCRIPT verdicts, preserves flagged-call evidence + local-Neon rows
+Documentation=docs/DB-Changes.md
+# Follows the stack: only useful while mvno-api is up; restarts are cheap and
+# idempotent (flag_call.sh skips already-flagged recordings via the manifest).
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# @REPO@ is substituted by `make flag-watch-install`
+ExecStart=/usr/bin/bash @REPO@/scripts/review/flag_watch.sh
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

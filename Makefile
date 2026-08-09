@@ -228,7 +228,7 @@ check-issues:
 #   make watchdog-log        tail the watchdog log
 #   make watchdog-status     systemd unit status
 # ─────────────────────────────────────────────────────────────────────────────
-.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test check-subs bootstrap-check
+.PHONY: watchdog-install watchdog-once watchdog-uninstall watchdog-log watchdog-status proof cockpit-proof subscriber-proof watchdog-self-test check-subs bootstrap-check neon-clone flag-watch-once flag-watch-install flag-watch-uninstall
 
 watchdog-install:
 	@mkdir -p $(HOME)/.config/systemd/user
@@ -255,6 +255,35 @@ watchdog-log:
 watchdog-status:
 	@systemctl --user --no-pager status mvno-stack-watchdog.service 2>/dev/null \
 		| head -n 10 || echo "(watchdog not installed — make watchdog-install)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Flag-for-review pipeline — local Neon mirror + verdict watcher.
+#   make neon-clone        READ-ONLY pg_dump of production Neon → local clone
+#                          (production never written; see docs/DB-Changes.md)
+#   make flag-watch-once   replay recent blocked-verdicts → evidence+rows
+#   make flag-watch-install  systemd --user unit (follow mode, restart=always)
+#   make flag-watch-uninstall
+# ─────────────────────────────────────────────────────────────────────────────
+neon-clone:
+	@bash scripts/neon/clone.sh
+
+flag-watch-once:
+	@bash scripts/review/flag_watch.sh --once
+
+flag-watch-install:
+	@mkdir -p $(HOME)/.config/systemd/user
+	@sed 's|@REPO@|$(CURDIR)|g' configs/systemd/mvno-flag-watch.service \
+		> $(HOME)/.config/systemd/user/mvno-flag-watch.service
+	@systemctl --user daemon-reload
+	@systemctl --user enable --now mvno-flag-watch.service
+	@echo "✓ flag-watch installed + started (systemd --user, follow mode)"
+	@echo "  → check: systemctl --user status mvno-flag-watch.service"
+
+flag-watch-uninstall:
+	@systemctl --user disable --now mvno-flag-watch.service 2>/dev/null || true
+	@rm -f $(HOME)/.config/systemd/user/mvno-flag-watch.service
+	@systemctl --user daemon-reload
+	@echo "✓ flag-watch uninstalled"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Proof harness — repeatable run-evidence (LIVE_DEMO "Evidence squares").

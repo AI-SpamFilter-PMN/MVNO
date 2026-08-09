@@ -782,3 +782,30 @@ services:
       mvno_net:
         ipv4_address: 10.89.0.43
     restart: unless-stopped
+
+  # ─── Local Neon clone (dev/flag-pipeline Postgres) ───
+  # Read-only mirror of the production Neon DB (cloned by scripts/neon/clone.sh
+  # via pg_dump from NEON_DB_URL — production is NEVER written to). The
+  # flag-for-review pipeline writes rows here; DB-Changes.md documents the
+  # equivalent SQL for the live production DB on Neon.
+  neon-local:
+    image: docker.io/library/postgres:18-alpine
+    container_name: mvno-neon-local
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      - POSTGRES_DB=neondb
+      - POSTGRES_USER=mvno
+      - POSTGRES_PASSWORD=mvno
+    volumes:
+      - ./state/neon-local:/var/lib/postgresql:z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mvno -d neondb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.62
+    restart: unless-stopped

@@ -52,6 +52,7 @@ public class NativeVoskService {
     private final Counter decodeErrors;
     private final Counter classified;
     private final Counter blocked;
+    private final Counter flagged;
     private final Counter unavailable;
     private final AtomicInteger modelReady = new AtomicInteger(0);
     private final AtomicLong lastStandbyWarn = new AtomicLong(0);
@@ -71,6 +72,7 @@ public class NativeVoskService {
         this.decodeErrors = meterRegistry.counter("mvno.vosk.decode.errors");
         this.classified = meterRegistry.counter("mvno.vosk.classified");
         this.blocked = meterRegistry.counter("mvno.vosk.blocked");
+        this.flagged = meterRegistry.counter("mvno.vosk.flagged");
         this.unavailable = meterRegistry.counter("mvno.vosk.unavailable");
         meterRegistry.gauge("mvno.vosk.model.ready", modelReady);
         initModel();
@@ -156,7 +158,13 @@ public class NativeVoskService {
             final InterceptResponse verdict = aiFilterService.classifyTranscript(recordingId, text);
             classified.increment();
             if (!verdict.allow()) {
+                // Flag-for-review semantics: the edge never hard-blocks a live
+                // call (post-call classification) — a blocked verdict is a
+                // REVIEW FLAG handed to the Filteration-System/admins, with
+                // evidence preserved by scripts/review/flag_call.sh. Telemetry
+                // keeps both counters so blocked and flagged stay separable.
                 blocked.increment();
+                flagged.increment();
             }
             logger.info("AI transcript verdict [{}]: allow={}, reason='{}'",
                     recordingId, verdict.allow(), verdict.reason());
