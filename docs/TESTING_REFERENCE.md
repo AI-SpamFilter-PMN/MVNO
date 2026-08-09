@@ -513,7 +513,7 @@ Vosk ASR runs **in-process inside `mvno-api`** (no separate Vosk container). Dro
 
 ```bash
 podman compose ps | grep mvno-api
-ls vendor/vosk/vosk-model-small-en-us-0.15/   # mounted model (ro)
+ls vendor/vosk/vosk-model-en-us-0.22/   # mounted model (ro)
 cp sample.wav state/spool/
 sleep 5 && cat state/spool/archived/sample.txt
 ```

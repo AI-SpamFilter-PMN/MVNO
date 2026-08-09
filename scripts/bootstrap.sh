@@ -217,10 +217,17 @@ try_log "maven:telecom-api" "
     ./mvnw -B dependency:go-offline -Dmaven.repo.local='$VENDOR_DIR/maven/repository'
 "
 
-# ─── Step 3: Download Vosk model ────────────────────────
-try_log "vosk-model" "
+# ─── Step 3: Download Vosk models ──────────────────────────
+# Small model (fallback, ~68 MB unpacked) — kept for CI/low-RAM environments
+try_log "vosk-model-small" "
     wget -q --show-progress -O '$VENDOR_DIR/vosk/vosk-model-small-en-us-0.15.zip' https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip &&
     unzip -o -q '$VENDOR_DIR/vosk/vosk-model-small-en-us-0.15.zip' -d '$VENDOR_DIR/vosk/'
+"
+# Large model (default for demos, ~1.7 GB unpacked) — vosk-model-en-us-0.22
+# VOSK_MODEL=large|small selects which one docker-compose mounts (default: large)
+try_log "vosk-model-large" "
+    wget -q --show-progress -O '$VENDOR_DIR/vosk/vosk-model-en-us-0.22.zip' https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip &&
+    unzip -o -q '$VENDOR_DIR/vosk/vosk-model-en-us-0.22.zip' -d '$VENDOR_DIR/vosk/'
 "
 
 # ─── Step 3b: Download VictoriaLogs Grafana datasource plugin ──

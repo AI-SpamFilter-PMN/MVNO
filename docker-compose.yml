@@ -570,16 +570,27 @@ services:
     container_name: mvno-api
     ports:
       - "8080:8080"
+    environment:
+      - VOSK_MODEL_PATH=/opt/vosk-model-en-us-0.22
+      - JAVA_TOOL_OPTIONS=-Xmx768m
     volumes:
       - ./state/kamailio:/etc/kamailio:z
       - ./state/spool:/var/spool/rtpengine:z
-      - ./vendor/vosk/vosk-model-small-en-us-0.15:/opt/vosk-model-small-en-us-0.15:ro,z
+      - ./vendor/vosk/vosk-model-en-us-0.22:/opt/vosk-model-en-us-0.22:ro,z
     healthcheck:
       test: ["CMD-SHELL", "timeout 3 bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 180s
+    mem_limit: 6g
+    # json-file driver: rootless podman 6 + journald logs nothing to `podman logs`
+    # (verified 2026-08-09) — flag_watch.sh tails podman logs for verdict lines.
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
     networks:
       mvno_net:
         ipv4_address: 10.89.0.46 # static pin required: unpinned services get auto-allocated IPs that collide with pinned ones (IPAM conflict on network recreate)

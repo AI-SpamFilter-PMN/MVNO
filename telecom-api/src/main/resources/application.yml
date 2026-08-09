@@ -57,7 +57,7 @@ intercept:
 # post-call extractions) and archives them after transcription.
 vosk:
   spool-dir: /var/spool/rtpengine
-  model-path: ${VOSK_MODEL_PATH:/opt/vosk-model-small-en-us-0.15}
+  model-path: ${VOSK_MODEL_PATH:/opt/vosk-model-en-us-0.22}
 
 # ------------------------------------------------------------------------------
 # Actuator Observability & Health Probes

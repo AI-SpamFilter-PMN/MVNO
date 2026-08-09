@@ -701,7 +701,7 @@ services:
       - ./state/spool:/var/spool/rtpengine:z   # shared with rtpengine for NativeVoskService
     environment:
       AI_FILTER_URL: http://ai-filter:8000/api/v1/classify
-      VOSK_MODEL_PATH: /opt/vosk-model-small-en-us-0.15
+      VOSK_MODEL_PATH: /opt/vosk-model-en-us-0.22
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health/liveness"]
       interval: 10s
@@ -1910,7 +1910,7 @@ Eliminates external worker processes by embedding speech-to-text recognition dir
 **Native Java 21 Architecture Highlights:**
 - **Zero Python Overhead**: Direct JNI native call memory layout inside the Java Virtual Machine.
 - **Virtual Thread Polling**: Uses Spring `@Scheduled(fixedDelay = 3000)` running on Loom Virtual Threads.
-- **Multilingual Support**: Supports both English (`vosk-model-small-en-us-0.15`) and Arabic models out-of-the-box.
+- **Multilingual Support**: Supports both English (`vosk-model-en-us-0.22`) and Arabic models out-of-the-box.
 - **In-Memory Decoding**: Stream decodes 16kHz PCM WAV captures directly from `/var/spool/rtpengine`.
 
 ```java
@@ -1943,7 +1943,7 @@ public class NativeVoskService {
 
     public NativeVoskService(
             @Value("${vosk.spool-dir:/var/spool/rtpengine}") String spoolDir,
-            @Value("${vosk.model-path:/opt/vosk-model-small-en-us-0.15}") String modelPath) {
+            @Value("${vosk.model-path:/opt/vosk-model-en-us-0.22}") String modelPath) {
         this.spoolDir = spoolDir;
         this.modelPath = modelPath;
         initModel();
@@ -2093,7 +2093,7 @@ data_dir = "/var/lib/vector"
 
 **Native Vosk ASR Service:**
 1. **Break it:** Change `vosk.spool-dir` in `application.yml` to `"/nonexistent"`. Start the gateway — what error logs appear? Fix it.
-2. **Break it:** Move the Vosk model directory outside `/opt/vosk-model-small-en-us-0.15`. Restart the gateway — verify standby mode log message. Fix it.
+2. **Break it:** Move the Vosk model directory outside `/opt/vosk-model-en-us-0.22`. Restart the gateway — verify standby mode log message. Fix it.
 3. **Verify:** Place a `.wav` file in `state/spool/` — verify `NativeVoskService` logs show ASR transcription.
 
 **Vector:**
@@ -2519,8 +2519,8 @@ Know what "healthy" looks like before you see "broken":
 | Kamailio won't start | Missing SQLite DB | Run `make init-db` before `make up`. |
 | SMS not routing | Wrong SMPP password | Check `osmo-smsc.cfg` password matches client credentials. |
 | No PCAP in spool | rtpengine socket config wrong | Check Kamailio → rtpengine `rtpengine_sock` parameter. |
-| No transcription from Vosk | Model not found or missing directory stream | Verify `vosk-model-small-en-us-0.15` is mounted at `/opt/vosk-model-small-en-us-0.15`. |
-| Vosk idle (no transcription) | Model not yet downloaded or wrong path | Verify `vosk-model-small-en-us-0.15` exists in `vendor/vosk/` or model path in `NativeVoskService.java`. |
+| No transcription from Vosk | Model not found or missing directory stream | Verify `vosk-model-en-us-0.22` is mounted at `/opt/vosk-model-en-us-0.22`. |
+| Vosk idle (no transcription) | Model not yet downloaded or wrong path | Verify `vosk-model-en-us-0.22` exists in `vendor/vosk/` or model path in `NativeVoskService.java`. |
 | SELinux volume errors | Missing `:z` flag | Add `:z` to volume definition in docker-compose.yml. |
 | `podman compose` not found | Docker Compose Plugin not installed | Install `docker-compose` via system package manager. See Section3. |
 | Vector not parsing logs | Wrong log path | Verify Kamailio/OsmoSMSC write logs to paths in vector.toml, or switch from file source to stdin pipe. |

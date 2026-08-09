@@ -368,7 +368,7 @@ These additional telecom core enhancements further elevate the project's securit
 *   **Concept**: Loading heavy multilingual speech models simultaneously wastes RAM.
 *   **Lightweight Implementation**:
     - Configure `NativeVoskService.java` to parse the dialed country code.
-    - If the call is local (English), load only the 40MB `vosk-model-small-en-us` model.
+    - If the call is local (English), load only the `vosk-model-en-us-0.22` model.
     - If the call is international (e.g., to an Arabic country code), load the corresponding small language model dynamically.
     - Keep only one model loaded in RAM at a time, performing hot-unloads of the inactive model to stay within your host VM's memory limits.
 
