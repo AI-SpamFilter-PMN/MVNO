@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     libz-dev \
     libpulse-dev \
+    libopus-dev \
+    libspandsp-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # libre (re) — the realtime networking stack baresip links against
@@ -44,7 +46,7 @@ RUN git clone --depth 1 --branch "${BARESIP_VERSION}" https://github.com/baresip
         -DCMAKE_INSTALL_PREFIX=/usr/local \
         -DCMAKE_PREFIX_PATH=/usr/local \
         -DCMAKE_LIBRARY_PATH=/usr/local/lib \
-        -DMODULES="stdio;g711;uuid;menu;account;aufile;ausine;ctrl_tcp;pulse" \
+        -DMODULES="stdio;g711;g722;opus;uuid;menu;account;aufile;ausine;ctrl_tcp;pulse" \
     && cmake --build build -j"$(nproc)" \
     && cmake --install build \
     && rm -rf /opt/baresip
