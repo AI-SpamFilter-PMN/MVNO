@@ -59,6 +59,8 @@ setup() {
 $(module_path)
 module stdio.so
 module g711.so
+module g722.so
+module opus.so
 module ausine.so
 module aufile.so
 module uuid.so
@@ -80,6 +82,8 @@ EOF
 $(module_path)
 module stdio.so
 module g711.so
+module g722.so
+module opus.so
 module ausine.so
 module aufile.so
 module pulse.so
