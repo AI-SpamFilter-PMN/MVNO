@@ -65,3 +65,10 @@ opencode.json
 # Same policy as AGENTS.md: STRICTLY machine-local, never publish.
 .cursorrules
 .goosehints
+
+# ============================================================
+# Env / credentials — deployment secrets stay LOCAL (see .env.example)
+# ============================================================
+.env
+.env.*
+!.env.example

@@ -26,6 +26,37 @@
 > Do **not** publish `2775` on a shared host — MVNO already publishes `2775:2775`.
 > Use container networking (`mvno_net` bridge / same compose network) instead.
 
+## Shared Neon history DB — write-matching-schema ONLY
+
+Both repos share one Postgres (Neon). The schema (`db/schema.sql`, owned by
+sms-client/Filteration-System) is **frozen for us**: we add/read rows with the
+existing structure only, and **never** `CREATE`/`ALTER`/`DROP` anything. Connect
+via the **`NEON_DB_URL`** env var (git-ignored — see MVNO `.env.example`;
+`sslmode=require&channel_binding=require`). Relevant tables:
+
+- `subscribers(msisdn UNIQUE, imsi UNIQUE, display_name, status
+  'ACTIVE'|'SUSPENDED'|'BLOCKED' DEFAULT 'ACTIVE', created_at)`
+- `messages(source, destination, classification_label 'spam'|'ham',
+  classification_score 0..1, status 'DELIVERED'|'BLOCKED', smpp_message_id,
+  received_at)` — nullable FKs `source_subscriber_id`/`destination_subscriber_id`
+  → `subscribers(id)`; `source`/`destination` are the raw MSISDNs (matched by
+  string value, not FK — deliberate).
+- `blocklist(msisdn UNIQUE, reason, expires_at)` and `logs(event_type,
+  severity 'INFO'|'WARN'|'ERROR', message, related ids)`
+- `users` / `phone_numbers` are the web app's; read-only for us.
+
+⚠ **Message bodies and call transcripts are intentionally NOT stored** — persist
+classification metadata only. Example (exact columns, no schema change):
+
+```sql
+INSERT INTO messages (source, destination, classification_label,
+                      classification_score, status, smpp_message_id)
+VALUES ('15551234567', '15557654321', 'ham', 0.97, 'DELIVERED', 'SMS-123');
+```
+
+Only `subscribers.msisdn` and `blocklist.msisdn` are UNIQUE — use
+`ON CONFLICT (msisdn) DO UPDATE` there; `messages` stays append-only.
+
 ## REST interception (zero-trust)
 
 ```http

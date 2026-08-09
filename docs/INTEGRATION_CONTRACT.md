@@ -259,6 +259,10 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   (e.g. `-Dserver.port=8081`). All keys are overridable via `-Dkey=value`.
 - **REST Interception (optional):** `POST http://telecom-api:8080/api/v1/intercept/sms` with
   `X-API-Key: mvno-demo-key-2026`; response `{ "allow": boolean, "reason": "string" }`.
+- **Shared Neon history (schema-preserving)**: MVNO may write rows into the existing
+  `subscribers` / `messages` / `blocklist` / `logs` tables via the `NEON_DB_URL` env var —
+  **rows only, never DDL** (bodies/transcripts are intentionally NOT stored). Full table
+  inventory + example insert: `docs/partner/sms-client-INTEGRATION.md`.
 
 ### AI-Filteration-System (`ai-model.py`) — endpoint documented, repo private (not verifiable)
 - FastAPI at `:8000/api/filter-sms`, requires `API_KEY` + `MODEL_ID` (routes to agentrouter.org).
