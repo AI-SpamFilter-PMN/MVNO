@@ -134,6 +134,9 @@ make test-sms && make test-call            # policy-intercept endpoint checks
 | 11 | **IP-SM-GW 2G↔5G SMS Bridge** | TS 23.204 interworking bridge (`mvno-ip-sm-gw`): polls 2G SMSC store-and-forward DB and relays to 5G/IMS via SIP MESSAGE; backhauls 5G SMS to SMSC via SMPP submit_sm. Both legs verified end-to-end. |
 | 12 | **Deterministic AI Spam Block** | Inline `ai-filter` mock returns `allow:false` when the payload contains `E2E-BLOCK`; Kamailio replies `403 SMS Intercepted / Blocked`, `mvno_sms_blocked_total` increments, message never delivered. Certified by the sms_matrix AI-block cell. |
 | 13 | **E2E SMS Interworking Gate** | `scripts/testing/sms_matrix.sh`: 5-cell matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) asserting on live metrics; **exit 0 = all cells green** (two consecutive certified runs). |
+| 14 | **User-Driven Live Demo** | `make user-demo` menu → `user_sms.sh` (your typed SMS body, any flow) + `user_call.sh` (your own voice live). Companion to the AUTO `make graduation`/`gate`. See [`docs/USER_DEMO.md`](docs/USER_DEMO.md). |
+| 15 | **HD / wideband calls** | baresip rig + SipClient offer **G.722/16000** (`rtpmap:9`) with **PCMU/8000** fallback; rtpengine relays codec-agnostic (negotiated G.722 passes through + is recorded). Verified live 2026-08-09. |
+| 16 | **Filteration-System voice contract** | `AiFilterService.tryVoiceFilter` → `POST {callerId:<MSISDN>, receiverId:<MSISDN>, transcript}` at `filteration.voice.url`. Local scam keyword **flags** (non-blocking) then forwards to the decider, whose `DROP_CALL`/`ALLOW_CALL` is authoritative. |
 
 ---
 
@@ -143,6 +146,8 @@ make test-sms && make test-call            # policy-intercept endpoint checks
 | :--- | :--- |
 | [ONBOARDING.md](ONBOARDING.md) | Team onboarding — setup, make targets, integration specs. |
 | [docs/LIVE_DEMO.md](docs/LIVE_DEMO.md) | The from-zero live demo (S1–S10): raw-shell walkthrough of voice call, RTPEngine media, live_tap → WAV → Vosk spam verdict, all five SMS paths, REST + smsc dump, telemetry, and the automated demo/e2e gates. |
+| [docs/USER_DEMO.md](docs/USER_DEMO.md) | **User-driven** live demo (companion to `make graduation`): `make user-demo` menu → `user_sms.sh` (your SMS body, any flow) + `user_call.sh` (your voice live). Distinguishes USER-driven from AUTO/gate flows. |
+| [docs/REALTIME_AUDIO.md](docs/REALTIME_AUDIO.md) | Recording pipeline tiers (Tier-1 live tap / Tier-3 post-call), latency budget, systemd unit — incl. **G.722/Opus** codec-aware extraction. |
 | [docs/TESTING_REFERENCE.md](docs/TESTING_REFERENCE.md) | Full multi-terminal testing reference — scripted/containerized variants of all MVP flows (2G/5G SMS, 2G↔5G IP-SM-GW bridging, SIP/IMS calls, RTP engine media, Vosk STT, recording, interception REST API, AI spam block, automated e2e gate, Grafana/VictoriaMetrics telemetry), plus troubleshooting and the certification log. |
 | [docs/INTEGRATION_CONTRACT.md](docs/INTEGRATION_CONTRACT.md) | Single source of truth for external repos — interfaces, X-API-Key auth, `/api/v1/classify` payload schemas (SMS/VOICE_CALL/TRANSCRIPT), SLA/fail-open, per-repo integration notes, partner handoff package. |
 | [docs/partner/](docs/partner/) | Ready-to-paste integration docs for each teammate repo (`sms-client`, `SipClient`, `Filteration-System`) — connection facts, credentials, payload schemas, "prove your integration" checklist. |

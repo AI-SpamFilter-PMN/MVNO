@@ -982,3 +982,34 @@ the SIP/RTP live while the Wireshark GUI captures it — the call equivalent of 
 > `watch_send.sh` wrapper remains a **possible** convenience, but is not
 > required to demonstrate the path — this section *is* the single-command demo
 > using the pieces already shipped.
+
+---
+
+## S12 — USER-driven live flow (`make user-demo`) · the human drives
+
+The AUTO/`make graduation`/`gate` path is canned and deterministic. The
+**user-driven** companion takes LIVE, dynamic input from the operator — your
+own SMS body and your own voice — reusing the same tested primitives.
+
+```bash
+make user-demo          # interactive menu (order: up -> mic probe -> SMS -> call)
+make user-sms  BODY="<your text>" FLOW=2g-2g    # any flow: 2g2g|2g5g|5g2g|5g5g|ai
+make user-call  CALLEE=15559998888              # speak ~10 s, see your words live
+```
+
+| Entry | Auto (canned) | User (live/dynamic) |
+|---|---|---|
+| SMS | `sms_matrix.sh` / `demo_call.sh` (fixed bodies) | `user_sms.sh` — **you type** the body |
+| Call | `demo_call.sh` / `graduation` (canned phrase) | `user_call.sh` — **you speak**, live Vosk |
+| Voice | baresip UAs + `--codec g722` sim | your phone/softphone or the mic |
+
+The user-driven family lives in `scripts/demo/` (`user_demo.sh` menu,
+`user_sms.sh` MO-write, `user_call.sh`); the AUTO test harness stays in
+`scripts/testing/` (`*matrix*`, `gate.sh`) — never mixed. Full details:
+`docs/USER_DEMO.md`.
+
+> **Exact phone / softphone values** (Linphone, MizuDroid, SipClient, baresip-UAs):
+> proxy `sip:192.168.100.93:5066`, username `15551234567`, password `testpass`,
+> realm `localhost`, transport UDP/TCP. Dial `15559998888` (baresip-rx auto-answer).
+> Negotiate **G.722/16000** (`rtpmap:9`) with **PCMU/8000** fallback — see
+> `server-port` config in the client build.

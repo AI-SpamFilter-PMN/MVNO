@@ -1135,3 +1135,36 @@ the caller leg provably differs from the canned phrase (AI filter verdicts
 `allow=true, Clean content` vs `allow=false, Spam (phishing phrase detected)`),
 with a speaker-proof monitor capture; the AI filter itself is labeled honestly
 as a deterministic mock classifier (Flow K).*
+
+---
+
+## USER-driven vs AUTO — which entry to use
+
+These are the two deliberately-separate demo families:
+
+| | AUTO (deterministic) | USER (live, dynamic) |
+|---|---|---|
+| SMS | `sms_matrix.sh` (fixed 5 cells), `gate.sh` | `scripts/demo/user_sms.sh` — **you type** the body, any flow |
+| Call | `demo_call.sh` / `graduation` (canned phrase) | `scripts/demo/user_call.sh` — **you speak** ~10 s, live Vosk |
+| Line | `gate.sh` (5G preflight + e2e + AI-block) | `scripts/demo/mic_probe.sh` + `user_demo.sh` menu ordering |
+| Entry | `make graduation`, `make gate`, `make test-*` | `make user-demo` (menu), `make user-sms`, `make user-call` |
+
+**Convention**: USER-facing scripts live in `scripts/demo/` (`user_*.sh`,
+`mic_probe.sh`, `mic_verify.sh`); AUTO test harness stays in `scripts/testing/`
+(`*_matrix.sh`, `gate.sh`, `live_demo.sh`, `sip_traffic_sim.py`). The two never
+share a runner. The auto determinism the gate asserts on is therefore never
+polluted by a user-typed body or a user-spoken phrase.
+
+```bash
+# USER SMS — any body, any flow (2g2g | 2g5g | 5g2g | 5g5g | ai)
+make user-sms BODY="Your bank account was charged" FLOW=2g-2g
+
+# USER call — a phone/softphone or the be-captured mic; G.722 negotiable
+make user-call CALLEE=15559998888
+```
+
+**Phone / softphone values** (Linphone, MizuDroid, SipClient, baresip-UA):
+proxy `sip:192.168.100.93:5066`, username a funded MSISDN (`15551234567` …),
+password `testpass`, realm `localhost`, transport UDP/TCP; dial `15559998888`
+(baresip-rx auto-answer). Negotiated codec G.722/16000 or PCMU/8000. Full
+nuts-and-bolts in `docs/USER_DEMO.md` and `docs/LIVE_DEMO.md` §S12.
