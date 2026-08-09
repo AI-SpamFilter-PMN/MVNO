@@ -23,7 +23,7 @@ class NativeVoskServiceVerdictTest {
         private final String reason;
 
         FixedVerdictAiFilterService(final boolean allow, final String reason) {
-            super(RestClient.create(), "http://127.0.0.1:1/api/v1/classify", new SimpleMeterRegistry());
+            super(RestClient.create(), "http://127.0.0.1:1/api/v1/classify", "", new SimpleMeterRegistry());
             this.allow = allow;
             this.reason = reason;
         }

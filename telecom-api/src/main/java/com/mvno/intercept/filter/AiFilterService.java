@@ -11,7 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -42,6 +45,7 @@ public class AiFilterService {
 
     private final RestClient restClient;
     private final String baseUrl;
+    private final String vfUrl;
     private final MeterRegistry meterRegistry;
 
     // Thread-safe atomic counters for tracking consecutive failures & circuit cooldown epoch
@@ -50,9 +54,11 @@ public class AiFilterService {
 
     public AiFilterService(final RestClient restClient,
                            @Value("${ai-filter.url:http://ai-filter:8000/api/v1/classify}") final String baseUrl,
+                           @Value("${filteration.voice.url:}") final String voiceFilterUrl,
                            final MeterRegistry meterRegistry) {
         this.restClient = restClient;
         this.baseUrl = baseUrl;
+        this.vfUrl = voiceFilterUrl.isBlank() ? baseUrl : voiceFilterUrl;
         this.meterRegistry = meterRegistry;
     }
 
@@ -173,8 +179,27 @@ public class AiFilterService {
             return failOpen("circuit_open", "AI filter circuit open — SLA allow");
         }
 
+        // Step 1b: local deterministic scam-keyword flag (ALWAYS on, independent of
+        // any external filter). This is the "flag without blocking" contract: a hit
+        // flags the transcript for review but never hard-blocks a live call.
+        final String scamWord = scanScamKeywords(transcript);
+        if (scamWord != null) {
+            meterRegistry.counter("mvno.vosk.scamflag", "word", scamWord).increment();
+            logger.info("Scam-keyword flag [{}]: '{}' hit '{}'", callId, transcript, scamWord);
+            return new InterceptResponse(false, "scam-keyword: " + scamWord);
+        }
+
+        // Step 2: try the Filteration-System real contract first (integrate w/ others),
+        // falling back to the legacy /api/v1/classify contract, then to fail-open.
+        // Filteration-System: POST /api/v1/voice/filter {callerId, receiverId, transcript}
+        //                     -> {isMalicious, action:"DROP_CALL"/"ALLOW_CALL"}
+        InterceptResponse fromVoiceFilter = tryVoiceFilter(callId, transcript);
+        if (fromVoiceFilter != null) {
+            return fromVoiceFilter;
+        }
+
+        // Step 3: legacy ai-filter contract fallback.
         try {
-            // Step 2: Build JSON classification request payload for post-call transcript
             final Map<String, Object> body = Map.of(
                 "event_type", "TRANSCRIPT",
                 "call_id", callId,
@@ -182,37 +207,97 @@ public class AiFilterService {
                 "timestamp_epoch_ms", System.currentTimeMillis()
             );
 
-            // Step 3: Execute POST request to external AI model microservice
             final TranscriptionResult result = restClient.post()
                     .uri(baseUrl)
                     .body(body)
                     .retrieve()
                     .body(TranscriptionResult.class);
 
-            // Step 4: On successful response, reset consecutive failure counter to 0
             if (result != null) {
                 consecutiveFailures.set(0);
                 return new InterceptResponse(result.allow(), result.reason());
             }
-
-            // Fallback for null response body
             return failOpen("empty_response", "AI filter returned empty response — SLA allow");
 
         } catch (final RestClientException e) {
-            // Network / Timeout Exception: record failure & trigger SLA fail-open
             recordFailure(e);
             return failOpen("unreachable", "AI filter unreachable — SLA allow");
-
         } catch (final Exception e) {
-            // Unexpected internal error: log & trigger SLA fail-open
             logger.error("Unexpected error in Transcript AI classification: {}", e.getMessage(), e);
             return failOpen("internal", "Gateway internal error — SLA allow");
         }
     }
 
     /**
+     * Tries the Filteration-System voice classifier ({@code /api/v1/voice/filter})
+     * which is MVNO's intended integration target. Returns {@code null} (rather
+     * than throwing) when the service is unreachable or not yet deployed, so the
+     * caller can fall back to the legacy ai-filter contract. This keeps the demo
+     * working even though Filteration-System may not be running yet.
+     */
+    private InterceptResponse tryVoiceFilter(final String callId, final String transcript) {
+        try {
+            final Map<String, Object> body = Map.of(
+                "callerId", callId,
+                "receiverId", "",
+                "transcript", transcript
+            );
+            final VoiceFilterResponse resp = restClient.post()
+                    .uri(vfUrl)
+                    .body(body)
+                    .retrieve()
+                    .body(VoiceFilterResponse.class);
+            if (resp != null) {
+                consecutiveFailures.set(0);
+                return new InterceptResponse(!resp.isMalicious(), resp.action());
+            }
+            return null;
+        } catch (final Exception e) {
+            // Filteration-System not reachable/not deployed — fall through to the
+            // legacy ai-filter contract. Log once at debug; not a circuit-break.
+            logger.debug("Filteration-System voice filter unavailable ({}), using ai-filter fallback: {}",
+                    vfUrl, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Carrier SLA Fallback: Increments Prometheus counter 'mvno.ai.failopen' and returns allow: true.
      */
+    /**
+     * Deterministic, flag-only scam-keyword matcher (config-driven, word-boundary,
+     * case-insensitive). Returns the first matching scam word or phrase, or {@code null}
+     * when the transcript is clean. Deliberately a local pre-classifier so flags work
+     * even when every external filter is unreachable (fail-open still flags locally).
+     *
+     * <p>Word families cover the demo scam scripts: "bank account won verify" + aliases
+     * ("you have won a prize call us now", "your account has been blocked please verify").
+     */
+    private String scanScamKeywords(final String transcript) {
+        if (transcript == null || transcript.isBlank()) {
+            return null;
+        }
+        final String t = transcript.toLowerCase(Locale.ROOT);
+        // Word-boundary, case-insensitive, config-driven list. Pattern.quote each
+        // word individually so "won" matches " won " but NOT "wonder"/"won't"-prefix false
+        // positives. Phrase families cover the demo scam scripts:
+        //   "you have won a prize call us now"
+        //   "your account has been blocked, please verify your details"
+        final String[] words = {
+            "won", "prize", "claim", "free", "urgent", "account",
+            "blocked", "confirm", "verify", "ssn", "pin", "password",
+            "card", "wire", "transfer", "refund", "offer", "winner", "fee", "bank"
+        };
+        for (final String w : words) {
+            // (?i) inline; (?<!\\w)/(?!\\w) negative lookarounds enforce boundaries
+            // without relying on \b adjacent to a quoted literal.
+            if (Pattern.compile("(?i)(?<![a-z])" + Pattern.quote(w) + "(?![a-z])").matcher(t).find()) {
+                return w;
+            }
+        }
+        return null;
+    }
+
     private InterceptResponse failOpen(final String reason, final String message) {
         meterRegistry.counter("mvno.ai.failopen", "reason", reason).increment();
         logger.warn("AI filter SLA fail-open ({}): {}", reason, message);

@@ -37,7 +37,7 @@ class AiFilterSlaTimeoutTest {
                 .build();
 
         meterRegistry = new SimpleMeterRegistry();
-        aiFilterService = new AiFilterService(restClient, closedPortUrl, meterRegistry);
+        aiFilterService = new AiFilterService(restClient, closedPortUrl, "", meterRegistry);
     }
 
     @Test
@@ -65,8 +65,10 @@ class AiFilterSlaTimeoutTest {
     @Test
     @DisplayName("Transcript Classification Timeout -> SLA Fail-Open Fallback")
     void testTranscriptSlaTimeoutFallback() {
+        // Use a CLEAN transcript so the SLA-timeout path (not the scam-keyword flag)
+        // is the branch under test. Scam words now flag locally before any network I/O.
         final InterceptResponse response = aiFilterService.classifyTranscript(
-                "call-1785097956%40127.0.0.1-464274ce81646346", "Claim your free prize now");
+                "call-1785097956%40127.0.0.1-464274ce81646346", "just calling to check in on you");
 
         assertNotNull(response);
         assertTrue(response.allow());
