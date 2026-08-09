@@ -76,8 +76,8 @@ The headless run intentionally ends RED at [6/6] (anti-theater proof, §3.3).
 To complete the headline: run `make graduation` interactively, and when
 `📢 SPEAK NOW` appears, say the demo phrase
 ("Your bank account has been blocked, please confirm your details now")
-for 4 s. The fresh capture is then non-empty → [6/6] and [7/7] both PASS →
-`🎉 GRADUATION PASS`. The 4 s window comes from `scripts/demo/mic_record.sh`.
+for 10 s. The fresh capture is then non-empty → [6/6] and [7/7] both PASS →
+`🎉 GRADUATION PASS`. The 10 s window comes from `scripts/testing/mic_record.sh`.
 
 ---
 

@@ -947,3 +947,38 @@ uniqueness in compose, not the runbook rigs).
 | SIP transport ports `:5070/:5071`, `:5090/:5091` | `sip_traffic_sim.py` `--listen-port` | Per-role convention, fixed in runbooks |
 | Kamailio source IP of UE calls | UPF SNAT (`MASQUERADE 10.45.0.0/16 !ogstun`) | UE calls appear from `10.89.0.14`, not the UE IP (Issue 8.20) |
 | Vosk/RTP spool file names | RTPEngine + `live_tap.sh` | `state/spool/pcaps/<pcap-stem>`; read via `newest.sh` |
+
+---
+
+## S11.1 — One command: personal SMS → MT → Wireshark (`watch_send`)
+
+**PURPOSE** — S6/S11 for a *single* message you actually type, collapsed to one
+command: send → watch it transit the network → confirm MT arrival → open the
+packets in the **Wireshark GUI**. This is the smallest possible "the user sent
+an SMS and it travelled to the phone" demo — no multi-terminal runbook.
+
+```bash
+# From the repo root (stack up). Send your own body to a 2G/5G recipient:
+RECIP=15557654321 ; BODY="hello from my phone"
+# 1) Send via the intercept gateway (real network, real MT):
+bash scripts/testing/send_rest_sms.sh 15551234567 "$RECIP" "$BODY"
+# 2) Watch it arrive on the 2G handset (poll the real phone's inbox):
+podman exec mvno-2g-ms sh -c "sleep 6; grep \"$BODY\" /root/.osmocom/bb/sms.txt"
+#   → prints the line → that's the MT receipt ("✓ arrived").
+# 3) Prove transit on the bridge counters (2g5g / 5g2g delta):
+curl -s localhost:9100/metrics | grep -E 'sms_(2g5g|5g2g)'
+# 4) Open the newest relay pcap in the Wireshark GUI:
+wireshark -r "$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')" \
+  -d udp.port==30000-30100,rtp -Y 'sip || tcp || smpp || rtp'
+```
+
+**Call flow (same idea, voice):** start the cockpit (`bash scripts/demo/demo_live.sh
+--wireshark --windowed`), SPEAK from pane P0, and the S11 `call` window P2 shows
+the SIP/RTP live while the Wireshark GUI captures it — the call equivalent of step 4.
+
+> **Why this (and not a new script/doc):** every primitive above already
+> exists and is verified (`send_rest_sms.sh`, the `sms.txt` MT grep from
+> `sms_matrix.sh`, `newest.sh`, the S11 `--wireshark` launcher). A dedicated
+> `watch_send.sh` wrapper remains a **possible** convenience, but is not
+> required to demonstrate the path — this section *is* the single-command demo
+> using the pieces already shipped.

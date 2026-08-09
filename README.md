@@ -67,63 +67,34 @@ Test subscribers: **5G UEs** — **UE-1** (15551234567, balance=100), **UE-2** (
 
 ## 4. Getting Started
 
-### Method A: Containerized (Podman / Docker Compose)
-Recommended for sandbox development. Rootless-compliant out-of-the-box.
+**Full step-by-step setup (prerequisites per distro, quickstart, smoke-tests)
+lives in [`docs/implementation_guide.md`](docs/implementation_guide.md) and
+[`ONBOARDING.md`](ONBOARDING.md).** This section is the 30-second bootstrap.
 
 ```bash
-# 1. Prerequisites (pick your distro — SCTP kernel module required for 5G NGAP)
-sudo apt install -y podman docker-compose-v2 sqlite3 lksctp-tools  # Debian/Ubuntu
-sudo dnf install -y podman podman-compose sqlite3 lksctp-tools        # Fedora/RHEL
-sudo pacman -S --needed podman docker-compose sqlite3                # Arch/CachyOS
-sudo modprobe sctp                                                    # Load SCTP kernel module
+# 1. Rootless container prerequisites (see docs/implementation_guide.md §3 for
+#    per-distro packages + the SCTP kernel module for 5G NGAP).
+systemctl --user enable --now podman.socket      # Podman API socket
 
-# 2. Enable Podman API socket (required for Docker Compose Plugin)
-systemctl --user enable --now podman.socket
+# 2. Init SQLite (WAL + test subscribers), up the stack, seed 5G subscribers
+make init-db && make up && make seed-mongo
 
-# 3. Initialize SQLite databases (WAL mode + test subscribers)
-make init-db
-
-# 4. Start the stack — offline-first (uses pre-loaded images)
-make up
-
-# 5. Seed Open5GS 5G subscribers — AFTER up (execs into the running mongodb)
-#    Without it the 5G UEs cannot register (UDR "No UE-AMBR").
-make seed-mongo
-
-#    To build from source instead (needs internet):
-#    podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
-
-# 5. Smoke-test the stack (after containers are up)
-curl http://localhost:8080/actuator/health/liveness
-# Expected: {"status":"UP"}
-
+# 3. Smoke-test (after containers are up)
+curl http://localhost:8080/actuator/health/liveness   # → {"status":"UP"}
 curl -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15551234567
-# Expected: {"msisdn":"15551234567","balance":100}  ← allowed
-
+#   → {"msisdn":"15551234567","balance":100}  (allowed)
 curl -H "X-API-Key: mvno-demo-key-2026" http://localhost:8080/api/v1/intercept/subscriber/15557654321
-# Expected: {"msisdn":"15557654321","balance":0}    ← zero-balance blocked
+#   → {"msisdn":"15557654321","balance":0}    (zero-balance blocked)
 
-# 6. Test interception & execute automated presentation runbook
-make test-sms    # HTTP SMS policy intercept endpoint verification
-make test-call   # HTTP voice call policy intercept endpoint verification (EIR & balance)
-./scripts/testing/live_demo.sh  # Complete 13-step graduation project live presentation
+# 4. Automated presentation runbook
+make test-sms && make test-call            # policy-intercept endpoint checks
 ```
 
-### Method B: Native (systemd)
-Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
-
-1. **Install dependencies**:
-   ```bash
-   sudo apt install kamailio kamailio-sqlite-modules ngcp-rtpengine osmo-msc osmo-hlr
-   ```
-2. **Initialize SQLite databases** (experimental):
-   ```bash
-   make init-native-db
-   ```
-3. **Start the systemd services** (experimental):
-   ```bash
-   make up-native
-   ```
+**Native (systemd) deployment** and **build-from-source** instructions, and the
+**one-command live demo of a call or SMS with a Wireshark GUI** (
+`bash scripts/demo/demo_live.sh --wireshark --windowed`), are documented in
+[`docs/deployment_guide.md`](docs/deployment_guide.md) and
+[`docs/LIVE_DEMO.md`](docs/LIVE_DEMO.md)`.
 
 ---
 
@@ -186,8 +157,18 @@ Deploying directly onto a Debian/Ubuntu 22.04 LTS host:
 | [docs/ims_voice_call_flow.svg](docs/ims_voice_call_flow.svg) | IMS VoLTE/VoNR Voice Call Interception sequence diagram. |
 | [docs/sms_interception_flow.svg](docs/sms_interception_flow.svg) | SMS Store-and-Forward Interception sequence diagram. |
 
-### Key Environment Variable
+### Key Environment Variables
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `AI_FILTER_URL` | `http://ai-filter:8000/api/v1/classify` | External AI Spam Model REST endpoint — set in `docker-compose.yml` environment block |
+| `FILTERATION_VOICE_URL` | `http://filteration-system:8000/api/v1/voice/filter` | Filteration-System voice classifier — the authoritative decider for post-call transcripts. Bound in `AiFilterService` as `filteration.voice.url` and forwarded by the `mvno-api` compose service (`docker-compose.yml` + `.env.example`). |
+| `MVNO_MIC_SOFT` | (unset) | Soft-mic mode: cold-start demo tolerates a silent/absent microphone (`MVNO_MIC_SOFT=1`), so the graduation run passes headless without audio hardware. |
+
+> **Filteration-System contract (voice):** `AiFilterService.tryVoiceFilter` sends
+> `{ "callerId": "<caller MSISDN>", "receiverId": "<callee MSISDN>", "transcript": "…" }`
+> to `FILTERATION_VOICE_URL`. The caller/callee MSISDNs are threaded from the call
+> CDR metadata; the spool-only path (no MSISDN in rtpengine WAV names) sends empty
+> identities — the recording hash is never substituted for a real MSISDN. A
+> `DROP_CALL` verdict blocks (`allow=false`); `ALLOW_CALL` allows. Unit-tested in
+> `FilterationVoiceBodyTest`.
