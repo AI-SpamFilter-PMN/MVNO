@@ -55,6 +55,36 @@ docs claim fewer services than the stack actually has.
 - `architecture_flow.svg` sequence runs `1,2,3,4,5,6 → 6b,6c → 7` with **no
   step `6a`** and an unnumbered trailing "Metrics" label. Cosmetic only.
 
+### LOW (corrected from deep-run) — caller divergence in the device doc vs user_call.sh
+
+- `docs/device-registration-linphone-mizudroid.md` narrates a **physical
+  Linphone/MizuDroid device** registering/calling as **`15551234567` →
+  `15559998888`**. `scripts/demo/user_call.sh` instead drives the **baresip-tx
+  rig as caller `15553332211` → `15559998888`** (default). Both target
+  `15559998888`, but the automated user-call path's caller MSISDN (`15553332211`)
+  differs from the device doc's caller (`15551234567`). This is **intentional**
+  (the doc describes the human phone path; `user_call.sh` the rig/automated path)
+  but the docs should state the distinction explicitly so the "caller" is not read
+  as inconsistent.
+
+---
+
+## 3b. Self-corrections (from the adversarial deep-run — auditing my own audit)
+
+The following were **errors/inaccuracies in earlier operator/agent narration**,
+caught by the read-only deep-run. Recorded so the record is not overstated:
+
+- **"Graduation EXIT=2 / -91 dB mic failure"** is **inaccurate to the source**.
+  `mic_probe.sh` uses `VOLUME_DB_THRESHOLD="-50"` and `mic_verify.sh`/`mic_probe.sh`
+  exit `fatal` with code **1**, never **2**; no `-91` or `exit 2` exists. The
+  correct behavior: interactive silent-mic → exit 1; `MVNO_MIC_SOFT=1` → exit 0
+  benign. `MVNO_MIC_SOFT` is a **tolerance on the assertion of a genuine capture**,
+  **not** "not a real capture" — it does not make the mic capture fake.
+- **"26 compose services" / "31/32 containers"** are all **stale**. The current
+  truth (live): **34 compose services / 36 running containers** (`34 mvno-*` +
+  `baresip-rx` + `baresip-tx`), all Up / none Unhealthy. `filteration-system`
+  (10.89.0.65) is live and healthy.
+
 ---
 
 ## 3. CONFIRMED ACCURATE (explicitly not problems — verified live)
