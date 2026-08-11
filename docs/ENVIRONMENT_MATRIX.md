@@ -35,6 +35,56 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 - If **another** SIP daemon happens to hold `0.0.0.0:5060/udp` on some host, stop it, or temporarily map Kamailio to a spare port (e.g. `5066:5060/udp`) — but the default/standard is **5060**.
 - **External SIP clients (SipClient / Linphone / softphones) target `<host-LAN-IP>:5060`** (UDP) — or `127.0.0.1:5060` when testing on the host itself. See `docs/INTEGRATION_CONTRACT.md`.
 
+## 3a. Kamailio number normalization (dialplan, dpid=4)
+
+Android softphones (Linphone/mizuDroid) dial `+20`/`00`-prefixed E.164, but
+`usrloc`/`auth_db` keep AoRs as **bare `15XXXXXXXXX` MSISDNs**. Kamailio's
+`dialplan` module rewrites the R-URI user (`$rU`) in `route[NORMALIZE]` **before
+every `lookup("location")`** so `+205559998888` routes to the same registered
+`15559998888` account. The rules live in the `dialplan` table of
+`state/kamailio/kamailio.db` (bind-mounted at `/etc/kamailio/db`).
+
+Rules (dpid=4, `match_op=1` POSIX, first-match-wins by `pr`):
+
+| pr | match_exp | repl_exp | Effect |
+|----|-----------|----------|--------|
+| 1 | `^\+(20)?([5-9][0-9]{9})$` | `1\2` | `+205559998888` (and `+55…`) → `15559998888` |
+| 2 | `^(00)2?([5-9][0-9]{9})$` | `1\2` | `00205559998888` (mizuDroid `00` access) → `15559998888` |
+| 3 | `^1([5-9][0-9]{9})$` | `1\1` | already-normalized `15559998888` → unchanged (idempotent) |
+| 4 | `^15[0-9]{9}$` | `\0` | safety identity for bare `15XXXXXXXXX` (desktop dials untouched) |
+
+**Fallback (never 404 on a missing rule):** if no rule matches (`dp_translate`
+returns false), `$rU` is left **verbatim** and `lookup("location")` proceeds as
+before — a genuinely unknown number 404s, but a dialplan gap never does, and no
+client behaviour is ever silently rewritten.
+
+**Re-seed deterministically (idempotent):**
+```bash
+bash scripts/seed-dialplan.sh                                   # live stack DB
+KAMAILIO_DB=/tmp/copy.db bash scripts/seed-dialplan.sh          # on a copy/test
+```
+It `DELETE`s only `dpid=4` rows in a single transaction and re-inserts them (and
+it is referenced from the `loadmodule "dialplan.so"` comment in
+`configs/kamailio/kamailio.cfg`).
+
+**Per-client dialing behavior (verified ≤2026-08):**
+
+| Client | How it dials | Dialplan as dialed | Covered |
+|--------|--------------|--------------------|---------|
+| **Linphone (Android)** | user types `+205559998888` or bare | `+205559998888` → pr1, bare `15559998888` → pr3/4 | ✅ |
+| **mizuDroid (Android)** | `00` international access, or bare | `00205559998888` → pr2, bare → pr3/4 | ✅ |
+| **SipClient (desktop)** | bare MSISDN (RFC-3261, digest `15559998888@host`) | bare → pr3/4 identity | ✅ |
+| **baresip/test rigs** | bare MSISDN | bare → pr3/4 identity | ✅ |
+
+> **Explicitly unsupported (safety default):** a `011…` US/NA international-access
+> prefix (if any client is configured to emit it) has **no** dialplan rule; it is
+> passed through verbatim and 404s unless a matching AoR is registered — it is
+> never misrouted. Add a rule in `seed-dialplan.sh` if a client needs `011`.
+
+`route[NORMALIZE]` sits ahead of **both** `lookup("location")` call sites
+(bare-INVITE/LOCATION and the MESSAGE path) and is skipped for
+OPTIONS/CANCEL/ACK (all handled earlier in `request_route`).
+
 ## 4. Vector log-shipper socket (runtime-agnostic)
 
 - The `mvno-vector` container mounts the container engine socket to read container logs.
