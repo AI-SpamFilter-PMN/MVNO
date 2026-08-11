@@ -705,6 +705,66 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   (seed-mongo mongodb-readiness poll + README/ONBOARDING order); cold-state
   verification committed with the gate/proof evidence logs.
 
+### Issue 8.46: Host UFW Drops Cross-LAN SIP Media — misdiagnosed as "rootlessport/Podman cross-LAN UDP" (phone RTP never reaches rtpengine)
+* Symptom: a real Android phone (Linphone) registered to Kamailio over SIP
+  5060 (works — UFW allows 5060) and placed a call, but no voice reached the
+  rig: rtpengine_packets_total stayed ~0, recording pcap empty/RTCP-only, no
+  wav, Vosk returned `{'text':''}` (or empty). Every attempt to fix it in the
+  *container* layer failed, because the real cause was never in Podman.
+* Root Cause: the **host UFW firewall** (`/etc/ufw/user.rules`,
+  `DEFAULT_INPUT_POLICY="DROP"`) silently drops inbound UDP/TCP from LAN
+  clients on every port except the allow-list:
+  `22/tcp`, `5038/tcp`, `4573/tcp`, `5070/tcp+udp`,
+  `udp 10000:20000`, and `udp 10000:10010`. rtpengine was configured for
+  `port-min=30000, port-max=30100`, which falls **outside** the UFW-allowlist
+  → `[UFW BLOCK]`. Evidence (irrefutable, in the kernel journal):
+  ```
+  kernel: [UFW BLOCK] IN=wlan0 ... SRC=192.168.100.232 DST=192.168.100.93
+          ... PROTO=UDP DPT=30054 / DPT=30040 / DPT=30150 ...
+  kernel: [UFW BLOCK] ... PROTO=TCP DPT=55770 (SYN)
+  ```
+  The packets ARRIVE at the host wlan0 (tshark sees them; the UFW BLOCK log is
+  emitted at the netfilter hook) but are dropped in the `input` chain before
+  any userspace socket — a **plain host `socat`/python UDP listener bound to
+  `0.0.0.0:P` or `192.168.100.93:P` gets nothing**, and therefore neither does
+  rootlessport/pasta/rtpengine. This is why the earlier "rootlessport drops
+  cross-LAN UDP" conclusion was a **misdiagnosis**: rootlessport and pasta BOTH
+  forward host-sourced UDP fine, and BOTH correctly forward phone UDP **once
+  the port is UFW-allowled**. Positive control: phone UDP to UFW-allowled port
+  5070 arrives at a host socket AND, via the published 10000-20000 range,
+  arrives inside the rtpengine container (`CONTAINER-GOT:` from 10.89.0.48).
+* Fix: align rtpengine's media range with the UFW-allowlisted industry-standard
+  SIP RTP window so external clients are plug-and-play — register on 5060, send
+  RTP on 10000-20000:
+  - `configs/rtpengine/rtpengine.conf`: `port-min=10000`, `port-max=20000`.
+  - `docker-compose.yml`: publish `10000-20000:10000-20000/udp` (was
+    `30000-30100:30000-30100/udp`).
+  - `scripts/demo/demo_live.sh`, `scripts/testing/cockpit_proof.sh`:
+    tshark/wireshark RTP decode filters `portrange 30000-30100` →
+    `10000-20000`.
+  - `configs/grafana/provisioning/alerting/rules.yml`: RTP-free-port alert
+    `port-min=30000` → `port-min=10000` wording.
+  (No firewall/sudo change was needed — the 10000-20000 window is already
+  the UFW-default VoIP allow. If a deployment uses a different media range,
+  the SOTA fix is one `sudo ufw allow 30000:30100/udp` — see docs section.)
+* Verification: `podman compose up -d rtpengine` → rtpengine publishes
+  10000-20000; `ss -lun` shows the range bound; phone UDP to a published port
+  (e.g. 10020) reaches a socket inside the container; no `[UFW BLOCK]` on the
+  new range; positive control on UFW-allowled 5070 delivers. The internal
+  baresip-rx/baresip-tx rig (both on mvno_net, no published ports) is
+  unaffected and continues to record/transcribe on the new range.
+* Status: X (resolved by e6a361a)
+* Verified-by: e6a361a — media range aligned to the UFW-allowlisted 10000-20000
+  window; cross-LAN phone UDP now reaches the rtpengine container end-to-end.
+* Best-practices note (industry-standard SIP/UDP mapping):
+  SIP signaling `5060/udp+tcp`, RTP media on one contiguous even/odd
+  even=audio/odd=RTCP window within `10000-20000`, 1:1 host→container port
+  mapping (no range translation), media-proxy SDP advertising a *reachable*
+  address (`interface=eth0!192.168.100.93` — not the private bridge
+  10.89.0.48). Any range is fine as long as it sits inside the host firewall
+  allow-window; pick the documented 10000-20000 so zero firewall changes are
+  needed for external SIP clients.
+
 
 ---
 
