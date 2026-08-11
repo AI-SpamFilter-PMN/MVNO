@@ -7,7 +7,7 @@
 [![SMS Interworking](https://img.shields.io/badge/2G%E2%86%945G_SMS-IP--SM--GW_%7C_Kamailio-blue?style=for-the-badge)](docs/implementation_guide.md)
 [![AI Block](https://img.shields.io/badge/AI_Spam_Block-Deterministic_E2E--BLOCK-red?style=for-the-badge)](docs/LIVE_DEMO.md)
 
-Simulates an MVNO / Private Mobile Network core for the companion [AI Spam Filter](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) platform. Handles SMS routing and SIP/VoIP calling, intercepts payloads in real-time, and enforces allow/block decisions from the AI filter REST API.
+Simulates an MVNO / Private Mobile Network core for the companion [AI Spam Filter](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) platform (and its `Filteration-System` voice decider). Handles SMS routing and SIP/VoIP calling, intercepts payloads in real-time, and enforces allow/block decisions from the AI filter REST APIs (`/api/v1/classify` for call/SMS/transcript, `filteration-system:8000/api/v1/voice/filter` for the post-call voice decider).
 
 ---
 

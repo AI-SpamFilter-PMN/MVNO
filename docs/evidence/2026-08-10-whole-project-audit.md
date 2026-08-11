@@ -74,12 +74,19 @@ docs claim fewer services than the stack actually has.
 The following were **errors/inaccuracies in earlier operator/agent narration**,
 caught by the read-only deep-run. Recorded so the record is not overstated:
 
-- **"Graduation EXIT=2 / -91 dB mic failure"** is **inaccurate to the source**.
-  `mic_probe.sh` uses `VOLUME_DB_THRESHOLD="-50"` and `mic_verify.sh`/`mic_probe.sh`
-  exit `fatal` with code **1**, never **2**; no `-91` or `exit 2` exists. The
-  correct behavior: interactive silent-mic → exit 1; `MVNO_MIC_SOFT=1` → exit 0
-  benign. `MVNO_MIC_SOFT` is a **tolerance on the assertion of a genuine capture**,
-  **not** "not a real capture" — it does not make the mic capture fake.
+- **"Graduation EXIT=2 mic failure" is imprecise; the recorded code is EXIT=1.**
+  `docs/evidence/GRADUATION.md:74` states the silent-mic graduation failed
+  **"with exit 1 (`FATAL: transcript is EMPTY`)"**. `mic_verify.sh` exits `1`
+  (lines 43,135) and `mic_probe.sh` uses `VOLUME_DB_THRESHOLD="-50"` dB and
+  exits `1` on fatal (lines 33,37). So the correct exit code is **1**, not 2.
+- **"-91 dB" is a real measured silent-mic level, not a script constant.**
+  `mic_probe.sh:33` documents "silence is -90ish"; a real graduation run measured
+  ~-91 dB (below the -50 dB threshold) → the probe hard-fails. So "-91 dB" is a
+  genuine observation consistent with the source, and the **threshold** is -50 dB.
+- **`MVNO_MIC_SOFT`** is a **tolerance on the assertion of a genuine capture**
+  (unattended/CI mode: silent mic → exit 0 benign), **not** "not a real capture";
+  the capture via `mic_record.sh` is genuine. Interactive mode hard-fails (exit 1)
+  on silence because a user is expected to speak.
 - **"26 compose services" / "31/32 containers"** are all **stale**. The current
   truth (live): **34 compose services / 36 running containers** (`34 mvno-*` +
   `baresip-rx` + `baresip-tx`), all Up / none Unhealthy. `filteration-system`

@@ -69,7 +69,7 @@ Ensure the full stack is up and healthy **before** running any flow:
 
 ```bash
 cd /home/zkhattab/AI-SpamFilter-PMN/MVNO
-podman compose ps          # expect 31/31 containers Up
+podman compose ps          # expect 34/34 compose services Up
 ./scripts/preflight.sh     # optional health preflight
 ```
 

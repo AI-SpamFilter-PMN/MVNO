@@ -52,7 +52,7 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 ```bash
 ./scripts/preflight.sh        # verify host (must be ✓ ALL CLEAR or ! WARN)
 make init-db                  # SQLite subscriber DBs (Kamailio auth + balance, HLR)
-make up                       # 31 containers, offline-first
+make up                       # 34 containers (compose), offline-first
 make seed-mongo               # Open5GS 5G subscribers — AFTER up (execs into mongodb)
 bash scripts/testing/live_demo.sh   # 13-step end-to-end gate
 ```
