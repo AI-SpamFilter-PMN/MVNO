@@ -174,7 +174,7 @@ done
 # ------------------------------------------------------------------------------
 P0="cd ${REPO_ROOT} && bash scripts/testing/demo_call.sh setup && bash scripts/testing/demo_call.sh dial; exec bash"
 P1="cd ${REPO_ROOT} && bash scripts/testing/live_tap.sh daemon; exec bash"
-P2="cd ${REPO_ROOT} && bash -c 'if timeout 3 tshark -i lo -f \"udp portrange 30000-30100 or port 5060\" -a duration:1 -c 1 >/dev/null 2>&1; then exec tshark -i lo -f \"udp portrange 30000-30100 or port 5060\" -d \"udp.port==30000-30100,rtp\" -Y \"sip || rtp\"; fi; echo \"[live capture unavailable (permissions?) — watching newest relay pcap]\"; while true; do NEW=\$(scripts/testing/newest.sh \"state/spool/pcaps/*.pcap\"); if [ -n \"\$NEW\" ]; then tshark -r \"\$NEW\" -d \"udp.port==30000-30100,rtp\" -Y rtp 2>/dev/null | tail -6; fi; sleep 3; done'"
+P2="cd ${REPO_ROOT} && bash -c 'if timeout 3 tshark -i lo -f \"udp portrange 10000-20000 or port 5060\" -a duration:1 -c 1 >/dev/null 2>&1; then exec tshark -i lo -f \"udp portrange 10000-20000 or port 5060\" -d \"udp.port==10000-20000,rtp\" -Y \"sip || rtp\"; fi; echo \"[live capture unavailable (permissions?) — watching newest relay pcap]\"; while true; do NEW=\$(scripts/testing/newest.sh \"state/spool/pcaps/*.pcap\"); if [ -n \"\$NEW\" ]; then tshark -r \"\$NEW\" -d \"udp.port==10000-20000,rtp\" -Y rtp 2>/dev/null | tail -6; fi; sleep 3; done'"
 P3="cd ${REPO_ROOT} && podman logs -f mvno-kamailio; exec bash"
 # P4 — live Vosk readout: verdict logs + the RAW recognized text (newest
 # live-*.txt, the near-real-time transcription stream written by NativeVoskService).
@@ -260,7 +260,7 @@ launch_wireshark() {
     command -v wireshark >/dev/null 2>&1 || {
         echo "  (wireshark not installed — post-hoc: see the S11 one-liner below)"; return 0; }
     [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || {
-        echo "  (no DISPLAY/WAYLAND_DISPLAY — post-hoc: wireshark -r \"\$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')\" -d udp.port==30000-30100,rtp)"; return 0; }
+        echo "  (no DISPLAY/WAYLAND_DISPLAY — post-hoc: wireshark -r \"\$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')\" -d udp.port==10000-20000,rtp)"; return 0; }
     if ! timeout 2 dumpcap -i lo -a duration:1 -w "${TMPDIR}/mvno-ws-perm.pcap" >/dev/null 2>&1; then
         echo "  ⚠ no lo capture permission — GUI opens but capture would be empty."
         echo "    fix: sudo setcap cap_net_raw,cap_net_admin+eip \$(command -v dumpcap)"
@@ -273,10 +273,10 @@ launch_wireshark() {
     mkdir -p state/logs
     setsid nohup env QT_QPA_PLATFORM="$plat" DISPLAY="${DISPLAY:-}" \
         WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" XAUTHORITY="$xa" \
-        wireshark -k -i lo -f "udp portrange 30000-30100 or port 5060" \
-        -d "udp.port==30000-30100,rtp" >> state/logs/wireshark-gui.log 2>&1 &
+        wireshark -k -i lo -f "udp portrange 10000-20000 or port 5060" \
+        -d "udp.port==10000-20000,rtp" >> state/logs/wireshark-gui.log 2>&1 &
     echo "  🦈 Wireshark GUI launched detached (Qt platform=${plat}) — errors: state/logs/wireshark-gui.log"
-    echo "  post-hoc: wireshark -r \"\$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')\" -d udp.port==30000-30100,rtp"
+    echo "  post-hoc: wireshark -r \"\$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')\" -d udp.port==10000-20000,rtp"
 }
 
 [ "${GUI_CAP}" -eq 1 ] && launch_wireshark

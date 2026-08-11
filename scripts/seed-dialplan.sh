@@ -41,28 +41,39 @@ if [ ! -f "${KAMAILIO_DB}" ]; then
     exit 1
 fi
 
-# --- dpid=4: E.164/national -> bare 15XXXXXXXXX ------------------------------
+# --- dpid=4: E.164/national/international -> bare 15XXXXXXXXX ---------------
 # pr order matters (first match wins). match_op=1 = POSIX regex.
-#   1. +/00 country prefix (Egypt +20, or bare + with 10 national digits)
-#   2. leading 00 international access
-#   3. already-normalized 15X (idempotent passthrough)
-#   4. safety identity for bare 15XXXXXXXXX (never alter what a desktop dials)
+# Canonical stored AoR is the 11-digit national mobile WITHOUT the leading 0
+# e.g. 0155...000 -> 155...000 (the '1' IS retained -- it is part of the AoR).
+# A real softphone/NEON record dials one of:
+#   1. E.164 strict  +2015559998888 ('+20' + 11-digit 1...)     -> drop '+20'
+#   2. Legacy +20-no-1 (Linphone DIALS THIS) +205559998888      -> prepend the
+#      omitted national '1' (10-digit 55... is the 1-less MSISDN)
+#   3. '+'-national (US-style) +15559998888 and bare 15559998888 -> drop '+'/identity
+#   4. National      015559998888 ('0' + 11-digit 1...)         -> drop leading '0'
+#   5. International 00[20]15559998888 / 0015559998888           -> drop '00[20]'
+# A caller who dials an arbitrary foreign/unknown CC (+45..., +14...) is left
+# verbatim and 404s (the safety fallback) rather than being silently rewritten
+# to a wrong number.
 # repl_exp uses \1..\2 backreferences from match_exp capture groups.
 sqlite3 "${KAMAILIO_DB}" <<'SQL'
 BEGIN;
 DELETE FROM dialplan WHERE dpid = 4;
 
 INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
-VALUES (4, 1, 1, '^\+(20)?([5-9][0-9]{9})$',  0, '^\+(20)?([5-9][0-9]{9})$',  '1\2', '', 0);
+VALUES (4, 1, 1, '^\+20(1[5-9][0-9]{9})$',   0, '^\+20(1[5-9][0-9]{9})$',     '\1', '', 0);
 
 INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
-VALUES (4, 2, 1, '^(00)2?([5-9][0-9]{9})$',   0, '^(00)2?([5-9][0-9]{9})$',   '1\2', '', 0);
+VALUES (4, 2, 1, '^\+20([5-9][0-9]{9})$',    0, '^\+20([5-9][0-9]{9})$',      '1\1', '', 0);
 
 INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
-VALUES (4, 3, 1, '^1([5-9][0-9]{9})$',        0, '^1([5-9][0-9]{9})$',        '1\1', '', 0);
+VALUES (4, 3, 1, '^\+?(1[5-9][0-9]{9})$',    0, '^\+?(1[5-9][0-9]{9})$',      '\1', '', 0);
 
 INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
-VALUES (4, 4, 1, '^15[0-9]{9}$',              0, '',                          '\0',  '', 0);
+VALUES (4, 4, 1, '^0(1[5-9][0-9]{9})$',      0, '^0(1[5-9][0-9]{9})$',        '\1', '', 0);
+
+INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
+VALUES (4, 5, 1, '^00(20)?(1[5-9][0-9]{9})$',0, '^00(20)?(1[5-9][0-9]{9})$',  '\2', '', 0);
 COMMIT;
 SQL
 

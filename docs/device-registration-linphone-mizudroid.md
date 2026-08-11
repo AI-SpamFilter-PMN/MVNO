@@ -39,7 +39,7 @@
 
 | Field | Value | Source |
 |---|---|---|
-| Call destination | `15559998888` (bare) — or `+205559998888` / `00205559998888` | baresip-rx auto-answer AoR (registered `sip:15559998888@10.89.0.60:43972`); Kamailio `route[NORMALIZE]` (dialplan dpid=4) rewrites any `+20`/`00` E.164 to the bare `15XXXXXXXXX` before `lookup()`. See `docs/ENVIRONMENT_MATRIX.md` §3a |
+| Call destination | `15559998888` (bare) — or `+2015559998888` / `015559998888` / `002015559998888` | baresip-rx auto-answer AoR (registered `sip:15559998888@10.89.0.60:43972`); Kamailio `route[NORMALIZE]` (dialplan dpid=4) rewrites any E.164 `+2015…` / national `0155…` / `00…` form to the bare `15XXXXXXXXX` before `lookup()`. See `docs/ENVIRONMENT_MATRIX.md` §3a |
 
 Verified reachable from the host network:
 ```

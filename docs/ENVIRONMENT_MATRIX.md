@@ -37,26 +37,34 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 
 ## 3a. Kamailio number normalization (dialplan, dpid=4)
 
-Android softphones (Linphone/mizuDroid) dial `+20`/`00`-prefixed E.164, but
-`usrloc`/`auth_db` keep AoRs as **bare `15XXXXXXXXX` MSISDNs**. Kamailio's
-`dialplan` module rewrites the R-URI user (`$rU`) in `route[NORMALIZE]` **before
-every `lookup("location")`** so `+205559998888` routes to the same registered
-`15559998888` account. The rules live in the `dialplan` table of
-`state/kamailio/kamailio.db` (bind-mounted at `/etc/kamailio/db`).
+Android softphones (Linphone/mizuDroid) dial `+2015…`/`015…`/`00…`-prefixed
+E.164/national forms, but `usrloc`/`auth_db` keep AoRs as **bare `15XXXXXXXXX`
+MSISDNs** (the 11-digit national mobile with the leading `0` stripped — e.g.
+`0155…` is stored `155…`). Kamailio's `dialplan` module rewrites the R-URI user
+(`$rU`) in `route[NORMALIZE]` **before every `lookup("location")`** so
+`+2015559998888` routes to the same registered `15559998888` account. The rules
+live in the `dialplan` table of `state/kamailio/kamailio.db` (bind-mounted at
+`/etc/kamailio/db`). NEON/HLR/call-log records keep the true national `015…`
+form; the dialplan bridges that to the stored `15…` AoR **without rewriting any
+data** (NEON/production is read-only and never modified).
 
-Rules (dpid=4, `match_op=1` POSIX, first-match-wins by `pr`):
+Rules (dpid=4, `match_op=1` POSIX, first-match-wins by `pr`). Canonical stored
+`15…` is 11 digits: `1` + `[5-9]` + `[0-9]{9}`.
 
 | pr | match_exp | repl_exp | Effect |
 |----|-----------|----------|--------|
-| 1 | `^\+(20)?([5-9][0-9]{9})$` | `1\2` | `+205559998888` (and `+55…`) → `15559998888` |
-| 2 | `^(00)2?([5-9][0-9]{9})$` | `1\2` | `00205559998888` (mizuDroid `00` access) → `15559998888` |
-| 3 | `^1([5-9][0-9]{9})$` | `1\1` | already-normalized `15559998888` → unchanged (idempotent) |
-| 4 | `^15[0-9]{9}$` | `\0` | safety identity for bare `15XXXXXXXXX` (desktop dials untouched) |
+| 1 | `^\+20(1[5-9][0-9]{9})$` | `\1` | `+2015559998888` (E.164) → `15559998888` |
+| 2 | `^\+?(1[5-9][0-9]{9})$` | `\1` | `+15559998888` (US-style plus, Linphone) and bare `15559998888` → `15559998888` |
+| 3 | `^0(1[5-9][0-9]{9})$` | `\1` | `015559998888` (national `0`-leading) → `15559998888` |
+| 4 | `^00(20)?(1[5-9][0-9]{9})$` | `\2` | `002015559998888` / `0015559998888` (`00` international) → `15559998888` |
 
 **Fallback (never 404 on a missing rule):** if no rule matches (`dp_translate`
 returns false), `$rU` is left **verbatim** and `lookup("location")` proceeds as
 before — a genuinely unknown number 404s, but a dialplan gap never does, and no
-client behaviour is ever silently rewritten.
+client behaviour is ever silently rewritten. An invalid dial that cannot be
+canonicalized (e.g. `+205559998888`, a `+20` number that *drops* the national
+`1`) is left verbatim and 404s rather than being silently rewritten to a wrong
+number.
 
 **Re-seed deterministically (idempotent):**
 ```bash
@@ -65,21 +73,24 @@ KAMAILIO_DB=/tmp/copy.db bash scripts/seed-dialplan.sh          # on a copy/test
 ```
 It `DELETE`s only `dpid=4` rows in a single transaction and re-inserts them (and
 it is referenced from the `loadmodule "dialplan.so"` comment in
-`configs/kamailio/kamailio.cfg`).
+`configs/kamailio/kamailio.cfg`). After reseeding run
+`podman restart mvno-kamailio` (the dialplan module caches rules at startup).
 
 **Per-client dialing behavior (verified ≤2026-08):**
 
 | Client | How it dials | Dialplan as dialed | Covered |
 |--------|--------------|--------------------|---------|
-| **Linphone (Android)** | user types `+205559998888` or bare | `+205559998888` → pr1, bare `15559998888` → pr3/4 | ✅ |
-| **mizuDroid (Android)** | `00` international access, or bare | `00205559998888` → pr2, bare → pr3/4 | ✅ |
-| **SipClient (desktop)** | bare MSISDN (RFC-3261, digest `15559998888@host`) | bare → pr3/4 identity | ✅ |
-| **baresip/test rigs** | bare MSISDN | bare → pr3/4 identity | ✅ |
+| **Linphone (Android)** | E.164 `+2015559998888` / `+15559998888` (dial-as-entered) / bare | `+2015559998888` → pr1, `+15559998888` → pr2, bare → pr2 | ✅ |
+| **mizuDroid (Android)** | national `015559998888` / `00…` / bare | `0155…` → pr3, `0020…`/`001…` → pr4, bare → pr2 | ✅ |
+| **SipClient (desktop)** | bare MSISDN (RFC-3261, digest `15559998888@host`) | bare → pr2 identity | ✅ |
+| **baresip/test rigs** | bare MSISDN | bare → pr2 identity | ✅ |
 
-> **Explicitly unsupported (safety default):** a `011…` US/NA international-access
-> prefix (if any client is configured to emit it) has **no** dialplan rule; it is
-> passed through verbatim and 404s unless a matching AoR is registered — it is
-> never misrouted. Add a rule in `seed-dialplan.sh` if a client needs `011`.
+> **Explicitly unsupported (safety default — all 404 cleanly, never misroute):**
+> * `011…` US/NA international-access prefix — no rule; passed through verbatim, 404s unless a matching AoR is registered. Add a rule (`^011(20)?(1[5-9][0-9]{9})$` → `\2`) if a client is ever configured to emit it.
+> * `tel:`-URI dialing (SIP R-URI carrying `tel:+2015…`) — `$rU` would carry the literal `tel:` scheme; no rule matches; 404.
+> * Star-codes / `*#` feature vocab (e.g. `**21*15559998888#`) — no matching; 404.
+> * Spacing/hyphens/punctuation inside a digit string — patterns are `^$`-anchored digit-only; 404.
+> * Non-Egypt country code (e.g. `+4515…`) — pr1 hard-codes `+20`; 404 (the rig is Egypt-only; such a number has no AoR anyway).
 
 `route[NORMALIZE]` sits ahead of **both** `lookup("location")` call sites
 (bare-INVITE/LOCATION and the MESSAGE path) and is skipped for

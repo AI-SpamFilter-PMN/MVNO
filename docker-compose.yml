@@ -389,12 +389,30 @@ services:
   rtpengine:
     image: drachtio/rtpengine:mr9.4.0.0
     container_name: mvno-rtpengine
+    # entrypoint: [] disables the image's /entrypoint.sh, which otherwise:
+    #   1. computes MY_IP as the container's OWN eth0 addr (10.89.0.48) and
+    #      sed -i's it into /etc/rtpengine.conf (root), then loads THAT first:
+    #      `exec rtpengine --config-file /etc/rtpengine.conf "$@"`. Since the
+    #      first --config-file wins, it overrode our hardened mounted config
+    #      (advertise host IP, /var/spool/rtpengine, port 10000-20000) with
+    #      unroutable 10.89.0.48 + /tmp recording-dir + 23000-32768 range.
+    #   2. Does `sed -i` on the root file which is NOT bind-mounted, so it was
+    #      fine before, but with our config mounted alone it'd be a no-op only
+    #      if no MY_IP token — yet we bypass it entirely for determinism.
+    # Cause of "phone answered but 0-down / no recording / no mic capture".
+    # See docs/ISSUES.md #4.x "rtpengine entrypoint config override".
+    entrypoint: []
     command:
       - rtpengine
       - --config-file=/etc/rtpengine/rtpengine.conf
       - --listen-http=9900
     ports:
-      - "30000-30100:30000-30100/udp"
+      # RTP media range MUST match the UFW-allowed window (udp 10000:20000).
+      # UFW accepts inbound 10000-20000 by default and DROPs higher ranges
+      # (e.g. the old 30000-30100), silently blocking phone media BEFORE it
+      # reaches rootlessport/pasta/rtpengine (kernel log: [UFW BLOCK]
+      # IN=wlan0 ... DPT=30xxx). Align with the standard SIP RTP range.
+      - "10000-20000:10000-20000/udp"
       - "9900:9900"
     volumes:
       - ./configs/rtpengine:/etc/rtpengine:z

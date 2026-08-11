@@ -11,8 +11,12 @@
 # baseline): tshark fields (ip.src, udp.dstport, data.data) -> awk keeps only
 # RTP (even UDP dstport; RTCP odd ports dropped; PCMU payload type 0 via the
 # RTP header byte; 12-byte RTP header stripped) -> xxd -r -p -> ffmpeg mulaw.
-# Audio is grouped into one stream per source IP (per-leg), so Vosk transcribes
-# each leg separately — no leg classification heuristic required.
+# Audio is grouped into one stream per rtpengine PROXY PORT (udp.dstport; one
+# per call leg). rtpengine rewrites BOTH directions to the same source IP
+# (its eth0 / the proxy source), so source-IP grouping would merge caller and
+# callee into one mangled stream. Port-based grouping keeps each side separate
+# so Vosk transcribes them independently and they can be labeled caller/callee
+# (e.g. live-<stem>-30000-N.wav = one side, live-<stem>-30020-M.wav = the other).
 #
 # Modes:
 #   daemon  Poll PCAP_DIR every POLL_SECS (default 1s). Reads only NEW packets
@@ -81,13 +85,21 @@ extract_new() {
                 # first-seen PT per leg so mux_leg picks the right decoder.
                 if (ptdec + 0 != ptdec + 0 || ptdec < 0) next
                 if (ptdec != 0 && ptdec != 8 && ptdec != 9 && ptdec != 111) next
-                if (! (($2) in seentype)) seentype[$2] = ptdec
-                print substr($4, 25) >> (d "/" $2 ".hex")
+                # LEG GROUPING: rtpengine (recording-method=pcap) rewrites BOTH
+                # directions to the same source IP (its own eth0 / the proxy
+                # source 10.89.0.1), so grouping by ip.src collapses caller and
+                # callee into ONE mangled stream (Vosk -> empty/single-word).
+                # udp.dstport is the rtpengine per-leg PROXY port (one per call
+                # side), so it uniquely separates the two directions for
+                # per-side transcription + caller/callee labeling. RTCP even
+                # (>base) pairs are excluded by the modulo-2 RTP-only gate.
+                if (! (($3) in seentype)) seentype[$3] = ptdec
+                print substr($4, 25) >> (d "/" $3 ".hex")
                 if ($1 > max) max = $1
             }
             END {
                 if (max > 0) print max > (d "/.maxframe")
-                for (ip in seentype) print seentype[ip] > (d "/" ip ".pt")
+                for (port in seentype) print seentype[port] > (d "/" port ".pt")
             }'
     cat "$dir/.maxframe" 2>/dev/null || echo 0
 }
