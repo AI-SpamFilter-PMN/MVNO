@@ -76,23 +76,27 @@ if [ "$INSTALL" -eq 1 ]; then
   else
     ok "container runtime: $RT"
   fi
-  for tool in sqlite3 curl espeak-ng ffmpeg baresip tshark nc; do
+  for tool in sqlite3 curl espeak-ng ffmpeg jq socat tshark nc lksctp-tools; do
     if command -v "$tool" >/dev/null 2>&1; then ok "$tool present"
     else
       # tool name != package name for some tools; map per distro
       case "$tool:$(command -v apt-get >/dev/null 2>&1 && echo apt || { command -v dnf >/dev/null 2>&1 && echo dnf || echo pacman; })" in
-        baresip:*)        pkg=baresip ;;
         tshark:apt*)      pkg=tshark ;;
         tshark:*)         pkg=wireshark-cli ;;
         nc:apt*)          pkg=netcat-openbsd ;;
         nc:dnf*)          pkg=nmap-ncat ;;
         nc:*)             pkg=openbsd-netcat ;;
+        lksctp-tools:*)   pkg=lksctp-tools ;;
         *)                pkg=$tool ;;
       esac
       echo "» installing $tool ($pkg)"
       if command -v apt-get >/dev/null 2>&1; then sudo apt-get install -y "$pkg"
       elif command -v dnf >/dev/null 2>&1; then sudo dnf install -y "$pkg"
       elif command -v pacman >/dev/null 2>&1; then sudo pacman -Sy --noconfirm "$pkg"; fi
+      ret=$?
+      if [ $ret -ne 0 ] && [ "$tool" = "lksctp-tools" ]; then
+        warn "lksctp-tools install failed — SCTP userspace tooling missing (5G NGAP needs it). Install manually or ensure /proc/net/sctp."
+      fi
     fi
   done
 else
@@ -102,7 +106,8 @@ fi
 # ---- 3. Kernel prerequisites --------------------------------------------------
 step "Kernel prerequisites"
 if [ -z "$RT" ]; then RT="podman"; fi   # compose refs below use RT
-if sudo -n modprobe sctp >/dev/null 2>&1 || modprobe sctp >/dev/null 2>&1; then ok "sctp module available"; else warn "sctp missing (5G NGAP gNB<->AMF won't connect)"; fi
+# Interactive sudo (no -n) so a fresh teammate with password-sudo can load SCTP.
+if sudo modprobe sctp >/dev/null 2>&1 || modprobe sctp >/dev/null 2>&1; then ok "sctp module available"; else warn "sctp missing (5G NGAP gNB<->AMF won't connect)"; fi
 [ -c /dev/net/tun ] && ok "/dev/net/tun present" || warn "/dev/net/tun missing (5G user plane)"
 [ -d /proc/net/sctp ] && ok "/proc/net/sctp up" || warn "/proc/net/sctp absent (verify sctp loaded)"
 

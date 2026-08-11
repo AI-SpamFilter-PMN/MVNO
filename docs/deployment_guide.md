@@ -84,12 +84,11 @@ pull from their own public Docker Hub namespaces as usual.
 - `docker-compose.build.yml` — opt-in **source-build** override for online rebuilds
   (`podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`); keeps the
   base file free of `build:` stanzas.
-- `docker-compose.5060.yml` — host-dependent, **default-off** override that *also* publishes
-  Kamailio on host `5060` for SipClient instances that hardcode 5060; blocked on the canonical host
-  (Asterisk owns 5060) — see `docs/ENVIRONMENT_MATRIX.md` Section 3.
 
-These are intentionally separate: merging them would force source builds on every machine and
-publish a privileged port by default. Leave all three in place.
+(Historical `docker-compose.5060.yml` — the redundant host-180 override that published
+Kamailio on 5060 in addition to 5066 — was removed in the 5060 consolidation. Kamailio now
+publishes directly on the canonical port **5060:5060/udp** in `docker-compose.yml`, so no
+override file is needed. See `docs/ENVIRONMENT_MATRIX.md` Section 3.)
 
 ### Kernel Prerequisites (5G NGAP Signaling)
 
@@ -469,7 +468,7 @@ services:
     image: mvno-kamailio:5.7.2
     container_name: mvno-kamailio
     ports:
-      - "5066:5060/udp"
+      - "5060:5060/udp"
     volumes:
       - ./configs/kamailio:/etc/kamailio:z
       - ./state/kamailio/kamailio.db:/etc/kamailio/kamailio.db:z
@@ -633,7 +632,7 @@ services:
 
 | Component | Target Port | Protocol | Usage | Podman Rootless Mode |
 | :--- | :--- | :--- | :--- | :--- |
-| **Kamailio** | `5066 (host) → 5060 (container)` | UDP / TCP | SIP signaling | Host port 5066 mapped to container port 5060 |
+| **Kamailio** | `5060 (host) → 5060 (container)` | UDP / TCP | SIP signaling | Host port 5060 mapped to container port 5060 |
 | **rtpengine** | `30000-30100` | UDP | Media plane (RTP) | Native bind (no changes) |
 | **OsmoSMSC** | `2775` | TCP | SMPP SMS delivery | Native bind (no changes) |
 | **Spring Boot** | `8080` | TCP | Interception REST API + actuator health | Native bind (no changes) |
@@ -823,7 +822,7 @@ The same SIP simulator drives **both** transport paths — nothing is hardcoded 
 
 | Path | Invocation | SIP source seen by Kamailio | Transport |
 |---|---|---|---|
-| **2G/IMS direct** (default) | `python3 scripts/testing/sip_traffic_sim.py` (host, `127.0.0.1:5066`) | `127.0.0.1` (host) | Loopback → Kamailio host-mapped port |
+| **2G/IMS direct** (default) | `python3 scripts/testing/sip_traffic_sim.py` (host, `127.0.0.1:5060`) | `127.0.0.1` (host) | Loopback → Kamailio host-mapped port |
 | **5G SA user plane** | From inside a UE container: `python3 /sim.py --host 10.89.0.23 --port 5060` | `10.89.0.14` (UPF, SNAT'd) | UE tun → N3 GTP-U → UPF ogstun → bridge → Kamailio |
 
 Simulator options (defaults preserve the 2G/IMS behavior exactly): `--host`, `--port`, `--caller`, `--callee`, `--password`.

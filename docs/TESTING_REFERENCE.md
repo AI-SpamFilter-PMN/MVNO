@@ -84,7 +84,7 @@ podman compose ps          # expect 34/34 compose services Up
 | 2G MS-2 | `15557778888` | `001010000000005` | 2G (GERAN) | OsmoMSC / VLR (attached) |
 
 - All SIP digest passwords default to `testpass`.
-- Kamailio SIP host: `10.89.0.23` (container) / `127.0.0.1:5066` (host-mapped).
+- Kamailio SIP host: `10.89.0.23` (container) / `127.0.0.1:5060` (host-mapped, canonical).
 - Keys: `mvno-demo-key-2026`.
 - 5G IMS SMS recipients used in raw demos: `15559998888` (baresip rx),
   `15553332211` (baresip tx — sender). **2G receipt checks always use
@@ -97,7 +97,7 @@ podman compose ps          # expect 34/34 compose services Up
 | Interception Gateway (Spring Boot) | `http://localhost:8080` |
 | AI Spam Filter (inline mock, E2E-BLOCK rule) | `http://localhost:8008` |
 | SMPP 3.4 (OsmoSMSC ESME) | `127.0.0.1:2775` |
-| Kamailio SIP (host-mapped) | `127.0.0.1:5066` |
+| Kamailio SIP (host-mapped) | `127.0.0.1:5060` |
 | IP-SM-GW bridge metrics | `http://localhost:9100/metrics` |
 | VictoriaMetrics PromQL | `http://localhost:8428` |
 | Grafana | `http://localhost:3000` (admin/admin) |
@@ -482,7 +482,7 @@ podman rm -f ims-uas58 ims-caller59
 ```
 
 > Legacy smoke test (no media): `python3 /scripts/sip_traffic_sim.py`
-> (defaults: host `127.0.0.1:5066`, registers the callee, sends one digest INVITE).
+> (defaults: host `127.0.0.1:5060`, registers the callee, sends one digest INVITE).
 > This still works from the host for a quick `407 → 100 → 200` check, but the full
 > media dialog above is the certified flow.
 
@@ -922,19 +922,19 @@ podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt | tail -2
 
 ### 3. SIP digest dance (what `send_digest_sms.py` does)
 
-3-step MESSAGE over UDP to Kamailio `5066`: unauthenticated request → 407
+3-step MESSAGE over UDP to Kamailio `5060`: unauthenticated request → 407
 challenge (`nonce`) → compute `HA1/HA2` → resend with `Proxy-Authorization`:
 
 ```bash
 cd /tmp && USER=15553332211 REALM=10.89.0.23 PASS=testpass \
   URI='sip:15554443322@10.89.0.23:5060' BODY='Hello raw 5G2G'
 printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK1;rport\r\nFrom: <sip:%s@%s>;tag=1\r\nTo: <sip:15554443322@%s>\r\nCall-ID: c1@10.89.0.62\r\nCSeq: 1 MESSAGE\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "${#BODY}" "$BODY" > m1.txt
-NONCE=$(timeout 5 nc -u localhost 5066 < m1.txt | grep -oE 'nonce="[^"]+"' | head -1 | sed 's/nonce="\(.*\)"/\1/')
+NONCE=$(timeout 5 nc -u localhost 5060 < m1.txt | grep -oE 'nonce="[^"]+"' | head -1 | sed 's/nonce="\(.*\)"/\1/')
 HA1=$(printf '%s:%s:%s' "$USER" "$REALM" "$PASS" | md5sum | cut -d' ' -f1)
 HA2=$(printf 'MESSAGE:%s' "$URI" | md5sum | cut -d' ' -f1)
 RESP=$(printf '%s:%s:%s' "$HA1" "$NONCE" "$HA2" | md5sum | cut -d' ' -f1)
 printf 'MESSAGE %s SIP/2.0\r\nVia: SIP/2.0/UDP 10.89.0.62:5070;branch=z9hG4bK2;rport\r\nFrom: <sip:%s@%s>;tag=2\r\nTo: <sip:15554443322@%s>\r\nCall-ID: c1@10.89.0.62\r\nCSeq: 2 MESSAGE\r\nProxy-Authorization: Digest username="%s", realm="%s", nonce="%s", uri="%s", response="%s", algorithm=MD5\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s' "$URI" "$USER" "$REALM" "$REALM" "$USER" "$REALM" "$NONCE" "$URI" "$RESP" "${#BODY}" "$BODY" > m2.txt
-timeout 5 nc -u localhost 5066 < m2.txt | grep -E "^SIP"
+timeout 5 nc -u localhost 5060 < m2.txt | grep -E "^SIP"
 sleep 8
 podman exec mvno-2g-ms cat /root/.osmocom/bb/sms.txt | tail -2
 ```
@@ -1164,7 +1164,7 @@ make user-call CALLEE=15559998888
 ```
 
 **Phone / softphone values** (Linphone, MizuDroid, SipClient, baresip-UA):
-proxy `sip:192.168.100.93:5066`, username a funded MSISDN (`15551234567` …),
+proxy `sip:<HOST-LAN-IP>:5060` (`hostname -I | awk '{print $1}'`), username a funded MSISDN (`15551234567` …),
 password `testpass`, realm `localhost`, transport UDP/TCP; dial `15559998888`
 (baresip-rx auto-answer). Negotiated codec G.722/16000 or PCMU/8000. Full
 nuts-and-bolts in `docs/USER_DEMO.md` and `docs/LIVE_DEMO.md` §S12.

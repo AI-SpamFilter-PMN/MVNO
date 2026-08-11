@@ -29,7 +29,7 @@ repositories are treated as **read-only external consumers**.
 
 | Interface | Endpoint / Port | Protocol | Consumed by | Status |
 |---|---|---|---|---|
-| **SIP registrar/proxy** | `127.0.0.1:5066` (host) → Kamailio `:5060` (container) | UDP/TCP SIP, RFC 3261 + digest auth | `SipClient` | ✅ stable |
+| **SIP registrar/proxy** | `127.0.0.1:5060` (host) → Kamailio `:5060` (container) | UDP/TCP SIP, RFC 3261 + digest auth | `SipClient` | ✅ stable |
 | **SMPP SMSC** | `127.0.0.1:2775` → OsmoSMSC | SMPP 3.4 (ESME bind/submit) | (see §5: refactored `sms-client` uses its own SMPP `:2076` + Neon today; `2775` is present but not currently consumed) | ✅ stable (present) |
 | **SMS intercept REST** | `POST /api/v1/intercept/sms` (`mvno-api:8080`, host `8080`) | HTTP JSON + `X-API-Key` | `sms-client` (optional), Kamailio `route[INTERCEPT_SMS]` | ✅ stable |
 | **Call intercept REST** | `POST|GET /api/v1/intercept/call` (`mvno-api:8080`) | HTTP JSON + `X-API-Key` | `SipClient` via Kamailio `route[INTERCEPT]` | ✅ stable |
@@ -196,13 +196,14 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 > marked ✅-verified or ⚠-mismatch. MVNO still never edits external repositories.
 
 ### SipClient (`com.sipclient.sip.config.SipConfig`) — ✅ verified
-- `SipConfig` hardcodes `SERVER_PORT = 5060`, `LOCAL_PORT = 5070` (confirmed in
-  source). Ships targeting `SERVER_PORT = 5060`, local `127.0.0.1:5070`.
-- **MVNO Kamailio host port is `5066`** (canonical). Host `5060` is occupied by a host-level
-  Asterisk (see `docs/ENVIRONMENT_MATRIX.md` Section 3) — the optional `MVNO_PUBLISH_5060` extra
-  publish is **default-off and blocked on this host**.
-- **Recommendation to the consuming client (not an MVNO edit):** set the SIP server port to `5066`
-  (or make it configurable) so the unmodified client reaches Kamailio.
+- `SipConfig` **loads from `src/main/resources/sip.properties`** at startup: server
+  host/port (`sip.server.host`, `sip.server.port`), local bind (`sip.local.ip`,
+  `sip.local.port`), transport, and optional account defaults. No source edit is
+  needed to point at any MVNO host.
+- **MVNO Kamailio host port is `5060`** (canonical, `5060:5060/udp`). A host-level
+  Asterisk formerly held `0.0.0.0:5060`; it is removed, so 5060 is free.
+- **Recommendation to the consuming client (not an MVNO edit):** ship `sip.properties`
+  with `sip.server.host=<host-LAN-ip>` and `sip.server.port=5060` (the canonical port).
 - **SIP INVITE Authentication (407 Digest):** Kamailio challenges unauthenticated `INVITE` with
   `407 Proxy Authentication Required`. Clients MUST handle the `Proxy-Authenticate: Digest`
   challenge and retry with an `Authorization: Digest` header using their subscriber-table
@@ -213,13 +214,13 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   transcode; PCMA/opus negotiations fail media.
 - **Blocked calls:** zero-balance / EIR-fraud / AI-blocked calls are rejected with
   `SIP/2.0 403 Forbidden` — treat 403 as a terminal call failure (no retry loop).
-- **Firewall:** open UDP `30000-30100` (RTP relay range) and UDP `5066` (SIP) between client host
+- **Firewall:** open UDP `30000-30100` (RTP relay range) and UDP `5060` (SIP) between client host
   and MVNO host; the client's own RTP socket must be reachable (see `fix_nated_contact()` in
   `configs/kamailio/kamailio.cfg`).
-- **Any RFC-3261 softphone works (mobile/desktop)**: MVNO publishes `5066/udp` and RTP
+- **Any RFC-3261 softphone works (mobile/desktop)**: MVNO publishes `5060/udp` and RTP
   `30000-30100/udp` on **all host interfaces** (`*`, verified live), so a phone on the same LAN can
   REGISTER directly with `username=<MSISDN>`, `password=testpass`, realm `localhost`, server
-  `<host-ip>:5066`, codec **PCMU only**. See `docs/LIVE_DEMO.md` S15 and
+  `<host-ip>:5060`, codec **PCMU only**. See `docs/LIVE_DEMO.md` S15 and
   `docs/partner/SipClient-INTEGRATION.md` (drop-in for the repo's README).
 
 ### sms-client (`src/main/resources/application.properties`) — ⚠ re-verified 2026-08-09 against `origin/main @ 1a388af`
@@ -317,12 +318,14 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 
 ---
 
-## 6. Optional `MVNO_PUBLISH_5060` (default-off, env-gated)
+## 6. (superceded) `MVNO_PUBLISH_5060` / `docker-compose.5060.yml`
 
-- A `SipClient` instance that hardcodes `5060` can be accommodated **only on hosts where UDP 5060
-  is free** by publishing an extra `5060:5060`. This is **default-off** and **blocked on this host**
-  (Asterisk owns `0.0.0.0:5060`). Enable via compose env when the host is clean.
-- `scripts/preflight.sh` checks `ss -lun | grep :5060` and warns loudly if occupied.
+- Kamailio is now published directly on the **canonical host port `5060`** (`5060:5060/udp`),
+  so the earlier opt-in `5060` extra-publish override (`docker-compose.5060.yml`) is **removed**.
+  There is no longer any need to publish 5060 additionally — it is the default.
+- On a host where another SIP daemon (e.g. a local Asterisk) holds `0.0.0.0:5060`, that listener
+  must be stopped for Kamailio to bind. `scripts/preflight.sh` checks `ss -lun | grep :5060`
+  and warns loudly if 5060 is occupied.
 
 ---
 
@@ -332,7 +335,7 @@ MVNO keeps these seams stable across changes so external clients keep working wi
 - `POST /api/v1/intercept/sms`, `POST|GET /api/v1/intercept/call` request/response schemas.
 - `POST /api/v1/classify` with the three event types (SMS, VOICE_CALL, TRANSCRIPT) + `{allow, reason}`.
 - SMPP `2775` + the `esme smsclient`/`esme mvno-api-route` routes.
-- SIP `5066` host port + digest `subscriber` table credentials (`testpass`).
+- SIP `5060` host port + digest `subscriber` table credentials (`testpass`).
 - `POST /api/v1/transcriptions` inbound schema (transcript + biometrics + DTMF).
 
 Any breaking change to these is a **coordinated, versioned contract change** communicated to the consuming repositories.

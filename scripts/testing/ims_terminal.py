@@ -222,7 +222,7 @@ def main():
     parser.add_argument("--peer", default=None, help="Recipient MSISDN (send mode)")
     parser.add_argument("--body", default="Hello from MVNO IMS SMS", help="Message body (send mode)")
     parser.add_argument("--host", default="127.0.0.1", help="Kamailio target host")
-    parser.add_argument("--port", type=int, default=5066, help="Kamailio target port")
+    parser.add_argument("--port", type=int, default=5060, help="Kamailio target port")
     parser.add_argument("--bind-ip", default="127.0.0.1", help="Local bind IP (UE tun IP for 5G path)")
     parser.add_argument("--listen-port", type=int, default=5090, help="Local UDP listen port")
     parser.add_argument("--password", default="testpass", help="SIP digest password")

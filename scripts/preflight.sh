@@ -102,14 +102,16 @@ if [ "${RT}" = "podman" ] || [ "${RT}" = "docker" ]; then
   fi
 fi
 
-# ─── 7. Host UDP 5060 conflict (canonical Kamailio host port = 5066) ─────────
+# ─── 7. Host UDP 5060 conflict (canonical Kamailio host port = 5060) ─────────
+# Kamailio is now published directly on the standard host SIP port 5060.
+# This was previously blocked by a host-level Asterisk on the author's box;
+# that Asterisk is removed, so 5060 is free on a clean host.
 if command -v ss >/dev/null 2>&1 && ss -lun 2>/dev/null | grep -qE ':5060[[:space:]]'; then
-  warn "Host UDP 5060 is occupied (e.g. host-level Asterisk holding 0.0.0.0:5060)."
-  warn "  Canonical Kamailio host port is 5066 — teammate SIP clients must target 5066."
-  warn "  The optional MVNO_PUBLISH_5060 gate is default-off for this reason."
+  warn "Host UDP 5060 is occupied by another process (e.g. a local Asterisk or second SIP stack)."
+  warn "  Kamailio needs host UDP 5060 (canonical). Stop the other listener, or override the port."
   WARN_FAIL=1
 else
-  ok "Host UDP 5060 free (canonical Kamailio host port remains 5066)"
+  ok "Host UDP 5060 free (canonical Kamailio host port = 5060)"
 fi
 
 # ─── 8. Compose config + image-tag drift ─────────────────────────────────────

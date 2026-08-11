@@ -5,7 +5,7 @@ Generates real SIP REGISTER & INVITE dialogs through Kamailio & RTPEngine
 
 Flexible transport paths (same script, different --host/--port):
   - 2G/IMS path (default):  python3 sip_traffic_sim.py
-    -> host loopback 127.0.0.1:5066 -> Kamailio (host-mapped port)
+    -> host loopback 127.0.0.1:5060 -> Kamailio (canonical host port)
   - 5G SA path:             python3 sip_traffic_sim.py --host 10.89.0.23 --port 5060
     -> from inside a UE container, with the kamailio /32 routed via the
        uesimtun0 interface, so SIP traverses the 5G user plane
@@ -45,7 +45,7 @@ def _extract_nonce(resp_text, header):
     return ""
 
 
-def deregister_subscriber(username, password, host="127.0.0.1", port=5066):
+def deregister_subscriber(username, password, host="127.0.0.1", port=5060):
     """Digest-authenticated deregister: REGISTER carrying Contact: * with
     Expires: 0 clears ALL bindings for the AoR in Kamailio's usrloc
     (Issue 8.37 pattern — the demo leaves stale registrations behind; a plain
@@ -103,7 +103,7 @@ def deregister_subscriber(username, password, host="127.0.0.1", port=5066):
     return False
 
 
-def register_subscriber(username, password, host="127.0.0.1", port=5066,
+def register_subscriber(username, password, host="127.0.0.1", port=5060,
                         bind_ip="127.0.0.1", listen_port=5070):
     """Register via a socket bound to (bind_ip, listen_port) so the source
     address matches the Contact header. Kamailio's fix_nated_contact() then
@@ -442,7 +442,7 @@ def run_call_with_media(caller, callee, password, host, port, bind_ip, listen_po
     return True
 
 
-def send_sip_invite(caller, callee, password, host="127.0.0.1", port=5066):
+def send_sip_invite(caller, callee, password, host="127.0.0.1", port=5060):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(10)
     call_id = f"call-{int(time.time())}@127.0.0.1"
@@ -515,7 +515,7 @@ def send_sip_invite(caller, callee, password, host="127.0.0.1", port=5066):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MVNO SIP traffic simulator")
     parser.add_argument("--host", default="127.0.0.1", help="Kamailio target host (127.0.0.1 = 2G/IMS path via host port; 10.89.0.23 = 5G SA path from a UE container)")
-    parser.add_argument("--port", type=int, default=5066, help="Kamailio target port (5066 = host-mapped, 5060 = container-internal)")
+    parser.add_argument("--port", type=int, default=5060, help="Kamailio target port (5060 = canonical host port, same as container)")
     parser.add_argument("--caller", default="15551234567", help="Calling subscriber")
     parser.add_argument("--callee", default="15557654321", help="Called subscriber (registered by this script)")
     parser.add_argument("--password", default="testpass", help="SIP digest password (auth_db)")

@@ -27,11 +27,13 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 - **arm64 (Apple Silicon):** the vendored amd64 image tarballs and the Vosk native JNI will not load/run; rebuild every custom image from source (`docker-compose.build.yml`) — untested.
 - **Rootful Docker on macOS/Windows:** no `/dev/net/tun`, no SCTP, no rootless socket — same blockers as above.
 
-## 3. Host port 5060 conflict (canonical Kamailio host port = 5066)
+## 3. Kamailio host SIP port (canonical = 5060)
 
-- The MVNO Kamailio is host-mapped to **`5066:5060/udp`**. A host-level service (here: **Asterisk**, pid bound to `0.0.0.0:5060/udp`) owns `5060`.
-- Therefore the optional `MVNO_PUBLISH_5060` extra publish is **default-off and blocked on this host** — a rootless container cannot grab `5060` while Asterisk holds the wildcard bind.
-- **External SIP clients must target `127.0.0.1:5066`** (the canonical MVNO Kamailio host port). See `docs/INTEGRATION_CONTRACT.md`.
+- The MVNO Kamailio is host-published as **`5060:5060/udp`** (the standard SIP port).
+- On the author's original dev host a **host-level Asterisk** (since removed) held `0.0.0.0:5060/udp`, which is why earlier docs used `5066:5060/udp` and gated the 5060 publish behind a `MVNO_PUBLISH_5060` override. **That Asterisk is gone**, so the canonical published port is now directly **5060**.
+- On a fresh Ubuntu host (no Asterisk, no competing SIP stack), UDP 5060 is free and Kamailio binds it directly — no override needed.
+- If **another** SIP daemon happens to hold `0.0.0.0:5060/udp` on some host, stop it, or temporarily map Kamailio to a spare port (e.g. `5066:5060/udp`) — but the default/standard is **5060**.
+- **External SIP clients (SipClient / Linphone / softphones) target `<host-LAN-IP>:5060`** (UDP) — or `127.0.0.1:5060` when testing on the host itself. See `docs/INTEGRATION_CONTRACT.md`.
 
 ## 4. Vector log-shipper socket (runtime-agnostic)
 

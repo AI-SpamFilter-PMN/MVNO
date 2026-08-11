@@ -425,10 +425,10 @@ unpolluted:
 sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"
 ```
 
-**S6c — 5G→2G** (digest-auth SIP MESSAGE via Kamailio 5066)
+**S6c — 5G→2G** (digest-auth SIP MESSAGE via Kamailio 5060)
 
 > **FLOW**: `MO 15553332211 (baresip-tx @10.89.0.61 — or any digest UA) → SIP
-> MESSAGE → KAMAILIO 5066 (digest auth `testpass`; INTERCEPT_SMS → ai-filter) →
+> MESSAGE → KAMAILIO 5060 (digest auth `testpass`; INTERCEPT_SMS → ai-filter) →
 > IP-SM-GW bridge (mvno-ip-sm-gw [RELAY] 5G→2G) → SMPP SUBMIT_SM → OSMO-SMSC
 > @2775 → 2G radio → MT 15554443322 (2G-MS1 → T-A sms.txt)`.
 
@@ -445,7 +445,7 @@ receipted — the 2G container serves only MS1; always use `15554443322`.)
 **S6d — 5G→5G** (digest-auth SIP MESSAGE to the registered IMS number)
 
 > **FLOW**: `MO 15553332211 (baresip-tx @10.89.0.61) → SIP MESSAGE → KAMAILIO
-> 5066 (digest auth; INTERCEPT_SMS → ai-filter) → lookup("location") → MT
+> 5060 (digest auth; INTERCEPT_SMS → ai-filter) → lookup("location") → MT
 > 15559998888 (baresip-rx @10.89.0.60)`. Pure IMS-to-IMS — no bridge/SMPP
 > (those counters stay flat).
 
@@ -627,7 +627,7 @@ once**; switch with `Ctrl-b n` / `Ctrl-b p`, or
 |---|---|---|
 | **P0** (top-left) | `demo_call.sh setup && dial` — **SPEAK NOW = your mic** (+ side-tone) | S4 |
 | **P1** (top-right) | `live_tap.sh daemon` — pcap → 16 kHz WAV → Vosk chunks mid-call | S4/S5 |
-| **P2** (bottom-left) | live capture — RTP `30000-30100` + SIP `5066` on host loopback | S4 |
+| **P2** (bottom-left) | live capture — RTP `30000-30100` + SIP `5060` on host loopback | S4 |
 | **P4** (bottom-right) | **Vosk LIVE readout** — verdict logs **+ the raw recognized text** (`live-*.txt` tail) | S4/S5 |
 
 **Window `monitors`** — network + health:
@@ -847,9 +847,9 @@ softphone** (phone app / Zoiper / MicroSIP / Linphone / Blink, or the teammate
 through RTPEngine. This doubles as the integration test for the `SipClient`
 teammate repo (drop-in: `docs/partner/SipClient-INTEGRATION.md`).
 
-> Ports bind on `*` (verified live): `5066/udp` (SIP) and `30000-30100/udp`
+> Ports bind on `*` (verified live): `5060/udp` (SIP) and `30000-30100/udp`
 > (RTP) are reachable from any host on the same LAN. Keep firewall UDP
-> `5066` + `30000-30100` open.
+> `5060` + `30000-30100` open.
 
 **SETUP** (one provisioned number is enough — e.g. `15553332211`):
 
@@ -859,7 +859,7 @@ hostname -I | awk '{print $1}'               # LAN IP the phone should reach
 ```
 
 On the softphone, add an account:
-- **Server / Proxy**: `<this-host-IP>:5066` (UDP)
+- **Server / Proxy**: `<this-host-IP>:5060` (UDP)
 - **Username**: the MSISDN (`15553332211`) · **Password**: `testpass` · **Auth**: digest
 - **Realm**: `localhost` · **Codec**: **PCMU only** (G.711u) — disable G.722/OPUS (no transcode, S4)
 - REGISTER. **EXPECT**: `SIP 200 OK` (Kamailio `auth_db`; bad password → 401/403).
@@ -897,7 +897,7 @@ Issue 8.19); host ports are published for rootless Podman/Docker on
 
 | Host endpoint | Container → port | Service | Demo step |
 |---|---|---|---|
-| `127.0.0.1:5066/udp` | kamailio `:5060` | SIP registrar/proxy (digest auth) | S6c/6d (external clients: INTEGRATION_CONTRACT §1) |
+| `127.0.0.1:5060/udp` | kamailio `:5060` | SIP registrar/proxy (digest auth) | S6c/6d (external clients: INTEGRATION_CONTRACT §1) |
 | `127.0.0.1:2775` | osmo-smsc `:2775` | SMPP 3.4 SMSC (ESME bind/submit) | S3, S6a, S7 |
 | `127.0.0.1:8080` | telecom-api `:8080` | REST intercept API + actuator | S2, S8 |
 | `127.0.0.1:8008` | ai-filter `:8000` | AI classifier (mock, deterministic rules) | S2, S5 |
@@ -910,9 +910,11 @@ Issue 8.19); host ports are published for rootless Podman/Docker on
 | `127.0.0.1:30000-30100/udp` | rtpengine `:30000-30100` | RTP media relay range (G.711 PCMU) | S4, S5 |
 | `127.0.0.1:9100` | ip-sm-gw `:9100` | bridge /metrics | — |
 
-> Host UDP `5060` is **not** used: a host Asterisk owns `0.0.0.0:5060`
-> (`ENVIRONMENT_MATRIX.md` §3). The optional `MVNO_PUBLISH_5060` compose extra
-> is default-off and blocked on this host.
+> Host UDP `5060` is the canonical Kamailio published port (`5060:5060/udp`).
+> A host-level Asterisk previously held `0.0.0.0:5060` (hence an earlier
+> `5066` + `MVNO_PUBLISH_5060` gating); that Asterisk is removed, so Kamailio
+> now binds 5060 directly. On a fresh host with no competing SIP daemon, UDP
+> 5060 is used as-is. See `ENVIRONMENT_MATRIX.md` §3.
 
 ### A.2 — Static container IPs on `mvno_net` (10.89.0.0/24, pinned in compose)
 
@@ -1009,7 +1011,8 @@ The user-driven family lives in `scripts/demo/` (`user_demo.sh` menu,
 `docs/USER_DEMO.md`.
 
 > **Exact phone / softphone values** (Linphone, MizuDroid, SipClient, baresip-UAs):
-> proxy `sip:192.168.100.93:5066`, username `15551234567`, password `testpass`,
+> proxy `sip:<HOST-LAN-IP>:5060` (discover `hostname -I | awk '{print $1}'`),
+> username `15551234567`, password `testpass`,
 > realm `localhost`, transport UDP/TCP. Dial `15559998888` (baresip-rx auto-answer).
 > Negotiate **G.722/16000** (`rtpmap:9`) with **PCMU/8000** fallback — see
 > `server-port` config in the client build.

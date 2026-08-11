@@ -8,9 +8,14 @@
 ## The one session every human step builds toward
 
 ```
-[Android phone]  --SIP UDP--> 192.168.100.93:5066 (Kamailio) --rtpengine--> baresip-rx auto-answer 15559998888
+[Android phone]  --SIP UDP--> <HOST-LAN-IP>:5060 (Kamailio) --rtpengine--> baresip-rx auto-answer 15559998888
      (register 15551234567)                                                       (answers + records RTP)
 ```
+
+> **Host LAN IP** is machine-specific. Discover it with:
+> `hostname -I | awk '{print $1}'` (returns e.g. `192.168.100.93` on the wired rig
+> host). In every config below replace `<HOST-LAN-IP>` with that value. The Kamailio
+> host SIP port is **5060** (UDP) — the canonical published port.
 
 ---
 
@@ -21,7 +26,7 @@
 | SIP username / Account ID | `15551234567` | `subscriber.username=15551234567` |
 | Password | `testpass` | `subscriber.password=testpass` |
 | Domain / Realm | `localhost` | `subscriber.domain=localhost` |
-| Proxy server | `192.168.100.93:5066` | host wlan0 = `192.168.100.93/24`; Kamailio host-map 5066→5060udp |
+| Proxy server | `<HOST-LAN-IP>:5060` | host LAN IP (discover via `hostname -I`); Kamailio host port 5060 (canonical) |
 | Transport | **UDP** | baresip/cfg uses UDP; all registered AoRs are UDP |
 | Display name | `MVNO-UE1` | free-form; balance `100` (funded, non-blocked) |
 
@@ -38,7 +43,7 @@
 
 Verified reachable from the host network:
 ```
-OPTIONS sip:15559998888@192.168.100.93 SIP/2.0   (from 192.168.100.93:50999)
+OPTIONS sip:15559998888@<HOST-LAN-IP> SIP/2.0   (from <HOST-LAN-IP>:50999)
 ==> SIP/2.0 200 OK
 ```
 And from inside the stack the caller role got `407 → 180 Ringing → 200 OK` against
@@ -52,7 +57,7 @@ it (see `2026-08-09-g722-sip-rtp-path.md`).
 - SIP Identity / Username: `15551234567`
 - Password: `testpass`
 - Domain: `localhost`
-- Proxy: `192.168.100.93:5066`
+- Proxy: `<HOST-LAN-IP>:5060`
 - Transport: `UDP`
 - Display name: `MVNO-UE1`
 - Codecs: enable **G.722/16000** (wideband) first, keep PCMU/G.711u as fallback
@@ -64,7 +69,7 @@ it (see `2026-08-09-g722-sip-rtp-path.md`).
 - Account name / Username: `15551234567`
 - Password: `testpass`
 - Domain / Realm: `localhost`
-- Proxy / Outbound: `192.168.100.93:5066`
+- Proxy / Outbound: `<HOST-LAN-IP>:5060`
 - Protocol: `UDP`
 - Display name: `MVNO-UE1`
 - Codecs: **G.722** ticked, PCMU fallback.
@@ -73,7 +78,7 @@ it (see `2026-08-09-g722-sip-rtp-path.md`).
 
 ## E. Exact human actions (do these; then report back)
 
-1. Join Wi-Fi **192.168.100.x** (same subnet as the rig host `192.168.100.93`).
+1. Join the **same Wi-Fi/LAN subnet as the rig host** (the host running the stack).
 2. Install **Linphone** or **MizuDroid** on an Android phone.
 3. Add the SIP account from section **A/C/D**.
 4. From the app, call **`15559998888`**.
@@ -91,6 +96,6 @@ it (see `2026-08-09-g722-sip-rtp-path.md`).
 ## F. Where this came from
 
 - Live DB dump: `state/kamailio/kamailio.db` → `subscriber` table (all 6 rows above).
-- Host L2/L3: `ip -4 addr show` → `192.168.100.93/24` on `wlan0`.
+- Host L2/L3: `ip -4 addr show` → `<HOST-LAN-IP>/24` on the active interface (LAN IP from `hostname -I`).
 - baresip-rx: `sip_traffic_sim.py` caller → `15559998888` auto-answer (probe above).
 - Canonical subscriber constants: `scripts/lib/common.sh` (`MVNO_MSISDN_ALL`).

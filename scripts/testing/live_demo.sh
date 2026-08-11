@@ -463,7 +463,7 @@ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.settimeout(5)
 caller = '15557654321' # Zero-balance subscriber
 callee = '15557654321'
-port = 5066
+port = 5060
 sdp = 'v=0\r\no=user2 1 1 IN IP4 127.0.0.1\r\ns=-\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 30004 RTP/AVP 0\r\na=rtpmap:0 PCMU/8000\r\n'
 
 def build_invite(auth=''):

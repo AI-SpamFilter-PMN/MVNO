@@ -409,7 +409,10 @@ services:
     image: mvno-kamailio:5.7.2
     container_name: mvno-kamailio
     ports:
-      - "5066:5060/udp"
+      # Standard SIP UDP port for all clients (softphones/SipClient/Linphone).
+      # Host UDP 5060 was previously held by a local Asterisk; it is now free,
+      # so Kamailio is exposed directly on 5060 (matches the container's 5060).
+      - "5060:5060/udp"
     volumes:
       - ./configs/kamailio/kamailio.cfg:/etc/kamailio/kamailio.cfg:z
       # Whole state/kamailio dir, NOT a single-file bind of kamailio.db:

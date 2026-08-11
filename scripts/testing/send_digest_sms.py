@@ -3,7 +3,7 @@
 SIP MESSAGE with Digest Auth to Kamailio (one-liner demo CLI)
 
 The LIVE_DEMO S6c/S6d path: a raw IMS SMS-over-IP MESSAGE through Kamailio
-port 5066, doing the full 3-step digest dance (challenge -> nonce -> reply)
+port 5060, doing the full 3-step digest dance (challenge -> nonce -> reply)
 internally so the demo line stays short:
 
   python3 scripts/testing/send_digest_sms.py 15553332211 15554443322 "Hello raw 5G2G"
@@ -15,7 +15,7 @@ import socket
 import sys
 
 HOST = "127.0.0.1"
-PORT = 5066
+PORT = 5060
 PASSWORD = "testpass"
 REALM = "10.89.0.23"
 UA = "10.89.0.62:5070"
