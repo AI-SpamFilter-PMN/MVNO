@@ -103,11 +103,16 @@ if [ "${RT}" = "podman" ] || [ "${RT}" = "docker" ]; then
 fi
 
 # ─── 7. Host UDP 5060 conflict (canonical Kamailio host port = 5060) ─────────
-# Kamailio is now published directly on the standard host SIP port 5060.
-# This was previously blocked by a host-level Asterisk on the author's box;
-# that Asterisk is removed, so 5060 is free on a clean host.
-if command -v ss >/dev/null 2>&1 && ss -lun 2>/dev/null | grep -qE ':5060[[:space:]]'; then
-  warn "Host UDP 5060 is occupied by another process (e.g. a local Asterisk or second SIP stack)."
+# Kamailio is published directly on the standard host SIP port 5060. Its own
+# rootless-port bind on 5060 is EXPECTED and must not be mistaken for a conflict
+# (an external Asterisk/second SIP stack on 5060 is the real problem). So we only
+# warn when 5060 is held by something OTHER than the mvno-kamailio container's
+# published mapping.
+KAMAILIO_5060="$(podman port mvno-kamailio 2>/dev/null | grep -E ':5060' | head -1)"
+if [ -n "${KAMAILIO_5060:-}" ]; then
+  ok "Host UDP 5060 bound by mvno-kamailio (expected, canonical port)"
+elif command -v ss >/dev/null 2>&1 && ss -lun 2>/dev/null | grep -qE ':5060[[:space:]]'; then
+  warn "Host UDP 5060 is occupied by a process OTHER than mvno-kamailio (e.g. a local Asterisk or second SIP stack)."
   warn "  Kamailio needs host UDP 5060 (canonical). Stop the other listener, or override the port."
   WARN_FAIL=1
 else

@@ -13,7 +13,7 @@ This repository contains a **complete Mobile Virtual Network Operator (MVNO) 5G 
 ┌───────────────────┐  ┌──────────────────────┐  ┌──────────────────┐  ┌─────────────┐
 │ VOICE PATH        │  │                      │  │                  │  │             │
 │ SipClient UA      │─▶│ Kamailio SIP Proxy   │─▶│ Telecom Gateway  │─▶│ AI Spam     │
-│ (SIP 5066)        │  │ (407 digest + 403)   │  │ (Spring Boot:    │  │ Filter      │
+│ (SIP 5060)        │  │ (407 digest + 403)   │  │ (Spring Boot:    │  │ Filter      │
 └───────────────────┘  └──────────────────────┘  │  OCS · EIR · SLA)│  │ (External)  │
 ┌───────────────────┐  ┌──────────────────────┐  └────────┬─────────┘  └─────────────┘
 │ SMS PATH          │  │                      │           │
@@ -283,13 +283,13 @@ never stalls the spool loop.
 
 | Repository | Role | Interface it consumes | MVNO side | Status |
 |---|---|---|---|---|
-| [`SipClient`](https://github.com/AI-SpamFilter-PMN/SipClient) | Voice UA | SIP `localhost:5066` (host → Kamailio `:5060`), 407 digest | Kamailio registrar/proxy | ✅ stable |
+| [`SipClient`](https://github.com/AI-SpamFilter-PMN/SipClient) | Voice UA | SIP `localhost:5060` (host → Kamailio `:5060`), 407 digest | Kamailio registrar/proxy | ✅ stable |
 | [`sms-client`](https://github.com/AI-SpamFilter-PMN/sms-client) | SMS ESME | SMPP 3.4 `osmo-smsc:2775`, ESME `smsclient` | OsmoSMSC (SMSC) | ✅ stable |
 | [`AI-Filteration-System`](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) | Classifier | `POST /api/v1/classify` | `telecom-api` (SLA 5s + circuit breaker) | mock-authoritative |
 
 Authoritative per-repository parameters & verified source findings live in **`docs/INTEGRATION_CONTRACT.md`** —
 that is the single source of truth for repository-side values and required changes (e.g. SipClient's
-`SERVER_PORT` 5060→5066, sms-client's `ai.classify.url` mismatch), and for the **`/api/v1/classify`
+`SERVER_PORT` configurable via `sip.properties` (default 5060), sms-client's `ai.classify.url` mismatch), and for the **`/api/v1/classify`
 payload schemas (SMS / VOICE_CALL / TRANSCRIPT)**, X-API-Key auth, SLA/fail-open rules, and the
 partner handoff file list (contract Section 8). The subsections below summarize it; maintainers of all
 three repositories should read the contract file.
@@ -349,7 +349,7 @@ returning `{ "allow": boolean, "reason": "string" }`. Full JSON schemas:
   - Secondary Client ESME Account: `smsclient` / password `password`
   - REST Interception Endpoint: `POST http://telecom-api:8080/api/v1/intercept/sms` — **requires header `X-API-Key: mvno-demo-key-2026`** (missing/mismatched key → `401 Unauthorized`; demo key via env `X_API_KEY`)
 * **Voice Client (`SipClient`)**:
-  - SIP Registrar & Proxy Target: `localhost:5066` on host (`5066:5060/udp`)
+  - SIP Registrar & Proxy Target: `localhost:5060` on host (`5060:5060/udp`)
   - RTP Media Port Range: `30000-30100/udp` (G.711u PCMU)
   - SIP INVITE Authentication: `INVITE` is challenged with `407 Proxy Authentication Required` (digest, realm `localhost`) — retry with `Authorization: Digest` using your REGISTER credentials
 

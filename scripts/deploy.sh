@@ -167,6 +167,20 @@ curl -s -m 3 http://localhost:8080/actuator/health | head -c 200; echo ""
 echo "compose ps lines: $($COMPOSE_CMD ps 2>/dev/null | wc -l)"
 
 echo ""
+echo "=== Connect a softphone/UA ==="
+# Portable LAN-IP detection: try `hostname -I` (Ubuntu/Fedora), fall back to
+# `ip -4 addr` (Arch), else a placeholder. Works on a fresh teammate box too.
+HOST_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+[ -z "$HOST_IP" ] && HOST_IP="$(ip -4 addr show scope global 2>/dev/null | grep -oP 'inet \K[0-9.]+' | head -1)"
+REG_USER="${MVNO_MSISDN_FUNDED:-15551234567}"
+echo "  SIP server :  ${HOST_IP:-<this-host-LAN-IP>}:5060  (UDP)"
+echo "  Username    :  ${REG_USER}   (funded subscriber)"
+echo "  Password    :  testpass"
+echo "  Realm       :  localhost  (or the host LAN IP)"
+echo "  Call a rig  :  15559998888 (baresip-rx auto-answer) / 15553332211"
+echo "  Linphone    :  username=${REG_USER} pass=testpass proxy=sip:${HOST_IP:-<IP>}:5060 transport=UDP"
+echo "  SipClient   :  src/main/resources/sip.properties -> sip.server.host=${HOST_IP:-<IP>}, sip.server.port=5060"
+echo ""
 echo "=== DEPLOY SUMMARY ==="
 for s in "${SUCCESSES[@]:-}"; do ok "$s"; done
 if [ "${#FAILURES[@]}" -gt 0 ]; then

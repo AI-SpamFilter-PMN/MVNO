@@ -141,7 +141,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 ### Issue 3.5: Host Port Binding Collision (Exit Code 255)
 * **Symptom**: Kamailio container terminates silently on startup with exit status `255` and zero log output.
 * **Root Cause**: Host port `5060/udp` was held by host system SIP daemons or socket proxies, causing socket bind failure (`EADDRINUSE`).
-* **Fix**: Updated `docker-compose.yml` port mapping for Kamailio to `5066:5060/udp`.
+* **Fix**: Updated `docker-compose.yml` port mapping for Kamailio to `5060:5060/udp` (canonical; the earlier 5066 workaround was because a host Asterisk held 5060).
 
 ### Issue 3.6: Unauthenticated SIP INVITE Proxying (Zero-Trust Section 1.1)
 * **Symptom**: Any unauthenticated SIP client could trigger policy interception calls and reach RTPEngine — no credential check on inbound `INVITE` dialogs.
@@ -570,9 +570,9 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 
 ### Issue 8.33: `nc -u` Never Exits After the SIP Response
 
-* **Symptom**: `printf 'MESSAGE …' | nc -u localhost 5066` prints Kamailio's 407/200 response but **hangs** — the command never returns and the shell blocks.
+* **Symptom**: `printf 'MESSAGE …' | nc -u localhost 5060` prints Kamailio's 407/200 response but **hangs** — the command never returns and the shell blocks.
 * **Root Cause**: the UDP socket stays open waiting for more input after the response; this nc build (openbsd-netcat) keeps reading until stdin EOF *and* does not self-close on a datagram reply.
-* **Fix**: always wrap in `timeout 5 nc -u localhost 5066 < request.txt` (and feed the request from a file, not a live terminal).
+* **Fix**: always wrap in `timeout 5 nc -u localhost 5060 < request.txt` (and feed the request from a file, not a live terminal).
 * **Verification**: the digest flows (5G→2G, 5G→5G, E2E-BLOCK) complete with `SIP/2.0 200 OK` / `403` under `timeout` (2026-08-06).
 
 ### Issue 8.34: zsh `:ro` Volume-Mount Modifier + Non-Word-Splitting Breaks Mount Loops
@@ -732,7 +732,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   `X-API-Key: mvno-demo-key-2026` (missing/mismatched → `401`).
 
 ### 3. `SipClient` User Agent Interface (`SipClient` Repo)
-- SIP UDP at `127.0.0.1:5066` (host) → `kamailio:5060/udp`; works for any RFC-3261 softphone
+- SIP UDP at `127.0.0.1:5060` (host) → `kamailio:5060/udp`; works for any RFC-3261 softphone
   (desktop/mobile), not just this repo's client — see LIVE_DEMO S15. REGISTER **and** INVITE are
   digest-challenged (realm `localhost`, subscriber-table creds; `407` → retry with
   `Authorization: Digest`). RTP relay `30000-30100/udp`, **PCMU only** (no transcode).
