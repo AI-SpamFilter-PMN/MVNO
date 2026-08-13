@@ -448,7 +448,9 @@ services:
     healthcheck:
       # SIP liveness: unauthenticated REGISTER -> 401 challenge (any SIP/2.0
       # reply proves the UDP listener is responsive; no DB write pre-auth).
-      test: ["CMD", "sh", "-c", "printf 'REGISTER sip:mvno.local SIP/2.0\\r\\nVia: SIP/2.0/UDP 127.0.0.1:5060;branch=z9hG4bKhc\\r\\nFrom: <sip:15551234567@mvno.local>;tag=hc\\r\\nTo: <sip:15551234567@mvno.local>\\r\\nCall-ID: hc@mvno.local\\r\\nCSeq: 1 REGISTER\\r\\nContact: <sip:15551234567@127.0.0.1:5060>\\r\\nExpires: 30\\r\\nContent-Length: 0\\r\\n\\r\\n' | socat -T3 - UDP4:127.0.0.1:5060 | grep -q 'SIP/2.0' || exit 1"]
+      # Targets 10.89.0.23:5060 (Kamailio's explicit listen address) — the
+      # config no longer binds 127.0.0.1 once a `listen` directive is set.
+      test: ["CMD", "sh", "-c", "printf 'REGISTER sip:mvno.local SIP/2.0\\r\\nVia: SIP/2.0/UDP 10.89.0.23:5060;branch=z9hG4bKhc\\r\\nFrom: <sip:15551234567@mvno.local>;tag=hc\\r\\nTo: <sip:15551234567@mvno.local>\\r\\nCall-ID: hc@mvno.local\\r\\nCSeq: 1 REGISTER\\r\\nContact: <sip:15551234567@10.89.0.23:5060>\\r\\nExpires: 30\\r\\nContent-Length: 0\\r\\n\\r\\n' | socat -T3 - UDP4:10.89.0.23:5060 | grep -q 'SIP/2.0' || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
