@@ -41,6 +41,27 @@ if [ ! -f "${KAMAILIO_DB}" ]; then
     exit 1
 fi
 
+# --- Ensure the `dialplan` table exists (true cold start) --------------------
+# On a fresh `make clean && make bootstrap`, init-db creates only version/
+# location/subscriber; the dialplan table is normally created by Kamailio's
+# kamdbctl schema init, which we do NOT run. Without this, the DELETE/INSERT
+# below fail with "no such table: dialplan" on a true cold start. Create it
+# idempotently (schema matches /usr/share/kamailio/db_sqlite/dialplan-create.sql).
+sqlite3 "${KAMAILIO_DB}" <<'SQL'
+CREATE TABLE IF NOT EXISTS dialplan (
+    id INTEGER PRIMARY KEY NOT NULL,
+    dpid INTEGER NOT NULL,
+    pr INTEGER NOT NULL,
+    match_op INTEGER NOT NULL,
+    match_exp VARCHAR(64) NOT NULL,
+    match_len INTEGER NOT NULL,
+    subst_exp VARCHAR(64) NOT NULL,
+    repl_exp VARCHAR(256) NOT NULL,
+    attrs VARCHAR(64) NOT NULL
+);
+INSERT OR IGNORE INTO version (table_name, table_version) VALUES ('dialplan','2');
+SQL
+
 # --- dpid=4: E.164/national/international -> bare 15XXXXXXXXX ---------------
 # pr order matters (first match wins). match_op=1 = POSIX regex.
 # Canonical stored AoR is the 11-digit national mobile WITHOUT the leading 0
@@ -60,20 +81,20 @@ sqlite3 "${KAMAILIO_DB}" <<'SQL'
 BEGIN;
 DELETE FROM dialplan WHERE dpid = 4;
 
-INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
-VALUES (4, 1, 1, '^\+20(1[5-9][0-9]{9})$',   0, '^\+20(1[5-9][0-9]{9})$',     '\1', '', 0);
+INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_len, subst_exp, repl_exp, attrs)
+VALUES (4, 1, 1, '^\+20(1[5-9][0-9]{9})$',   0, '^\+20(1[5-9][0-9]{9})$',     '\1', '');
 
-INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
-VALUES (4, 2, 1, '^\+20([5-9][0-9]{9})$',    0, '^\+20([5-9][0-9]{9})$',      '1\1', '', 0);
+INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_len, subst_exp, repl_exp, attrs)
+VALUES (4, 2, 1, '^\+20([5-9][0-9]{9})$',    0, '^\+20([5-9][0-9]{9})$',      '1\1', '');
 
-INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
-VALUES (4, 3, 1, '^\+?(1[5-9][0-9]{9})$',    0, '^\+?(1[5-9][0-9]{9})$',      '\1', '', 0);
+INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_len, subst_exp, repl_exp, attrs)
+VALUES (4, 3, 1, '^\+?(1[5-9][0-9]{9})$',    0, '^\+?(1[5-9][0-9]{9})$',      '\1', '');
 
-INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
-VALUES (4, 4, 1, '^0(1[5-9][0-9]{9})$',      0, '^0(1[5-9][0-9]{9})$',        '\1', '', 0);
+INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_len, subst_exp, repl_exp, attrs)
+VALUES (4, 4, 1, '^0(1[5-9][0-9]{9})$',      0, '^0(1[5-9][0-9]{9})$',        '\1', '');
 
-INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_flags, subst_exp, repl_exp, attrs, match_len)
-VALUES (4, 5, 1, '^00(20)?(1[5-9][0-9]{9})$',0, '^00(20)?(1[5-9][0-9]{9})$',  '\2', '', 0);
+INSERT INTO dialplan (dpid, pr, match_op, match_exp, match_len, subst_exp, repl_exp, attrs)
+VALUES (4, 5, 1, '^00(20)?(1[5-9][0-9]{9})$',0, '^00(20)?(1[5-9][0-9]{9})$',  '\2', '');
 COMMIT;
 SQL
 

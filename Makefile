@@ -26,7 +26,14 @@ ps:
 # Completely resets runtime container volumes and state directory
 clean:
 	./scripts/up.sh down -v
-	rm -rf state/kamailio/* state/spool/* state/hlr/* state/vm-data/* state/grafana/*
+	# Grafana writes its plugins/db as container uid 100471 (rootless podman
+	# user-namespace), so host `rm -rf` hits "Permission denied" on cold start.
+	# `podman unshare` maps us into that namespace to remove them; fall back to
+	# sudo if unshare is unavailable. Other state dirs are host-owned.
+	rm -rf state/kamailio/* state/spool/* state/hlr/* state/vm-data/*
+	@if [ -d state/grafana ] && [ -n "$$(ls -A state/grafana 2>/dev/null)" ]; then \
+		podman unshare rm -rf state/grafana/* 2>/dev/null || sudo rm -rf state/grafana/*; \
+	fi
 
 # Rebuilds all custom images from source, initializes databases, and starts the stack
 rebuild: clean init-db
