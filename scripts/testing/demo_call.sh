@@ -91,8 +91,22 @@ module uuid.so
 module_app account.so
 module_app menu.so
 module_app ctrl_tcp.so
-audio_source ${tx_src}
+ctrl_tcp_listen 0.0.0.0:4444
 EOF
+  if [ "$PULSE_OK" -eq 1 ]; then
+    # Live host mic via PulseAudio/PipeWire socket (proven recipe, Issue 8.47):
+    # mount the pulse socket + cookie, set PULSE_SERVER + XDG_RUNTIME_DIR, and
+    # disable SELinux labeling so the root container can reach the host socket.
+    # The specific ALSA device pins the laptop's real hardware mic.
+    cat >> state/baresip/tx/config <<EOF
+audio_source pulse,alsa_input.pci-0000_05_00.6.analog-stereo
+audio_player pulse,alsa_output.pci-0000_05_00.6.analog-stereo
+EOF
+  else
+    cat >> state/baresip/tx/config <<EOF
+audio_source ausine
+EOF
+  fi
   cat > state/baresip/tx/accounts <<EOF
 <sip:${CALLER}@${SIP_HOST}:5060>;auth_user=${CALLER};auth_pass=testpass
 EOF
@@ -104,9 +118,12 @@ EOF
       -v $PWD/state/baresip/speech8k.wav:/media/speech8k.wav:ro \
       "${IMAGE}" >/dev/null
     podman run -d --name baresip-tx "${NET[@]}" --ip 10.89.0.61 \
+      --security-opt label=disable \
       -v $PWD/state/baresip/tx:/cfg:z \
       -v "${PULSE_DIR}/pulse/native:${PULSE_DIR}/pulse/native" \
+      -v "${HOME}/.config/pulse/cookie:${HOME}/.config/pulse/cookie" \
       -e "PULSE_SERVER=unix:${PULSE_DIR}/pulse/native" \
+      -e "XDG_RUNTIME_DIR=${PULSE_DIR}" \
       "${IMAGE}" >/dev/null
   else
     podman run -d --name baresip-rx "${NET[@]}" --ip 10.89.0.60 \

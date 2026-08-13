@@ -44,7 +44,7 @@ map_sides() {
     for rtcp_port in $(tshark -r "$P" -Y "rtcp" -T fields -e udp.dstport 2>/dev/null | sort -n | uniq); do
         rtp_port=$(( rtcp_port - 1 ))
         cname=$(tshark -r "$P" -Y "rtcp && udp.dstport==${rtcp_port}" -V 2>/dev/null \
-            | grep -oE "Text: sip:[^ ]+" | head -1 | sed 's/Text: //')
+            | grep -oE "Text: sip:[^ ]+" | head -1 | sed 's/Text: //' || true)
         [ -n "$cname" ] && echo "${rtp_port}|${cname}"
     done | sort -u
 }
@@ -53,8 +53,15 @@ found=0
 while IFS='|' read -r port cname; do
     side="UNKNOWN"
     case "$cname" in
-        *15559998888*) side="CALLEE (15559998888)" ;;
-        *15553332211*) side="CALLER (15553332211)" ;;
+        # Callee: 15559998888 (baresip-rx), also as +201555999888 / +205559998888
+        # (the dialplan-normalized CNAME the peer sends keeps the raw dialed
+        # "+2X..." prefix). Match the stable local-MSDN tails so prefix forms map.
+        *559998888*) side="CALLEE (15559998888)" ;;
+        # baresip-tx rig caller (number is 15553332211, NOT 1555332211:
+        #   digits = 1-5-5-5-3-3-3-2-2-1-1, so match the unique 3332211 tail)
+        *3332211*)  side="CALLER (15553332211)" ;;
+        # Android Linphone caller (phone on-device mic)
+        *551234567*) side="CALLER (Linphone 15551234567)" ;;
     esac
     # Concatenate any non-empty per-chunk transcripts for this leg.
     txt=""
