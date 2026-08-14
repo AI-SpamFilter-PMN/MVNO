@@ -82,4 +82,8 @@ fi
 sqlite3 state/kamailio/kamailio.db \
     "DELETE FROM location WHERE expires < julianday('now');" 2>/dev/null || true
 
+# 5. Host-side PulseAudio side-tone loopback (live-mic audio cue, NOT a call)
+source "${REPO_ROOT}/scripts/lib/common.sh" 2>/dev/null || true
+side_tone_off 2>/dev/null || true
+
 echo -e "${GREEN}🎉 ALL CALLS AND CHANNELS SUCCESSFULLY TERMINATED.${NC}"
