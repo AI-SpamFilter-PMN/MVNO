@@ -33,6 +33,8 @@ IMAGES=(
   "mvno-open5gs:2.8.0"
   "mvno-open5gs-webui:2.8.0"
   "mvno-telecom-api:1.0.0"
+  "mvno-asterisk:1.0.0"
+  "mvno-baresip:1.1.0"
 )
 
 for img in "${IMAGES[@]}"; do
