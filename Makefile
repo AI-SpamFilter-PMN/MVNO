@@ -460,6 +460,18 @@ all-up: bootstrap companion-up
 	@echo "  • SMS Web Portal:      http://localhost:8083"
 	@echo "  • Grafana NOC:         http://localhost:3000"
 
+# Real-World Hardware-In-The-Loop (HIL) Smoke Test (0 Mocks)
+smoke-test:
+	@python3 scripts/testing/live_hardware_smoke_test.py
+
+live-smoke: smoke-test
+
+# Real-time live call monitor & audio VU-meter HUD
+monitor:
+	@python3 scripts/demo/call_monitor.py
+
+
+
 
 
 
