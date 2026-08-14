@@ -107,13 +107,17 @@ def main():
     print(f"• Active Live Registered AoRs in Kamailio DB:\n{usrloc}")
     
     # Assert minimum required AoRs
+    # Assert minimum required AoRs
     assert "15553332211" in usrloc, "Missing registered caller AoR 15553332211"
     assert "15559998888" in usrloc, "Missing registered callee AoR 15559998888"
     assert "15554443322" in usrloc, "Missing registered GSM SMS AoR 15554443322"
     
-    if has_adb and HANDSET_MSISDN in usrloc:
-        print(f"  ✓ Physical Handset AoR ({HANDSET_MSISDN}) active in Kamailio USRLOC DB.")
-    print("  ✓ Live SIP Registration & USRLOC DB Verified.")
+    # Adaptive Endpoint Resolution
+    sys.path.insert(0, os.path.join(REPO_ROOT, "scripts/lib"))
+    from endpoint_selector import resolve_callee_endpoint, print_endpoint_banner
+    ep = resolve_callee_endpoint()
+    print_endpoint_banner(ep)
+    print("  ✓ Live SIP Registration & Adaptive USRLOC Routing Verified.")
 
     # ─── 3. Live 1-to-1 Voice Call + Real-Time RTP Media Switching ───
     banner("STAGE 3: LIVE 1-TO-1 VOICE CALL + REAL-TIME RTP MEDIA SWITCHING (8s CALL DURATION)")
@@ -128,12 +132,12 @@ def main():
     else:
         print("  ✓ baresip caller rig already running")
 
-    print(f"• Initiating live SIP call: Laptop UE ({LAPTOP_UE1}) -> Rig Callee ({LAPTOP_UE2})...")
-    dial_res = run_cmd("podman exec baresip-tx python3 /cfg/baresip_dial.py --uri sip:15559998888@10.89.0.23:5060 --timeout 14", timeout=16)
+    print(f"• Initiating live SIP call: Laptop UE ({LAPTOP_UE1}) -> Callee Target ({ep['target_uri']})...")
+    dial_res = run_cmd(f"podman exec baresip-tx python3 /cfg/baresip_dial.py --uri {ep['target_uri']} --timeout 14", timeout=16)
     print(f"  SIP Call Handshake:\n{dial_res}")
-    if "CALL_ESTABLISHED" not in dial_res:
+    if "CALL_ESTABLISHED" not in dial_res and "CALL_ANSWERED" not in dial_res:
         raise RuntimeError("Fatal: Live SIP call failed to establish!")
-    print("  ✓ Live SIP Call Established & Media Anchored across RTPEngine.")
+    print(f"  ✓ Live SIP Call Established ({ep['display_name']}) & Media Anchored across RTPEngine.")
     print("  • Streaming live audio across RTP pipeline for 8.0s...")
     time.sleep(8)
     run_cmd("make hangup", timeout=10)

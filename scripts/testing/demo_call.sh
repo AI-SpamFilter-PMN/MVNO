@@ -216,7 +216,10 @@ hangup() {
 
 case "${1:-}" in
   setup) setup ;;
-  dial) dial ;;
+  dial) 
+    CALLEE="${2:-$CALLEE}"
+    dial 
+    ;;
   hangup) hangup ;;
-  *) echo "Usage: bash scripts/testing/demo_call.sh {setup|dial|hangup}" >&2; exit 2 ;;
+  *) echo "Usage: bash scripts/testing/demo_call.sh {setup|dial [callee]|hangup}" >&2; exit 2 ;;
 esac

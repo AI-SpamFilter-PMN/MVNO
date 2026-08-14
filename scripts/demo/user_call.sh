@@ -20,7 +20,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-CALLEE="${1:-15559998888}"
+if [ -z "${1:-}" ]; then
+    # Auto-resolve target using adaptive endpoint selector
+    CALLEE=$(python3 -c "import sys; sys.path.insert(0, '${REPO_ROOT}/scripts/lib'); from endpoint_selector import resolve_callee_endpoint; print(resolve_callee_endpoint()['msisdn'])" 2>/dev/null || echo "15559998888")
+else
+    CALLEE="$1"
+fi
 
 echo ""
 echo "=============================================="
@@ -36,8 +41,8 @@ if ! podman ps --format '{{.Names}}' | grep -q '^baresip-tx$'; then
     bash "${REPO_ROOT}/scripts/testing/demo_call.sh" setup >/dev/null 2>&1 || true
 fi
 
-# Initiate the live call through the baresip rig.
-bash "${REPO_ROOT}/scripts/testing/demo_call.sh" dial
+# Initiate the live call through the baresip rig with dynamic callee
+bash "${REPO_ROOT}/scripts/testing/demo_call.sh" dial "${CALLEE}"
 
 # The call's RTP is tapped by live_tap -> Vosk spool -> NativeVoskService.
 # Surface any live transcript that landed (the operator sees their words).
