@@ -1,0 +1,23 @@
+# ==============================================================================
+# Dockerfile.sms-client — SMS Web Client (Java 17 + Embedded Tomcat + JSMPP)
+# ==============================================================================
+
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+WORKDIR /build
+COPY pom.xml .
+RUN mvn dependency:go-offline -B || true
+COPY src ./src
+RUN mvn clean package -DskipTests -B
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=builder /build/target/*.jar app.jar
+
+ENV PORT=8083
+ENV DB_URL=postgresql://mvno:mvno@mvno-neon-local:5432/neondb
+ENV SMPP_HOST=mvno-osmosmsc
+ENV SMPP_PORT=2775
+
+EXPOSE 8083
+
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Dserver.port=8083", "-Ddb.url=postgresql://mvno:mvno@mvno-neon-local:5432/neondb", "-jar", "app.jar"]

@@ -443,5 +443,23 @@ listen-call:
 listen-call-cli:
 	@python3 scripts/demo/call_listener.py --no-gui
 
+# Builds and launches teammate companion containers (Filteration-System, admin-client, sms-client)
+companion-up:
+	@podman compose -f docker-compose.yml -f docker-compose.companion.yml up -d --build filteration-system-app admin-client-app sms-client-app
+
+# Stops teammate companion containers
+companion-down:
+	@podman compose -f docker-compose.companion.yml down
+
+# 1-Command startup for the ENTIRE 5-Repository Ecosystem (Core + All 3 Companion Apps)
+all-up: bootstrap companion-up
+	@echo "🎉 Complete 5-Repository AI-SpamFilter Ecosystem is UP & Healthy!"
+	@echo "  • MVNO Core API:       http://localhost:8080"
+	@echo "  • Filteration-System:  http://localhost:8081"
+	@echo "  • Admin Dashboard:     http://localhost:8082"
+	@echo "  • SMS Web Portal:      http://localhost:8083"
+	@echo "  • Grafana NOC:         http://localhost:3000"
+
+
 
 

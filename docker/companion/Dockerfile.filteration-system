@@ -1,0 +1,24 @@
+# ==============================================================================
+# Dockerfile.filteration-system — AI Decision Engine (Spring Boot 3 + Java 17)
+# ==============================================================================
+
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+WORKDIR /build
+COPY pom.xml .
+RUN mvn dependency:go-offline -B || true
+COPY src ./src
+RUN mvn clean package -DskipTests -B
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=builder /build/target/*.jar app.jar
+
+ENV SERVER_PORT=8081
+ENV SPRING_PROFILES_ACTIVE=prod
+ENV DB_URL=jdbc:postgresql://mvno-neon-local:5432/neondb
+ENV DB_USER=mvno
+ENV DB_PASS=mvno
+
+EXPOSE 8081 2076
+
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]

@@ -1,0 +1,76 @@
+# ==============================================================================
+# docker-compose.companion.yml — Teammate Companion Microservices Stack
+# ==============================================================================
+# Defines containerized services for:
+#   1. Filteration-System (:8081 HTTP REST + :2076 SMPP)
+#   2. admin-client (:8082 Web Dashboard)
+#   3. sms-client (:8083 SMS Portal)
+#
+# Usage:
+#   podman compose -f docker-compose.yml -f docker-compose.companion.yml up -d --build
+# ==============================================================================
+
+services:
+  # ─── Filteration-System (Spring Boot 3 + AI Spam Decision Engine) ───
+  filteration-system-app:
+    build:
+      context: ../Filteration-System
+      dockerfile: ../MVNO/docker/companion/Dockerfile.filteration-system
+    container_name: mvno-filteration-app
+    ports:
+      - "8081:8081"
+      - "2076:2076"
+    environment:
+      - SERVER_PORT=8081
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_URL=jdbc:postgresql://mvno-neon-local:5432/neondb
+      - DB_USER=mvno
+      - DB_PASS=mvno
+      - OSMO_MSC_HOST=mvno-osmosmsc
+      - OSMO_MSC_PORT=2775
+    depends_on:
+      - neon-local
+      - osmo-smsc
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.70
+    restart: unless-stopped
+
+  # ─── admin-client (Moderation & Call/SMS Dashboard) ───
+  admin-client-app:
+    build:
+      context: ../admin-client
+      dockerfile: ../MVNO/docker/companion/Dockerfile.admin-client
+    container_name: mvno-admin-client-app
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - DB_URL=postgresql://mvno:mvno@mvno-neon-local:5432/neondb
+    depends_on:
+      - neon-local
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.71
+    restart: unless-stopped
+
+  # ─── sms-client (User SMS Portal & SMPP Transmitter) ───
+  sms-client-app:
+    build:
+      context: ../sms-client
+      dockerfile: ../MVNO/docker/companion/Dockerfile.sms-client
+    container_name: mvno-sms-client-app
+    ports:
+      - "8083:8083"
+    environment:
+      - PORT=8083
+      - DB_URL=postgresql://mvno:mvno@mvno-neon-local:5432/neondb
+      - SMPP_HOST=mvno-osmosmsc
+      - SMPP_PORT=2775
+    depends_on:
+      - neon-local
+      - osmo-smsc
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.72
+    restart: unless-stopped
