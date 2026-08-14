@@ -93,14 +93,15 @@ def main():
     print("  ✓ Live SIP Registration & USRLOC DB Verified.")
 
     # ─── 3. Live 1-to-1 Voice Call + Real-Time Mic Capture ───
-    banner("STAGE 3: LIVE 1-TO-1 VOICE CALL + REAL-TIME RTP MEDIA SWITCHING")
+    banner("STAGE 3: LIVE 1-TO-1 VOICE CALL + REAL-TIME RTP MEDIA SWITCHING (7s CALL DURATION)")
     print(f"• Initiating live SIP call: Laptop UE ({LAPTOP_UE1}) -> Rig Callee ({LAPTOP_UE2})...")
-    dial_res = run_cmd("podman exec baresip-tx python3 /cfg/baresip_dial.py --uri sip:15559998888@10.89.0.23:5060 --timeout 6", timeout=10)
+    dial_res = run_cmd("podman exec baresip-tx python3 /cfg/baresip_dial.py --uri sip:15559998888@10.89.0.23:5060 --timeout 12", timeout=15)
     print(f"  SIP Call Handshake:\n{dial_res}")
     if "CALL_ESTABLISHED" not in dial_res:
         raise RuntimeError("Fatal: Live SIP call failed to establish!")
     print("  ✓ Live SIP Call Established & Media Anchored across RTPEngine.")
-    time.sleep(2)
+    print("  • Streaming live audio across RTP pipeline for 7.0s...")
+    time.sleep(7)
     run_cmd("make hangup", timeout=10)
 
     # ─── 4. Live Vosk ASR JNI Offline Speech Recognition & AI Classification ───

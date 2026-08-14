@@ -46,7 +46,7 @@ def main():
     print("\n[1/4] Joining Participant 1 (Laptop UE1 15553332211) into ConfBridge...")
     proc1 = subprocess.Popen(
         ["podman", "exec", "-i", "baresip-tx", "python3", "/cfg/baresip_dial.py",
-         "--target", f"sip:{CONF_ROOM}@10.89.0.23:5060", "--duration", "15"],
+         "--target", f"sip:{CONF_ROOM}@10.89.0.23:5060", "--duration", "20"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
     time.sleep(2)
@@ -55,7 +55,7 @@ def main():
     print("[2/4] Joining Participant 2 (Laptop UE2 15559998888) into ConfBridge...")
     proc2 = subprocess.Popen(
         ["podman", "exec", "-i", "baresip-rx", "python3", "/cfg/baresip_dial.py",
-         "--target", f"sip:{CONF_ROOM}@10.89.0.23:5060", "--duration", "13"],
+         "--target", f"sip:{CONF_ROOM}@10.89.0.23:5060", "--duration", "18"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
     time.sleep(2)
@@ -84,7 +84,8 @@ def main():
         subprocess.run(["make", "hangup"], capture_output=True, check=False)
         raise RuntimeError("Empirical assertion FAILED: ConfBridge room 001 has no active participant channels!")
 
-    time.sleep(3)
+    print("  • Holding 3-way conference bridge active for 7.0s...")
+    time.sleep(7)
 
     # Clean termination
     subprocess.run(["make", "hangup"], capture_output=True, check=False)
