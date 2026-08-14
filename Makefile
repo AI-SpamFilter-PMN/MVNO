@@ -146,6 +146,7 @@ init-db:
 		"PRAGMA user_version = 7;" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
+	@bash scripts/testing/demo_call.sh setup >/dev/null 2>&1 || true
 
 # Upserts 5G SA subscribers into Open5GS MongoDB
 seed-mongo:

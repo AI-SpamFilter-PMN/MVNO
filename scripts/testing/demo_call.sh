@@ -147,6 +147,7 @@ EOF
   cat > state/baresip/tx/accounts <<EOF
 <sip:${CALLER}@${SIP_HOST}:5060>;auth_user=${CALLER};auth_pass=testpass
 EOF
+  cp -f scripts/testing/baresip_dial.py state/baresip/tx/baresip_dial.py 2>/dev/null || true
 
   # Containers are COMPOSE-MANAGED (docker-compose.yml baresip-rx/baresip-tx
   # services, since the cold-start fragmentation fix): `make up` / `podman
