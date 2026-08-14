@@ -78,16 +78,16 @@ public class AiFilterService {
         // Step 1b: local deterministic scam-keyword flag (SMS too). A hit is a
         // REVIEW FLAG (allow=true, NEVER a hard block) + mvno.vosk.scamflag.
         if (req != null && req.content() != null) {
-            final String scamWord = scanScamKeywords(req.content());
-            if (scamWord != null) {
-                meterRegistry.counter("mvno.vosk.scamflag", "word", scamWord).increment();
-                return new InterceptResponse(true, "scam-keyword-review: " + scamWord);
-            }
             final String smishThreat = scanSmishingUrls(req.content());
             if (smishThreat != null) {
                 meterRegistry.counter("mvno.smishing.url.blocked", "threat", smishThreat).increment();
                 logger.warn("SMISHING PHISHING URL INTERCEPTED: sender={} threat='{}'", req.sender(), smishThreat);
                 return new InterceptResponse(false, "SMISHING_URL_BLOCKED: " + smishThreat);
+            }
+            final String scamWord = scanScamKeywords(req.content());
+            if (scamWord != null) {
+                meterRegistry.counter("mvno.vosk.scamflag", "word", scamWord).increment();
+                return new InterceptResponse(true, "scam-keyword-review: " + scamWord);
             }
         }
 
@@ -386,12 +386,20 @@ public class AiFilterService {
 
     private static final Set<String> PHISHING_INDICATORS = Set.of(
         "claim-prize", "account-update", "bank-secure", "verify-account",
-        "login-bank", "free-reward", "gift-card", "free-crypto", "claim-now"
+        "login-bank", "free-reward", "gift-card", "free-crypto", "claim-now",
+        "update-pin", "suspended-account", "unlock-card", "identity-verify"
     );
+
+    private static final java.net.http.HttpClient SANDBOX_HTTP_CLIENT = java.net.http.HttpClient.newBuilder()
+        .version(java.net.http.HttpClient.Version.HTTP_1_1)
+        .followRedirects(java.net.http.HttpClient.Redirect.NEVER)
+        .connectTimeout(java.time.Duration.ofMillis(150))
+        .build();
 
     /**
      * AI Smishing URL Sandbox & Heuristic Analyzer.
-     * Extracts shortened URLs or suspicious phishing domains embedded in SMS bodies.
+     * Extracts shortened URLs or suspicious phishing domains embedded in SMS bodies
+     * and safely follows HTTP 301/302 redirect chains with strict SSRF guards.
      */
     public String scanSmishingUrls(final String text) {
         if (text == null || text.isBlank()) {
@@ -399,14 +407,123 @@ public class AiFilterService {
         }
         final var matcher = URL_PATTERN.matcher(text);
         while (matcher.find()) {
-            final String url = matcher.group().toLowerCase(Locale.ROOT);
-            for (final String indicator : PHISHING_INDICATORS) {
-                if (url.contains(indicator)) {
-                    return indicator;
-                }
+            String rawUrl = matcher.group();
+            if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://")) {
+                rawUrl = "http://" + rawUrl;
+            }
+            final String threat = expandAndScanRedirectChain(rawUrl);
+            if (threat != null) {
+                return threat;
             }
         }
         return null;
+    }
+
+    /**
+     * Follows HTTP redirects up to 3 hops within a 300ms budget, enforcing SSRF guards.
+     */
+    public String expandAndScanRedirectChain(final String initialUrl) {
+        String currentUrl = initialUrl;
+        int hops = 0;
+
+        while (hops < 3 && currentUrl != null) {
+            hops++;
+            final String lower = currentUrl.toLowerCase(Locale.ROOT);
+            for (final String indicator : PHISHING_INDICATORS) {
+                if (lower.contains(indicator)) {
+                    return indicator + " (found in redirect chain: " + currentUrl + ")";
+                }
+            }
+
+            try {
+                final java.net.URI uri = java.net.URI.create(currentUrl);
+                final String host = uri.getHost();
+                if (host == null || host.isBlank()) {
+                    break;
+                }
+
+                // SSRF Guard: Validate all resolved IP addresses
+                final java.net.InetAddress[] addresses = java.net.InetAddress.getAllByName(host);
+                boolean safe = true;
+                for (final java.net.InetAddress addr : addresses) {
+                    if (!isSafePublicIp(addr)) {
+                        safe = false;
+                        logger.warn("SSRF ATTEMPT BLOCKED: host={} resolved to private/reserved IP={}", host, addr.getHostAddress());
+                        return "SSRF_ATTEMPT_BLOCKED: " + host;
+                    }
+                }
+                if (!safe) {
+                    break;
+                }
+
+                // Execute safe HTTP GET with short timeout
+                final java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                    .uri(uri)
+                    .timeout(java.time.Duration.ofMillis(120))
+                    .header("User-Agent", "MVNO-Smishing-Sandbox/1.0")
+                    .GET()
+                    .build();
+
+                final java.net.http.HttpResponse<String> resp = SANDBOX_HTTP_CLIENT.send(
+                    req, java.net.http.HttpResponse.BodyHandlers.ofString(java.nio.charset.StandardCharsets.UTF_8)
+                );
+
+                final int status = resp.statusCode();
+                if (status >= 300 && status < 400) {
+                    final String loc = resp.headers().firstValue("Location").orElse(null);
+                    if (loc == null || loc.isBlank()) {
+                        break;
+                    }
+                    if (loc.startsWith("http://") || loc.startsWith("https://")) {
+                        currentUrl = loc;
+                    } else {
+                        currentUrl = uri.resolve(loc).toString();
+                    }
+                } else {
+                    // Check landing page content (capped at 8KB)
+                    final String body = resp.body();
+                    if (body != null) {
+                        final String bodyLower = body.length() > 8192 ? body.substring(0, 8192).toLowerCase(Locale.ROOT) : body.toLowerCase(Locale.ROOT);
+                        for (final String indicator : PHISHING_INDICATORS) {
+                            if (bodyLower.contains(indicator)) {
+                                return indicator + " (found in landing DOM)";
+                            }
+                        }
+                    }
+                    break;
+                }
+            } catch (final Exception e) {
+                logger.debug("Smishing sandbox hop {} failed: {}", hops, e.getMessage());
+                break;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Strict SSRF Validator: Blocks loopback, RFC 1918 private, Carrier-Grade NAT (100.64.0.0/10),
+     * Link-Local, Multicast, and Cloud Metadata IPs.
+     */
+    public static boolean isSafePublicIp(final java.net.InetAddress address) {
+        if (address == null || address.isLoopbackAddress() || address.isSiteLocalAddress()
+                || address.isLinkLocalAddress() || address.isAnyLocalAddress()
+                || address.isMulticastAddress()) {
+            return false;
+        }
+        final byte[] b = address.getAddress();
+        // Block Carrier-Grade NAT (100.64.0.0/10 — used by 5G UPF ogstun)
+        if (b.length == 4 && (b[0] & 0xFF) == 100 && ((b[1] & 0xFF) >= 64 && (b[1] & 0xFF) <= 127)) {
+            return false;
+        }
+        // Block Cloud Metadata (169.254.169.254)
+        if (b.length == 4 && (b[0] & 0xFF) == 169 && (b[1] & 0xFF) == 254) {
+            return false;
+        }
+        // Block IPv4-mapped IPv6 literals
+        if (address instanceof java.net.Inet6Address ip6 && ip6.isIPv4CompatibleAddress()) {
+            return false;
+        }
+        return true;
     }
 
     private InterceptResponse failOpen(final String reason, final String message) {

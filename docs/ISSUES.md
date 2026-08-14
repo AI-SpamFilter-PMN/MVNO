@@ -45,8 +45,9 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * `room-silence` → Issue 8.71
 * `companion-compose` → Issue 8.72
 * `call-monitor` → Issue 8.73
+* `carrier-mesh` → Issue 8.74
 
-<!-- check-issues frontier: Issue 8.73 -->
+<!-- check-issues frontier: Issue 8.74 -->
 
 ---
 
@@ -1340,6 +1341,21 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * Status: X (fixed 2026-08-14, commit `f5f41df`)
 * Verified-by: python3 scripts/demo/call_monitor.py live HUD execution on 2026-08-14
 * Distinct-from: 8.39 (watchdog) — different purpose: 8.39 was background SRE health monitor; 8.73 is interactive real-time call & mic HUD.
+
+### Issue 8.74: SOTA Carrier Telephony Innovations, 5G L7 DPI & Security Mesh
+* Symptom: Carrier network required next-generation security and anti-fraud features: deep smishing URL sandboxing (302 following), RFC 8588 STIR/SHAKEN cryptographic PASSporT signing, stateful interactive USSD (*100#), emergency 911 Layer 0 preemption, AI voice clone DSP detection, and 5G user plane deep packet inspection.
+* Root Cause: Earlier stack relied on static headers and simple regex matching, lacking live async HTTP redirect sandboxing with SSRF guards, true in-memory ES256 ECDSA crypto, and GTP-U/ogstun L7 packet probes.
+* Fix:
+  1. Implemented SSRF-guarded async HTTP 301/302 redirect follower in `AiFilterService.java` (blocking 10.0.0.0/8, 100.64.0.0/10, 169.254.169.254).
+  2. Implemented RFC 8224 / RFC 8588 STIR/SHAKEN ECDSA P-256 signer with mandatory `origid` UUID in `StirShakenCryptoService.java`.
+  3. Implemented 3GPP TS 24.090 stateful USSD session engine in `UssdSessionService.java` (*100# -> 1: Balance, 2: Top-Up, 3: 5G Slices).
+  4. Implemented Layer 0 Emergency 911 / 112 priority preemption in `kamailio.cfg` routing directly to Asterisk PSAP trunk (`10.89.0.63:5061`).
+  5. Implemented AI Voice Clone & Synthetic Audio DSP Analyzer in `VoiceCloneDetector.java` (pitch jitter & spectral centroid).
+  6. Implemented 5G L7 Deep Packet Inspection (DPI) Probe in `scripts/dpi/dpi_probe.py` decoding DNS (53), TLS SNI (443), and HTTP (80).
+* Verification: Verified live 2026-08-14 — `test_all_advanced_features.py` passed 6/6 tests (0 mocks) and `make smoke-test` passed 7/7 stages with 100% clean assertions.
+* Status: X (fixed 2026-08-14)
+* Verified-by: python3 scripts/testing/test_all_advanced_features.py (6/6 PASS) and make smoke-test (7/7 PASS) on 2026-08-14
+* Distinct-from: 8.73 (call monitor) — different scope: 8.74 introduces full cryptographic attestation, L7 DPI, emergency bypass, and DSP voice analytics.
 
 ---
 

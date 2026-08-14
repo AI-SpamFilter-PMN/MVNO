@@ -608,6 +608,7 @@ services:
       #   POST /api/v1/voice/filter {callerId, receiverId, transcript}
       - FILTERATION_VOICE_URL=${FILTERATION_VOICE_URL:-http://filteration-system:8000/api/v1/voice/filter}
     volumes:
+      - ./telecom-api/target/intercept-gateway-1.0.0.jar:/app/app.jar:z
       - ./state/kamailio:/etc/kamailio:z
       - ./state/spool:/var/spool/rtpengine:z
       # Model source dir maps to the container path selected above (default small).
