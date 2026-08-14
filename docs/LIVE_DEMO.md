@@ -20,11 +20,40 @@
 > **One-shot cockpit**: instead of juggling T-A..T-M by hand, `bash
 > scripts/demo/demo_live.sh` opens all of them as a tmux session (S11).
 
-> **Portable `find` newest-file idiom**: this host (and many dev shells) alias
-> `ls` to `eza`, which breaks `ls -t | head` (icons/ANSI, no GNU sort). Everywhere
-> the demo needs "the newest file" it uses
-> `scripts/testing/newest.sh 'glob'` (GNU `find -printf`, `\ls`-and-`eza`-safe).
-> No `ls` is invoked, so the same snippet works on Ubuntu/GNU too.
+---
+
+## 🎯 Supervisor Quick-Start Executive Runbook (0-Cold-Start to Complete Live Demo)
+
+When demonstrating the project live to your academic or technical supervisor, execute these 5 high-impact stages in order:
+
+### Stage 1: Zero Cold-Start Bootstrap (37 Containers Up & Healthy)
+```bash
+cd /home/zkhattab/AI-SpamFilter-PMN/MVNO
+make bootstrap
+# ≡ make init-db -> make up -> make seed-mongo -> make bootstrap-check (8/8 functional checks green)
+```
+
+### Stage 2: Full Bidirectional Matrix E2E Test (12/12 Automated Suite)
+```bash
+python3 scripts/testing/bidirectional_matrix_e2e.py
+# Runs all 12 permutations: 2G<->2G, 2G<->5G, 5G<->5G, AI Phishing Block, ConfBridge 7001, IVR 8000, and Linphone!
+```
+
+### Stage 3: Live Microphone Capture & Real-Time Vosk ASR Transcription
+```bash
+bash scripts/demo/mic_verify.sh
+# 🎙️ Prompts you to speak into laptop microphone -> records WAV -> Native Vosk JNI transcribes -> AI verdict printed!
+```
+
+### Stage 4: Physical Android Handset Live Call & ConfBridge Conference
+* **Softphone Setup**: Linphone Android on `192.168.100.34` (User: `15551234567`, Domain: `192.168.100.93:5060`).
+* **Multi-Party Mixed Conference**: Dial `7001` from the phone to join Asterisk ConfBridge with laptop speaker/mic.
+* **Interactive Call Screening IVR**: Dial `8000` to state your name and press `1` to accept.
+
+### Stage 5: Mirrored Local NeonDB & Companion Repositories
+* **Local Postgres Mirror**: Running on `127.0.0.1:5433/neondb` (9 tables: `blocklist`, `calls`, `messages`, `users`, `logs`).
+* **Admin Dashboard**: Run `admin-client` on `http://localhost:8082` to moderate subscribers and view live call/SMS logs.
+* **SMS Portal**: Run `sms-client` on `http://localhost:8083` to send/receive messages via SMPP.
 
 ---
 
