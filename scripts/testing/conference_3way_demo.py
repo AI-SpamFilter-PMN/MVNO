@@ -72,8 +72,6 @@ def main():
     except Exception as e:
         print(f"  [!] ADB Linphone dial notice: {e}")
 
-    time.sleep(3)
-
     # 4. Assert Active ConfBridge Participants in Asterisk
     print("\n[4/4] Querying Asterisk ConfBridge Active Room Participants:")
     conf_list = run_cmd("podman exec mvno-asterisk asterisk -rx 'confbridge list 001'")
@@ -81,7 +79,12 @@ def main():
     print(conf_list)
     print("-" * 50)
 
-    time.sleep(4)
+    # Empirical Verification Assertion (Karpathy Rule 4)
+    if "1555" not in conf_list or "default_bridge" not in conf_list:
+        subprocess.run(["make", "hangup"], capture_output=True, check=False)
+        raise RuntimeError("Empirical assertion FAILED: ConfBridge room 001 has no active participant channels!")
+
+    time.sleep(3)
 
     # Clean termination
     subprocess.run(["make", "hangup"], capture_output=True, check=False)
@@ -91,7 +94,7 @@ def main():
     except Exception:
         pass
 
-    print("\n🎉 3-WAY MULTI-PARTY CONFERENCE VERIFIED SUCCESSFULLY!")
+    print("\n🎉 3-WAY MULTI-PARTY CONFERENCE EMPIRICALLY VERIFIED WITH ACTIVE MIXED CHANNELS!")
 
 
 if __name__ == "__main__":

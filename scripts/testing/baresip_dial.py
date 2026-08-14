@@ -53,11 +53,23 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=4444)
     ap.add_argument("--timeout", type=float, default=12.0)
-    ap.add_argument("--uri", default="sip:15559998888@10.89.0.23:5060")
+    ap.add_argument("--duration", type=float, default=None, help="alias for timeout")
+    ap.add_argument("--uri", default=None)
+    ap.add_argument("--target", default=None, help="alias for --uri")
+    ap.add_argument("--callee", default=None, help="alias for --uri")
     ap.add_argument("--hangup", action="store_true")
     ap.add_argument("--drain", type=float, default=0.5,
                     help="seconds to drain the socket before dialing")
     args = ap.parse_args()
+
+    if args.duration is not None:
+        args.timeout = args.duration
+    if args.target:
+        args.uri = args.target
+    elif args.callee:
+        args.uri = args.callee
+    if not args.uri:
+        args.uri = "sip:15559998888@10.89.0.23:5060"
 
     sock = socket.create_connection((args.host, args.port), timeout=5)
     sock.settimeout(0.2)

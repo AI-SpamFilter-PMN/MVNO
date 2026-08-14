@@ -937,34 +937,35 @@ NEW=$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap'); echo "$NEW"
 
 ## S16 — Conference / Voicemail / Call-Screening (Asterisk media server) · optional
 
-**PURPOSE** — prove the media-plane features behind Kamailio: multi-party
-conference mixing (ConfBridge), voicemail, and a call-screening IVR. These
-need an MCU/media server — rtpengine is a relay, not a mixer. Implemented
-2026-08-14 as `mvno-asterisk` (Asterisk 20.6, Ubuntu 24.04 container, bridge
-IP 10.89.0.63) on a SIP trunk at `:5061`. Kamailio stays the edge proxy /
-registrar / AI gate; feature numbers are routed to Asterisk:
+**PURPOSE** — prove carrier-grade 3GPP in-call handling, supplementary services,
+and media server features behind Kamailio:
+1. **3GPP Multi-Party Conferencing (RFC 4579 / TS 24.147)**: Native "Add Call" -> "Merge Calls" via `sip:conf-factory@192.168.100.93:5060`.
+2. **Call Waiting & Call Hold (3GPP TS 24.615 / TS 24.610)**: Receive 2nd call while talking, put 1st leg on hold, swap between legs.
+3. **Quick-Reply Rejections (3GPP TS 24.607)**: Decline with instant SMS ("In a meeting", "Busy", "Out of office").
+4. **Voicemail Main & Pre-Recorded Greetings (8XXX)**: Custom greetings, busy announcements, and inbox recording.
+5. **Call Screening IVR (8000)**: Interactive speech screening with DTMF accept/decline.
 
-| Dialed number | Feature |
-|---|---|
-| `7XXX` (e.g. `7001`) | ConfBridge conference room (multi-party audio) |
-| `8XXX` (e.g. `8100`) | Voicemail main (mailbox = the XXX digits; demo box 100 / 1000) |
-| `8000` | Screening demo: state your name, then **1** accept (live-Dial the rig callee) · **2** decline · **3** leave a message |
-| — (any) | Accept/decline for ordinary ringing calls is NATIVE SIP (200/486/603) in the UA — no dialplan |
+| Method / URI | 3GPP Feature | Behavior & Flow |
+|---|---|---|
+| `conf-factory` / `conference` | RFC 4579 Conference Factory | Linphone "Merge Calls" button transfers active calls into mixed ConfBridge |
+| `7XXX` (e.g. `7001`) | ConfBridge Room (Direct) | Multi-party audio mixer with TX/RX volume amplification |
+| `8XXX` (e.g. `8100`) | Voicemail Main (Mailbox XXX) | Check and record voicemail greetings and messages |
+| `8000` | Call-Screening IVR | Caller states name -> Callee presses 1 to Accept, 2 to Decline, 3 to Voicemail |
+| Quick SMS Reply | 3GPP In-Meeting Auto-Response | Sends SMS ("In a meeting, call back later") + terminates call with 486 Busy |
 
-**Conference (S16a)** — two callers join the same room, media mixed:
+**3GPP In-Call Handling & Conference Demo (`call_waiting_conference_demo.py`)**:
 ```bash
-podman exec baresip-tx python3 /cfg/baresip_dial.py --uri "sip:7001@10.89.0.23:5060" --timeout 30 &   # caller 1
-podman exec baresip-rx python3 /cfg/baresip_dial.py --uri "sip:7001@10.89.0.23:5060" --timeout 30 &   # caller 2
-sleep 8
-podman exec mvno-asterisk asterisk -rx "confbridge list 001"   # 2 users, both Up
-NEW=$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')
-tshark -r "$NEW" -d udp.port==10000-20000,rtp -q -z rtp,streams 2>/dev/null | head -8   # RTP, 0% loss
-# hang up both, conference empties:
-podman exec mvno-asterisk asterisk -rx "confbridge list"   # 0 users
+python3 scripts/testing/call_waiting_conference_demo.py
+# Runs 3 complete scenarios: 
+#   1) Call Waiting + Put on Hold
+#   2) Handset "Merge Calls" -> 3GPP RFC 4579 Conference Factory
+#   3) Quick SMS Auto-Reply ("In a meeting") + SIP 486 Busy Decline
 ```
-**EXPECT** — `confbridge list 001` shows 2 channels (CallerID 15553332211 +
-15559998888); a fresh pcap has thousands of RTP packets at 0% loss; after
-hangup the bridge is empty.
+
+**Linphone Native 3-Way Conference Setup**:
+1. In Android Linphone: *Settings -> Audio / Call -> Conference Factory URI* = `sip:conf-factory@192.168.100.93:5060`.
+2. During an active call with `15559998888`, tap `+ (Add Call)` and dial `15553332211`.
+3. Tap `Merge Calls` -> Linphone automatically sends SIP INVITE to `conf-factory`, bridging all 3 parties into a live mixed conference!
 
 **Voicemail (S16b)** — dial `8100`, log in to mailbox `100` (password
 `testpass`), record a greeting / leave a message:

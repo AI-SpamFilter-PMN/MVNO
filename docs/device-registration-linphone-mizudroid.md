@@ -99,7 +99,30 @@ it (see `2026-08-09-g722-sip-rtp-path.md`).
 > call are yours to perform. Everything up to the physical device is pre-verified
 > (see `2026-08-09-g722-sip-rtp-path.md`); the only unproven link is the phone.
 
-## F. Where this came from
+---
+
+## F. 3GPP Group Calls, Conference Factory & In-Call Supplementary Services
+
+### 1. Conference Factory Setup (for native "Merge Calls" button)
+* In Linphone Android: **Settings -> Audio / Call -> Conference Factory URI**
+* Set to: `sip:conf-factory@<HOST-LAN-IP>:5060`
+
+### 2. Live 3-Way Group Calling (Merge Calls)
+1. Call contact A (`15559998888`).
+2. Once connected, tap **`+` (Add Call)** on Linphone screen and dial contact B (`15553332211`). Contact A is placed on Hold.
+3. Tap **`Merge Calls` (Conference icon)** -> Linphone automatically sends SIP INVITE to `conf-factory`, merging all 3 parties into a live mixed conference!
+
+### 3. Call Waiting & Call Hold (CW / CH)
+* When a 2nd call arrives while you are already talking:
+  * Tap **`Accept`** -> 1st call is put on Hold (`a=sendonly`).
+  * Tap **`Swap`** -> Toggles between the two callers.
+
+### 4. Quick Auto-Reply & Voicemail
+* To decline with a quick message: Tap **`Send Message`** ("In a meeting, call back later"). Linphone sends the SMS and terminates the call with `486 Busy`.
+* To check voicemails or recorded greetings: Dial **`8100`** (Mailbox `100`, password `testpass`).
+
+
+## G. Where this came from
 
 - Live DB dump: `state/kamailio/kamailio.db` → `subscriber` table (all 6 rows above).
 - Host L2/L3: `ip -4 addr show` → `<HOST-LAN-IP>/24` on the active interface (LAN IP from `hostname -I`).
