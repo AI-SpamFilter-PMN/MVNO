@@ -268,7 +268,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(eir_sim_swaps_detected_total) default 0",
+          "expr": "sum(mvno_eir_sim_swap_detected_total) default 0",
           "refId": "A"
         }
       ]
@@ -291,9 +291,9 @@
         "uid": "victoriametrics"
       },
       "id": 5,
-      "title": "\ud83d\udd11 Transcribed Scam & Phishing Keywords (Vosk ASR)",
-      "description": "Frequency of high-risk banking/phishing phrases detected in live call audio.",
-      "type": "bargauge",
+      "title": "\u26a1 Offline Vosk ASR Speech Transcriptions",
+      "description": "Audio call media segments transcribed and classified by Vosk JNI.",
+      "type": "stat",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -303,7 +303,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "fixedColor": "#00E676",
+            "mode": "fixed"
           },
           "thresholds": {
             "mode": "absolute",
@@ -311,14 +312,6 @@
               {
                 "color": "#00E676",
                 "value": null
-              },
-              {
-                "color": "#FF9100",
-                "value": 2
-              },
-              {
-                "color": "#FF0055",
-                "value": 5
               }
             ]
           },
@@ -326,8 +319,8 @@
         }
       },
       "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
+        "colorMode": "background",
+        "graphMode": "area",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -335,7 +328,7 @@
           "fields": "",
           "values": false
         },
-        "showUnfilled": true
+        "textMode": "auto"
       },
       "targets": [
         {
@@ -343,8 +336,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (keyword) (mvno_speech_keyword_hits_total)",
-          "legendFormat": "{{keyword}}",
+          "expr": "sum(mvno_vosk_transcriptions_total) default 0",
           "refId": "A"
         }
       ]
@@ -355,9 +347,9 @@
         "uid": "victoriametrics"
       },
       "id": 6,
-      "title": "\u26a1 AI ASR Transcription Velocity & Latency",
-      "description": "Rate of real-time speech segments processed by offline Vosk ASR JNI.",
-      "type": "timeseries",
+      "title": "\ud83d\udee1\ufe0f Smishing URLs Neutralized by Sandbox",
+      "description": "Malicious URLs redirected through SSRF guard and blocked.",
+      "type": "stat",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -367,41 +359,32 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "fixedColor": "#FF0055",
+            "mode": "fixed"
           },
-          "custom": {
-            "fillOpacity": 18,
-            "lineWidth": 2
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Transcriptions"
-            },
-            "properties": [
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
               {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#00F2FE",
-                  "mode": "fixed"
-                }
+                "color": "#FF0055",
+                "value": null
               }
             ]
-          }
-        ]
+          },
+          "unit": "short"
+        }
       },
       "options": {
-        "legend": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
           "calcs": [
-            "lastNotNull",
-            "max"
+            "lastNotNull"
           ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
       },
       "targets": [
         {
@@ -409,8 +392,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(mvno_speech_transcriptions_total) default 0",
-          "legendFormat": "Transcriptions",
+          "expr": "sum(mvno_smishing_url_blocked_total) default 0",
           "refId": "A"
         }
       ]

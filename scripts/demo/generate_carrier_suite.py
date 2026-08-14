@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """
 generate_carrier_suite.py — Generates the Complete SOTA Tier-1 Vibrant Telecom NOC Suite
-Includes:
-1. MVNO NOC — Unified (Master Single-Pane Carrier Cockpit with ALL subsystems)
-2. MVNO SOC — AI Anti-Fraud & Cyber Security Mesh (Vibrant Threat Intelligence)
-3. MVNO 5G SA — Core Network & Data Plane Slicing (GTP-U & L7 DPI)
-4. MVNO IMS — Voice Signaling & RTP Media Performance (Kamailio & RTPEngine)
-5. MVNO VictoriaMetrics — Platform TSDB Infrastructure (Storage, Memory, Scrapes)
+Using 100% Real, Authoritative Metric Names from Live Exporters:
+  - RTPEngine: rtpengine_sessions, rtpengine_bytes_total, rtpengine_zero_packet_streams_total, rtpengine_packet_errors_total, rtpengine_ports_free, rtpengine_uptime_seconds
+  - IP-SM-GW: mvno_bridge_sms_2g_to_5g_total, mvno_bridge_sms_5g_to_2g_total, mvno_bridge_sms_failures_total, mvno_bridge_sms_attempts_total
+  - Vosk ASR: mvno_vosk_transcriptions_total, mvno_vosk_classified_total, mvno_vosk_scamflag_total, mvno_vosk_model_ready
+  - Telecom EIR: mvno_eir_sim_swap_detected_total, mvno_eir_cache_size, mvno_smishing_url_blocked_total
+  - 5G SA Core & DPI: ran_ue, fivegs_upffunction_upf_sessionnbr, mvno_dpi_bytes_total, mvno_dpi_flows_active, mvno_dpi_threats_intercepted_total
 """
 import json
 import os
-import urllib.request
-import base64
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 DASH_DIR = os.path.join(REPO_ROOT, "configs/grafana/provisioning/dashboards")
@@ -119,11 +117,11 @@ def make_unified_dashboard():
     # ─── SECTION 3: SOC & AI ANTI-FRAUD MESH (y=14) ───
     dash["panels"].append({"collapsed": False, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14}, "id": 200, "title": "🛡️ AI ANTI-FRAUD & CYBER SECURITY MESH", "type": "row"})
     dash["panels"].append({
-        "datasource": DS_VM, "id": 201, "title": "🔑 Flagged Phishing & Fraud Keywords (Vosk ASR)", "description": "High-risk banking/phishing phrases transcribed live from call media.", "type": "bargauge",
+        "datasource": DS_VM, "id": 201, "title": "⚡ Offline Vosk ASR Speech Transcriptions", "description": "Audio call media segments transcribed and classified by Vosk JNI.", "type": "stat",
         "gridPos": {"h": 7, "w": 12, "x": 0, "y": 15},
-        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#00E676", "value": None}, {"color": "#FF9100", "value": 2}, {"color": "#FF0055", "value": 5}]}, "unit": "short"}},
-        "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "showUnfilled": True},
-        "targets": [{"datasource": DS_VM, "expr": "sum by (keyword) (mvno_speech_keyword_hits_total)", "legendFormat": "{{keyword}}", "refId": "A"}]
+        "fieldConfig": {"defaults": {"color": {"fixedColor": "#00E676", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#00E676", "value": None}]}, "unit": "short"}},
+        "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "textMode": "auto"},
+        "targets": [{"datasource": DS_VM, "expr": "sum(mvno_vosk_transcriptions_total) default 0", "refId": "A"}]
     })
     dash["panels"].append({
         "datasource": DS_VM, "id": 202, "title": "📱 SMS Ingestion vs Spam Neutralization Volume", "description": "Incoming SMS messages versus spam/smishing blocked by AI.", "type": "timeseries",
@@ -203,28 +201,28 @@ def make_unified_dashboard():
         "gridPos": {"h": 4, "w": 4, "x": 0, "y": 38},
         "fieldConfig": {"defaults": {"color": {"fixedColor": "#00F2FE", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#00F2FE", "value": None}]}, "unit": "short"}},
         "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "textMode": "auto"},
-        "targets": [{"datasource": DS_VM, "expr": "sum(ipsmgw_messages_total{direction=\"2g_to_5g\"}) default 0", "refId": "A"}]
+        "targets": [{"datasource": DS_VM, "expr": "sum(mvno_bridge_sms_2g_to_5g_total) default 0", "refId": "A"}]
     })
     dash["panels"].append({
         "datasource": DS_VM, "id": 111, "title": "5G ➔ 2G Backhaul", "description": "SIP MESSAGE SMS delivered to GSM handsets.", "type": "stat",
         "gridPos": {"h": 4, "w": 4, "x": 4, "y": 38},
         "fieldConfig": {"defaults": {"color": {"fixedColor": "#7928CA", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#7928CA", "value": None}]}, "unit": "short"}},
         "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "textMode": "auto"},
-        "targets": [{"datasource": DS_VM, "expr": "sum(ipsmgw_messages_total{direction=\"5g_to_2g\"}) default 0", "refId": "A"}]
+        "targets": [{"datasource": DS_VM, "expr": "sum(mvno_bridge_sms_5g_to_2g_total) default 0", "refId": "A"}]
     })
     dash["panels"].append({
         "datasource": DS_VM, "id": 112, "title": "Bridge Failures", "description": "Timed-out or dropped cross-network SMS.", "type": "stat",
         "gridPos": {"h": 4, "w": 4, "x": 8, "y": 38},
         "fieldConfig": {"defaults": {"color": {"fixedColor": "#FF0055", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#00E676", "value": None}, {"color": "#FF0055", "value": 1}]}, "unit": "short"}},
         "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "textMode": "auto"},
-        "targets": [{"datasource": DS_VM, "expr": "sum(ipsmgw_delivery_failures_total) default 0", "refId": "A"}]
+        "targets": [{"datasource": DS_VM, "expr": "sum(mvno_bridge_sms_failures_total) default 0", "refId": "A"}]
     })
     dash["panels"].append({
-        "datasource": DS_VM, "id": 113, "title": "🌉 2G↔5G SMS Interworking Traffic Volume", "description": "Cross-network bidirectional SMS packet volume.", "type": "timeseries",
+        "datasource": DS_VM, "id": 113, "title": "Bridge Ingress Attempts", "description": "Cross-network SMS bridge attempts initiated.", "type": "stat",
         "gridPos": {"h": 4, "w": 12, "x": 12, "y": 38},
-        "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 18, "lineWidth": 2}, "unit": "short"}},
-        "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom"}},
-        "targets": [{"datasource": DS_VM, "expr": "sum by (direction) (ipsmgw_messages_total)", "legendFormat": "{{direction}}", "refId": "A"}]
+        "fieldConfig": {"defaults": {"color": {"fixedColor": "#38BDF8", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#38BDF8", "value": None}]}, "unit": "short"}},
+        "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "textMode": "auto"},
+        "targets": [{"datasource": DS_VM, "expr": "sum(mvno_bridge_sms_attempts_total) default 0", "refId": "A"}]
     })
 
     # ─── SECTION 7: MEDIA & CORE INFRASTRUCTURE HEALTH (y=42) ───
@@ -234,14 +232,14 @@ def make_unified_dashboard():
         "gridPos": {"h": 4, "w": 4, "x": 0, "y": 43},
         "fieldConfig": {"defaults": {"color": {"fixedColor": "#00F2FE", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#00F2FE", "value": None}]}, "unit": "short"}},
         "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "textMode": "auto"},
-        "targets": [{"datasource": DS_VM, "expr": "rtpengine_current_sessions default 0", "refId": "A"}]
+        "targets": [{"datasource": DS_VM, "expr": "rtpengine_sessions default 0", "refId": "A"}]
     })
     dash["panels"].append({
         "datasource": DS_VM, "id": 123, "title": "Stuck RTP Streams", "description": "Zero-packet stuck audio sessions.", "type": "stat",
         "gridPos": {"h": 4, "w": 4, "x": 4, "y": 43},
         "fieldConfig": {"defaults": {"color": {"fixedColor": "#FF0055", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#00E676", "value": None}, {"color": "#FF0055", "value": 1}]}, "unit": "short"}},
         "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "textMode": "auto"},
-        "targets": [{"datasource": DS_VM, "expr": "sum(rtpengine_zeropacket_sessions) default 0", "refId": "A"}]
+        "targets": [{"datasource": DS_VM, "expr": "sum(rtpengine_zero_packet_streams_total) default 0", "refId": "A"}]
     })
     dash["panels"].append({
         "datasource": DS_VM, "id": 124, "title": "RTP Packet Errors", "description": "Corrupted/dropped UDP media packets.", "type": "stat",
@@ -298,7 +296,7 @@ def make_soc_dashboard():
         ("🚨 Malicious SMS / Smishing Blocked", "sum(mvno_sms_blocked_total) default 0", "#FF0055", "Smishing messages containing weaponized URLs or financial scams intercepted by AI.", 0),
         ("📞 Fraudulent Voice Calls Blocked", "sum(mvno_call_blocked_total) default 0", "#FF5252", "Robocalls, spoofed caller IDs, and fraud voice attempts blocked at Kamailio.", 6),
         ("🔍 5G UPF Phishing Intercepts", "sum(mvno_dpi_threats_intercepted_total) default 0", "#FF9100", "L7 DNS queries and TLS SNIs blocked on 5G user plane (ogstun 10.45.0.1).", 12),
-        ("🔐 EIR SIM-Swap Violations", "sum(eir_sim_swaps_detected_total) default 0", "#7928CA", "IMSI/IMEI binding mismatches flagged by Equipment Identity Register.", 18)
+        ("🔐 EIR SIM-Swap Violations", "sum(mvno_eir_sim_swap_detected_total) default 0", "#7928CA", "IMSI/IMEI binding mismatches flagged by Equipment Identity Register.", 18)
     ]
     for idx, (title, expr, color, desc, x_pos) in enumerate(soc_kpis, 1):
         dash["panels"].append({
@@ -311,21 +309,18 @@ def make_soc_dashboard():
 
     dash["panels"].append({"collapsed": False, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}, "id": 20, "title": "🧠 AI ACOUSTIC SPEECH & VOICE CLONE DETECTION PIPELINE", "type": "row"})
     dash["panels"].append({
-        "datasource": DS_VM, "id": 5, "title": "🔑 Transcribed Scam & Phishing Keywords (Vosk ASR)", "description": "Frequency of high-risk banking/phishing phrases detected in live call audio.", "type": "bargauge",
+        "datasource": DS_VM, "id": 5, "title": "⚡ Offline Vosk ASR Speech Transcriptions", "description": "Audio call media segments transcribed and classified by Vosk JNI.", "type": "stat",
         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
-        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#00E676", "value": None}, {"color": "#FF9100", "value": 2}, {"color": "#FF0055", "value": 5}]}, "unit": "short"}},
-        "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "showUnfilled": True},
-        "targets": [{"datasource": DS_VM, "expr": "sum by (keyword) (mvno_speech_keyword_hits_total)", "legendFormat": "{{keyword}}", "refId": "A"}]
+        "fieldConfig": {"defaults": {"color": {"fixedColor": "#00E676", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#00E676", "value": None}]}, "unit": "short"}},
+        "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "textMode": "auto"},
+        "targets": [{"datasource": DS_VM, "expr": "sum(mvno_vosk_transcriptions_total) default 0", "refId": "A"}]
     })
     dash["panels"].append({
-        "datasource": DS_VM, "id": 6, "title": "⚡ AI ASR Transcription Velocity & Latency", "description": "Rate of real-time speech segments processed by offline Vosk ASR JNI.", "type": "timeseries",
+        "datasource": DS_VM, "id": 6, "title": "🛡️ Smishing URLs Neutralized by Sandbox", "description": "Malicious URLs redirected through SSRF guard and blocked.", "type": "stat",
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
-        "fieldConfig": {
-            "defaults": {"color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 18, "lineWidth": 2}, "unit": "short"},
-            "overrides": [{"matcher": {"id": "byName", "options": "Transcriptions"}, "properties": [{"id": "color", "value": {"fixedColor": "#00F2FE", "mode": "fixed"}}]}]
-        },
-        "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom"}},
-        "targets": [{"datasource": DS_VM, "expr": "sum(mvno_speech_transcriptions_total) default 0", "legendFormat": "Transcriptions", "refId": "A"}]
+        "fieldConfig": {"defaults": {"color": {"fixedColor": "#FF0055", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#FF0055", "value": None}]}, "unit": "short"}},
+        "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}, "textMode": "auto"},
+        "targets": [{"datasource": DS_VM, "expr": "sum(mvno_smishing_url_blocked_total) default 0", "refId": "A"}]
     })
 
     dash["panels"].append({"collapsed": False, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14}, "id": 30, "title": "📋 REAL-TIME THREAT INTERCEPTION STREAM (VICTORIALOGS)", "type": "row"})
@@ -413,8 +408,8 @@ def make_ims_dashboard():
     dash["panels"].append({"collapsed": False, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 10, "title": "🎙️ IMS VOICE SIGNALING & RTP MEDIA RELAY HEALTH", "type": "row"})
     
     ims_kpis = [
-        ("Active RTP Sessions", "rtpengine_current_sessions default 0", "#00F2FE", "Active audio channels currently bridged through in-kernel RTPEngine.", 0),
-        ("Stuck RTP Streams", "sum(rtpengine_zeropacket_sessions) default 0", "#FF0055", "RTP streams with 0 packets transmitted (dead audio / firewall drop).", 4),
+        ("Active RTP Sessions", "rtpengine_sessions default 0", "#00F2FE", "Active audio channels currently bridged through in-kernel RTPEngine.", 0),
+        ("Stuck RTP Streams", "sum(rtpengine_zero_packet_streams_total) default 0", "#FF0055", "RTP streams with 0 packets transmitted (dead audio / firewall drop).", 4),
         ("RTP Packet Errors", "sum(rtpengine_packet_errors_total) default 0", "#FF9100", "Corrupted or dropped media packets.", 8),
         ("Available Media Ports", "rtpengine_ports_free default 0", "#00E676", "Free UDP ports in the 10000-20000 RTP port allocation pool.", 12),
         ("Total Processed Calls", "sum(mvno_call_requests_total) default 0", "#38BDF8", "Cumulative SIP calls handled since startup.", 16)
@@ -453,7 +448,7 @@ def make_ims_dashboard():
     return dash
 
 # ──────────────────────────────────────────────────────────────────────────────
-# WRITE AND PUBLISH ALL 5 DASHBOARDS
+# WRITE AND PUBLISH ALL 4 DASHBOARDS
 # ──────────────────────────────────────────────────────────────────────────────
 all_dashboards = [
     ("mvno_unified_noc.json", make_unified_dashboard()),
@@ -468,4 +463,4 @@ for filename, dash_obj in all_dashboards:
         json.dump(dash_obj, f, indent=2)
     print(f"✓ Wrote {filename} ({len(dash_obj['panels'])} panels)")
 
-print("\nAll 4 Carrier NOC Dashboards generated cleanly with SOTA vibrant color coding!")
+print("\nAll 4 Carrier NOC Dashboards generated with 100% authoritative exporter metric names!")

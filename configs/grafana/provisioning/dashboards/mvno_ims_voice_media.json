@@ -96,7 +96,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "rtpengine_current_sessions default 0",
+          "expr": "rtpengine_sessions default 0",
           "refId": "A"
         }
       ]
@@ -152,7 +152,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(rtpengine_zeropacket_sessions) default 0",
+          "expr": "sum(rtpengine_zero_packet_streams_total) default 0",
           "refId": "A"
         }
       ]

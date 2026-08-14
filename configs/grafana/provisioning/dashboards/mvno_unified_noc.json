@@ -488,9 +488,9 @@
         "uid": "victoriametrics"
       },
       "id": 201,
-      "title": "\ud83d\udd11 Flagged Phishing & Fraud Keywords (Vosk ASR)",
-      "description": "High-risk banking/phishing phrases transcribed live from call media.",
-      "type": "bargauge",
+      "title": "\u26a1 Offline Vosk ASR Speech Transcriptions",
+      "description": "Audio call media segments transcribed and classified by Vosk JNI.",
+      "type": "stat",
       "gridPos": {
         "h": 7,
         "w": 12,
@@ -500,7 +500,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "fixedColor": "#00E676",
+            "mode": "fixed"
           },
           "thresholds": {
             "mode": "absolute",
@@ -508,14 +509,6 @@
               {
                 "color": "#00E676",
                 "value": null
-              },
-              {
-                "color": "#FF9100",
-                "value": 2
-              },
-              {
-                "color": "#FF0055",
-                "value": 5
               }
             ]
           },
@@ -523,8 +516,9 @@
         }
       },
       "options": {
-        "displayMode": "gradient",
-        "orientation": "horizontal",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -532,7 +526,7 @@
           "fields": "",
           "values": false
         },
-        "showUnfilled": true
+        "textMode": "auto"
       },
       "targets": [
         {
@@ -540,8 +534,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (keyword) (mvno_speech_keyword_hits_total)",
-          "legendFormat": "{{keyword}}",
+          "expr": "sum(mvno_vosk_transcriptions_total) default 0",
           "refId": "A"
         }
       ]
@@ -1047,7 +1040,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(ipsmgw_messages_total{direction=\"2g_to_5g\"}) default 0",
+          "expr": "sum(mvno_bridge_sms_2g_to_5g_total) default 0",
           "refId": "A"
         }
       ]
@@ -1103,7 +1096,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(ipsmgw_messages_total{direction=\"5g_to_2g\"}) default 0",
+          "expr": "sum(mvno_bridge_sms_5g_to_2g_total) default 0",
           "refId": "A"
         }
       ]
@@ -1163,7 +1156,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(ipsmgw_delivery_failures_total) default 0",
+          "expr": "sum(mvno_bridge_sms_failures_total) default 0",
           "refId": "A"
         }
       ]
@@ -1174,9 +1167,9 @@
         "uid": "victoriametrics"
       },
       "id": 113,
-      "title": "\ud83c\udf09 2G\u21945G SMS Interworking Traffic Volume",
-      "description": "Cross-network bidirectional SMS packet volume.",
-      "type": "timeseries",
+      "title": "Bridge Ingress Attempts",
+      "description": "Cross-network SMS bridge attempts initiated.",
+      "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 12,
@@ -1186,24 +1179,32 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "fixedColor": "#38BDF8",
+            "mode": "fixed"
           },
-          "custom": {
-            "fillOpacity": 18,
-            "lineWidth": 2
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#38BDF8",
+                "value": null
+              }
+            ]
           },
           "unit": "short"
         }
       },
       "options": {
-        "legend": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
           "calcs": [
-            "lastNotNull",
-            "max"
+            "lastNotNull"
           ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
       },
       "targets": [
         {
@@ -1211,8 +1212,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum by (direction) (ipsmgw_messages_total)",
-          "legendFormat": "{{direction}}",
+          "expr": "sum(mvno_bridge_sms_attempts_total) default 0",
           "refId": "A"
         }
       ]
@@ -1280,7 +1280,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "rtpengine_current_sessions default 0",
+          "expr": "rtpengine_sessions default 0",
           "refId": "A"
         }
       ]
@@ -1340,7 +1340,7 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "sum(rtpengine_zeropacket_sessions) default 0",
+          "expr": "sum(rtpengine_zero_packet_streams_total) default 0",
           "refId": "A"
         }
       ]
