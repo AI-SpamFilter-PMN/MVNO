@@ -103,7 +103,7 @@ capture_probe() {
     # with mtime-age > 3s and can decode a SHORT capture mid-write — landing
     # via .part + atomic rename (watcher filter endsWith(".wav")) guarantees
     # it only ever reads a complete file (see mic_record.sh for the same fix).
-    timeout 15 ffmpeg -y -loglevel error -f pulse -i "${CAPTURE_SRC}" -ar 16000 -ac 1 \
+    timeout 15 ffmpeg -nostdin -y -loglevel error -f pulse -i "${CAPTURE_SRC}" -ar 16000 -ac 1 \
         -t 3 -f wav "${PROBE_WAV}.part" 2>"${FFMPEG_ERR}" && mv -f "${PROBE_WAV}.part" "${PROBE_WAV}"
 }
 if capture_probe; then

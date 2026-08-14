@@ -22,7 +22,7 @@
 # ==============================================================================
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SEND="${REPO_ROOT}/scripts/testing/send_rest_sms.sh"
 
 # --- flow -> (sender, recipient) mapping (canonical MSISDNs, single source) ---

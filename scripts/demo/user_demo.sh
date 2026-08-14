@@ -23,7 +23,7 @@
 #   5) evidence             view docs/evidence / prometheus scamflag
 # ==============================================================================
 set -euo pipefail
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 menu() {
     clear 2>/dev/null || true
