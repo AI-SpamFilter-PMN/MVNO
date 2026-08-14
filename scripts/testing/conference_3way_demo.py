@@ -84,8 +84,8 @@ def main():
         subprocess.run(["make", "hangup"], capture_output=True, check=False)
         raise RuntimeError("Empirical assertion FAILED: ConfBridge room 001 has no active participant channels!")
 
-    print("  • Holding 3-way conference bridge active for 7.0s...")
-    time.sleep(7)
+    print("  • Holding 3-way conference bridge active for 8.5s...")
+    time.sleep(8.5)
 
     # Clean termination
     subprocess.run(["make", "hangup"], capture_output=True, check=False)
