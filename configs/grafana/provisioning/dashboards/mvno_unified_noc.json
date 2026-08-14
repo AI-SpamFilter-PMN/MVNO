@@ -469,8 +469,8 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "ran_ue default 0",
-          "legendFormat": "registered UEs",
+          "expr": "fivegs_upffunction_upf_sessionnbr default 0",
+          "legendFormat": "Active 5G PDU Sessions",
           "refId": "A"
         }
       ],
