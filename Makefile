@@ -435,4 +435,13 @@ cockpit:
 wireshark:
 	@bash scripts/demo/demo_live.sh --wireshark
 
+# Interactive incoming call listener with desktop GUI modal popup & terminal controls
+listen-call:
+	@python3 scripts/demo/call_listener.py
+
+# Headless incoming call listener (terminal-only, ideal for tmux panes)
+listen-call-cli:
+	@python3 scripts/demo/call_listener.py --no-gui
+
+
 
