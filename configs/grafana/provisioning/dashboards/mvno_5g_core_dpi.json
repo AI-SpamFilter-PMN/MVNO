@@ -10,13 +10,14 @@
   "refresh": "5s",
   "schemaVersion": 39,
   "tags": [
-    "mvno",
-    "plane:5g",
-    "open5gs",
-    "ueransim",
-    "sota",
+    "dpi",
     "gtp-u",
-    "dpi"
+    "mvno",
+    "open5gs",
+    "plane:5g",
+    "sota",
+    "ueransim",
+    "vibrant"
   ],
   "time": {
     "from": "now-15m",
@@ -193,7 +194,7 @@
       },
       "options": {
         "colorMode": "background",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "reduceOptions": {
           "calcs": [
@@ -353,11 +354,73 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "fillOpacity": 15,
+            "fillOpacity": 18,
             "lineWidth": 2
           },
           "unit": "decbytes"
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "dns"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00F2FE",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tls"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#7928CA",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "http"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9100",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rtp"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00E676",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {

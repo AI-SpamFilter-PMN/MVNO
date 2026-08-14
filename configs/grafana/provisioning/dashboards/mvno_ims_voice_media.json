@@ -10,13 +10,14 @@
   "refresh": "5s",
   "schemaVersion": 39,
   "tags": [
+    "asterisk",
+    "kamailio",
     "mvno",
     "plane:ims",
-    "voice",
     "rtpengine",
-    "kamailio",
-    "asterisk",
-    "sota"
+    "sota",
+    "voice",
+    "vibrant"
   ],
   "time": {
     "from": "now-15m",
@@ -64,6 +65,15 @@
           "color": {
             "fixedColor": "#00F2FE",
             "mode": "fixed"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00F2FE",
+                "value": null
+              }
+            ]
           },
           "unit": "short"
         }
@@ -116,12 +126,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#00E676",
-                "value": null
-              },
-              {
                 "color": "#FF0055",
-                "value": 1
+                "value": null
               }
             ]
           },
@@ -176,12 +182,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#00E676",
-                "value": null
-              },
-              {
                 "color": "#FF9100",
-                "value": 1
+                "value": null
               }
             ]
           },
@@ -232,6 +234,15 @@
             "fixedColor": "#00E676",
             "mode": "fixed"
           },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00E676",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
@@ -279,12 +290,21 @@
             "fixedColor": "#38BDF8",
             "mode": "fixed"
           },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#38BDF8",
+                "value": null
+              }
+            ]
+          },
           "unit": "short"
         }
       },
       "options": {
         "colorMode": "background",
-        "graphMode": "area",
+        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -338,11 +358,28 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "fillOpacity": 15,
+            "fillOpacity": 18,
             "lineWidth": 2
           },
           "unit": "Bps"
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bandwidth"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00E676",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -387,11 +424,28 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "fillOpacity": 15,
+            "fillOpacity": 18,
             "lineWidth": 2
           },
           "unit": "reqps"
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Call Rate"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00F2FE",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {

@@ -10,13 +10,14 @@
   "refresh": "5s",
   "schemaVersion": 39,
   "tags": [
+    "anti-fraud",
+    "dsp",
     "mvno",
     "plane:soc",
     "security",
-    "anti-fraud",
     "sota",
     "stir-shaken",
-    "dsp"
+    "vibrant"
   ],
   "time": {
     "from": "now-15m",
@@ -369,11 +370,28 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "fillOpacity": 15,
+            "fillOpacity": 18,
             "lineWidth": 2
           },
           "unit": "short"
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Transcriptions"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00F2FE",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
