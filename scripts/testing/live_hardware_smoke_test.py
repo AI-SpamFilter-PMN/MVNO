@@ -120,7 +120,8 @@ def main():
     print("  ✓ Live SIP Registration & Adaptive USRLOC Routing Verified.")
 
     # ─── 3. Live 1-to-1 Voice Call + Real-Time RTP Media Switching ───
-    banner("STAGE 3: LIVE 1-TO-1 VOICE CALL + REAL-TIME RTP MEDIA SWITCHING (8s CALL DURATION)")
+    HOLD_SECS = float(os.environ.get("DEMO_DURATION", 12.0))
+    banner(f"STAGE 3: LIVE 1-TO-1 VOICE CALL + REAL-TIME RTP MEDIA SWITCHING ({int(HOLD_SECS)}s LIVE AUDIO STREAM)")
     rig_check = run_cmd("podman ps --format '{{.Names}}' | grep -x baresip-tx")
     if "baresip-tx" not in rig_check:
         print("  [!] baresip caller rig not running — provisioning via demo_call.sh setup ...")
@@ -132,14 +133,18 @@ def main():
     else:
         print("  ✓ baresip caller rig already running")
 
+    # Clean any dangling calls before originating
+    run_cmd("make hangup", timeout=5)
+    time.sleep(1)
+
     print(f"• Initiating live SIP call: Laptop UE ({LAPTOP_UE1}) -> Callee Target ({ep['target_uri']})...")
-    dial_res = run_cmd(f"podman exec baresip-tx python3 /cfg/baresip_dial.py --uri {ep['target_uri']} --timeout 14", timeout=16)
-    print(f"  SIP Call Handshake:\n{dial_res}")
+    dial_res = run_cmd(f"podman exec baresip-tx python3 /cfg/baresip_dial.py --uri {ep['target_uri']} --timeout 16", timeout=18)
+    print(f"  SIP Handshake Response:\n{dial_res}")
     if "CALL_ESTABLISHED" not in dial_res and "CALL_ANSWERED" not in dial_res:
         raise RuntimeError("Fatal: Live SIP call failed to establish!")
     print(f"  ✓ Live SIP Call Established ({ep['display_name']}) & Media Anchored across RTPEngine.")
-    print("  • Streaming live audio across RTP pipeline for 8.0s...")
-    time.sleep(8)
+    print(f"  • Streaming live audio across RTP pipeline for {HOLD_SECS}s...")
+    time.sleep(HOLD_SECS)
     run_cmd("make hangup", timeout=10)
 
     # ─── 4. Live Vosk ASR JNI Speech Recognition & AI Classification ───
@@ -186,7 +191,7 @@ def main():
     # ─── 6. Live 3GPP RFC 4579 Multi-Party Conference Mixing ───
     banner("STAGE 6: LIVE 3GPP RFC 4579 MULTI-PARTY CONFERENCE MIXING")
     print("• Bridging 3 distinct endpoints into Asterisk ConfBridge (RFC 4579 conf-factory)...")
-    conf_res = run_cmd("python3 scripts/testing/conference_3way_demo.py", timeout=25)
+    conf_res = run_cmd("python3 scripts/testing/conference_3way_demo.py", timeout=45)
     print(f"  {conf_res}")
     if "EMPIRICALLY VERIFIED" not in conf_res:
         raise RuntimeError("Fatal: Live 3-Way Conference Mixing failed!")

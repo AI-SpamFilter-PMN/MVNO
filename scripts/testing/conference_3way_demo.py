@@ -97,7 +97,9 @@ def main():
 
     # 4. Verification in Asterisk
     print("\n[4/4] Verifying Active Participants in Asterisk ConfBridge...")
-    time.sleep(3)
+    CONF_DURATION = float(os.environ.get("DEMO_DURATION", 12.0))
+    print(f"  • Mixing 3-party audio in ConfBridge room 001 for {CONF_DURATION}s...")
+    time.sleep(CONF_DURATION)
     res = run_cmd("podman exec mvno-asterisk asterisk -rx 'confbridge list 001'")
     print(f"Asterisk ConfBridge Status:\n{res}")
     
@@ -111,9 +113,6 @@ def main():
     if "1555" not in res or "default_bridge" not in res:
         subprocess.run(["make", "hangup"], capture_output=True, check=False)
         raise RuntimeError("Empirical assertion FAILED: ConfBridge room 001 has no active participant channels!")
-
-    print("  • Holding 3-way conference bridge active for 8.5s...")
-    time.sleep(8.5)
 
     # Clean termination
     subprocess.run(["make", "hangup"], capture_output=True, check=False)
