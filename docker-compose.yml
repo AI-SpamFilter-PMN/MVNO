@@ -928,3 +928,47 @@ services:
       mvno_net:
         ipv4_address: 10.89.0.62
     restart: unless-stopped
+
+  # ─── Live-demo baresip rig (SIP UAs: laptop mic <-> phone) ───
+  # Compose-managed since the cold-start fragmentation fix: `make up` brings
+  # them up, `make clean` removes them (no more stale-registration orphans).
+  # Config/accounts are written by `scripts/testing/demo_call.sh setup` into
+  # ./state/baresip/{rx,tx} (mounted at /cfg). The pulse socket + cookie are
+  # mounted so baresip's pulse.so captures the real laptop HW mic and plays
+  # the remote leg on the laptop speakers (Issue 8.47 proven recipe). The
+  # host pulse paths default to uid 1000; override via PULSE_SOCK/PULSE_DIR/
+  # PULSE_COOKIE env when running as a different user.
+  baresip-rx:
+    image: mvno-baresip:1.1.0
+    container_name: baresip-rx
+    security_opt:
+      - label=disable
+    environment:
+      - PULSE_SERVER=unix:${PULSE_SOCK:-/run/user/1000/pulse/native}
+      - XDG_RUNTIME_DIR=${PULSE_DIR:-/run/user/1000}
+    volumes:
+      - ./state/baresip/rx:/cfg:z
+      - ./state/baresip/speech8k.wav:/media/speech8k.wav:ro
+      - ${PULSE_SOCK:-/run/user/1000/pulse/native}:${PULSE_SOCK:-/run/user/1000/pulse/native}:ro
+      - ${PULSE_COOKIE:-/home/zkhattab/.config/pulse/cookie}:${PULSE_DIR:-/run/user/1000}/pulse/cookie:ro
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.60
+    restart: unless-stopped
+
+  baresip-tx:
+    image: mvno-baresip:1.1.0
+    container_name: baresip-tx
+    security_opt:
+      - label=disable
+    environment:
+      - PULSE_SERVER=unix:${PULSE_SOCK:-/run/user/1000/pulse/native}
+      - XDG_RUNTIME_DIR=${PULSE_DIR:-/run/user/1000}
+    volumes:
+      - ./state/baresip/tx:/cfg:z
+      - ${PULSE_SOCK:-/run/user/1000/pulse/native}:${PULSE_SOCK:-/run/user/1000/pulse/native}:ro
+      - ${PULSE_COOKIE:-/home/zkhattab/.config/pulse/cookie}:${PULSE_DIR:-/run/user/1000}/pulse/cookie:ro
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.61
+    restart: unless-stopped

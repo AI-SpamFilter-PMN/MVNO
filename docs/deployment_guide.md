@@ -59,6 +59,26 @@ Operating in a daemonless, rootless environment:
 | **Podman** | `sudo apt install podman` | Daemonless rootless engine |
 | **Docker Compose Plugin**| `sudo apt install docker-compose` | Compose orchestration via `podman compose` |
 
+**Ubuntu host-tool one-liner** (everything `preflight.sh` + `make bootstrap` need on a
+fresh Ubuntu box — run once, then `./scripts/preflight.sh` should be ALL CLEAR):
+
+```bash
+sudo apt update && sudo apt install -y \
+  podman docker-compose sqlite3 netcat-openbsd curl python3 \
+  tshark ffmpeg espeak-ng alsa-utils xxd \
+  linux-modules-extra-$(uname -r)   # SCTP module (5G NGAP + 2G M3UA)
+# Kernel features (5G UPF/UERANSIM + 2G virtual-Um):
+sudo modprobe sctp
+sudo modprobe tun
+# UFW (Ubuntu default firewall) — allow SIP + RTP media or calls ring with no audio:
+sudo ufw allow 5060/udp && sudo ufw allow 10000:20000/udp
+```
+
+> **UFW landmine (Ubuntu-specific):** with UFW active, SIP (5060) passes but the
+> phone's RTP media (UDP 10000-20000) is silently dropped — calls ring but carry
+> no audio. `preflight.sh` now detects this and warns. The two `ufw allow` lines
+> above are the fix.
+
 **Custom images (no local cache, internet available):** the 8 project-built images
 (`mvno-*`) are published **publicly** to Docker Hub under
 `docker.io/5attab007/mvno-*:<tag>` (kamailio 5.7.2, 2g-ms/2g-core/osmo-smsc/telecom-api
@@ -80,7 +100,8 @@ pull from their own public Docker Hub namespaces as usual.
 
 **Compose file layout (why 3 files — do NOT merge them):** the stack uses standard Compose
 *override layering*, so each file has one distinct purpose:
-- `docker-compose.yml` — the canonical, offline-first base (34 services, statically pinned IPs).
+- `docker-compose.yml` — the canonical, offline-first base (36 services: 34 core + the
+  `baresip-rx`/`baresip-tx` live-demo rig, statically pinned IPs).
 - `docker-compose.build.yml` — opt-in **source-build** override for online rebuilds
   (`podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`); keeps the
   base file free of `build:` stanzas.
@@ -89,6 +110,36 @@ pull from their own public Docker Hub namespaces as usual.
 Kamailio on 5060 in addition to 5066 — was removed in the 5060 consolidation. Kamailio now
 publishes directly on the canonical port **5060:5060/udp** in `docker-compose.yml`, so no
 override file is needed. See `docs/ENVIRONMENT_MATRIX.md` Section 3.)
+
+### Live-Demo Rig (baresip) — Compose-Managed
+
+The live-mic SIP rig is now **fully containerized** (cold-start fragmentation fix):
+
+- `baresip-rx` (callee `15559998888`, auto-answer) and `baresip-tx` (caller
+  `15553332211`) are real services in `docker-compose.yml` — `make up` brings
+  them up, `make clean` removes them. No more stale registrations or orphaned
+  rig containers.
+- Configs/accounts are written by `scripts/testing/demo_call.sh setup` into
+  `./state/baresip/{rx,tx}` (mounted at `/cfg`); the script then runs
+  `podman compose up -d baresip-rx baresip-tx` to apply them. It no longer
+  creates containers via raw `podman run`.
+- Image: `mvno-baresip:1.1.0` (one of the 9 `mvno-*` custom images).
+
+**Host Pulse/PipeWire requirement (live-mic legs):** the rig captures the real
+laptop mic via the host Pulse daemon. `pipewire-pulse` (or `pulseaudio`) must be
+running and `$XDG_RUNTIME_DIR/pulse/native` must exist. The compose services
+default to uid-1000 paths (`/run/user/1000/...`, `/home/zkhattab/.config/pulse/cookie`);
+operators with a different UID/username **must** export `PULSE_SOCK`, `PULSE_DIR`,
+and `PULSE_COOKIE` before `demo_call.sh setup` (the script re-exports them from
+your own runtime dir automatically).
+
+**UFW (Ubuntu-specific, the #1 silent phone-media killer):** with UFW active,
+SIP (5060) passes but the phone's RTP media (UDP 10000-20000) is silently
+dropped — calls ring but carry no audio. `preflight.sh` detects this. Fix:
+
+```bash
+sudo ufw allow 5060/udp && sudo ufw allow 10000:20000/udp
+```
 
 ### Kernel Prerequisites (5G NGAP Signaling)
 
@@ -893,8 +944,8 @@ tar czf mvno-offline.tar.gz vendor/   # ~5 GB — the ship artifact
 `vendor-bundle.sh` is **surgical and needs no network**: it re-saves the
 already-present local images with the exact `bootstrap.sh` SAVE_IMAGES tags,
 removes stale unversioned tars (`mongo-8.0.tar`, `grafana-oss-latest.tar`, …),
-and regenerates the checksums. Gates inside: 22 tars present (incl. the
-containerized `mvno-baresip:1.0.0` rig image), `sha256sum -c` all OK. Exit 0
+and regenerates the checksums. Gates inside: 23 tars present (incl. the
+containerized `mvno-baresip:1.1.0` rig image), `sha256sum -c` all OK. Exit 0
 means ship-ready.
 
 ### 8.3 Consumer side (AIR-GAPPED machine)

@@ -93,13 +93,36 @@ fi
 
 # ─── 6. Multicast (2G virtual-Um osmocom-bb virtphy) ─────────────────────────
 if [ "${RT}" = "podman" ] || [ "${RT}" = "docker" ]; then
-  if ip -o link >/dev/null 2>&1; then
-    # multicast is on by default on most bridges; warn only if igmp snooping blocks it
-    ok "Multicast: host link queryable (2G virtual-Um uses 239.193.23.1:4729)"
+  # Verify the bridge/interface actually carries the MULTICAST flag — the 2G
+  # virtual-Um uses 239.193.23.1:4729 and cloud/VM bridges often disable it.
+  MCAST_IF="$(ip -o link show 2>/dev/null | grep -iE 'MULTICAST' | head -1 | sed -E 's/^[0-9]+: ([^:]+):.*/\1/')"
+  if [ -n "${MCAST_IF}" ]; then
+    ok "Multicast: interface ${MCAST_IF} carries MULTICAST flag (2G virtual-Um uses 239.193.23.1:4729)"
+  elif ip -o link >/dev/null 2>&1; then
+    warn "No interface with MULTICAST flag found — 2G virtual-Um may fail on cloud/VM bridges"
+    warn "  Try: sudo ip link set <bridge> multicast on"
+    WARN_FAIL=1
   else
     warn "Cannot query host links — verify multicast is enabled for the 2G virtual-Um path"
     WARN_FAIL=1
   fi
+fi
+
+# ─── 6b. UFW firewall (Ubuntu) — SIP/media port rules ────────────────────────
+# Ubuntu's default UFW silently DROPS the phone's RTP media (UDP 10000-20000)
+# while SIP (5060) still passes — calls ring but carry no audio. This is the
+# single most common Ubuntu-only landmine, so warn loudly when UFW is active
+# without the media range allowed.
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qE 'Status: active'; then
+  if ufw status 2>/dev/null | grep -qE '10000:20000.*(udp|ALLOW)'; then
+    ok "UFW active and allows UDP 10000:20000 (phone RTP media)"
+  else
+    warn "UFW is ACTIVE but UDP 10000:20000 is not allowed — phone call media will be silently dropped."
+    warn "  Run: sudo ufw allow 5060/udp && sudo ufw allow 10000:20000/udp"
+    WARN_FAIL=1
+  fi
+else
+  ok "UFW not active (or not installed) — no firewall port blocking expected"
 fi
 
 # ─── 7. Host UDP 5060 conflict (canonical Kamailio host port = 5060) ─────────

@@ -867,25 +867,32 @@ cat > state/baresip/tx/accounts <<'EOF'
 EOF
 ```
 
-Containers (packaged `mvno-baresip:1.0.0` rig — no host baresip / shared libs
-/ pulse mounts; the image is built from `configs/baresip/Dockerfile`, see
-`scripts/testing/demo_call.sh setup` and `scripts/bootstrap.sh`):
+Containers (packaged `mvno-baresip:1.1.0` rig — no host baresip / shared libs;
+the image is built from `configs/baresip/Dockerfile`, see `scripts/bootstrap.sh`).
+**The rig is now COMPOSE-MANAGED** (cold-start fragmentation fix): `baresip-rx`/
+`baresip-tx` are services in `docker-compose.yml` — `podman compose up -d
+baresip-rx baresip-tx` brings them up with the proven pulse mounts + static IPs,
+`make clean` removes them. `demo_call.sh setup` writes the `/cfg` configs into
+`state/baresip/{rx,tx}` and applies them via compose; it no longer runs raw
+`podman run`. The legacy raw-run block below is preserved for reference only:
 
 ```bash
+# LEGACY raw podman run (pre-compose; kept for reference) — prefer:
+#   bash scripts/testing/demo_call.sh setup   # writes configs + compose up
 PULSE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/pulse/native"
 podman run -d --name baresip-rx --network mvno_mvno_net --ip 10.89.0.60 \
   -v $PWD/state/baresip/rx:/cfg:z \
   -v $PWD/state/baresip/speech8k.wav:/media/speech8k.wav:ro \
-  mvno-baresip:1.0.0
+  mvno-baresip:1.1.0
 if [ -S "$PULSE" ]; then
   podman run -d --name baresip-tx --network mvno_mvno_net --ip 10.89.0.61 \
     -v $PWD/state/baresip/tx:/cfg:z \
     -v "${PULSE}:${PULSE}" -e "PULSE_SERVER=unix:${PULSE}" \
-    mvno-baresip:1.0.0
+    mvno-baresip:1.1.0
 else
   podman run -d --name baresip-tx --network mvno_mvno_net --ip 10.89.0.61 \
     -v $PWD/state/baresip/tx:/cfg:z \
-    mvno-baresip:1.0.0
+    mvno-baresip:1.1.0
 fi
 sleep 3
 podman logs baresip-rx | grep -c "200 OK"      # expect >= 2

@@ -69,10 +69,11 @@ with internet can pre-pull instead: `./scripts/pull-images.sh && make up`.
 at the image/state level). Full details: `docs/deployment_guide.md` §2 / §2B.
 
 **EXPECT** — `Started`/`Up` lines; `podman compose ps | grep -c Up` eventually
-returns **32** (the core stack; `baresip-rx`/`baresip-tx` are demo-only and are
-added by S4). Health can take ~30 s — poll:
+returns **36** (34 core + `baresip-rx`/`baresip-tx` — the rig is now
+**compose-managed**, so `make up` includes it; no separate demo-only bring-up).
+Health can take ~30 s — poll:
 ```bash
-until [ "$(podman compose ps 2>/dev/null | grep -c Up)" -ge 32 ]; do
+until [ "$(podman compose ps 2>/dev/null | grep -c Up)" -ge 36 ]; do
   sleep 3; printf '.'
 done; echo " UP"
 ```
@@ -96,7 +97,7 @@ registrations in Kamailio's usrloc (Issue 8.37) that mask the bounded-retry and
 404 flows. Reset first (idempotent — safe to run already-clean):
 
 ```bash
-podman rm -f baresip-rx baresip-tx 2>/dev/null
+podman compose rm -sf baresip-rx baresip-tx 2>/dev/null
 for u in 15559998888 15557654321 15554443322 15557778888; do
   python3 scripts/testing/sip_traffic_sim.py --callee "$u" --deregister
 done
@@ -178,9 +179,9 @@ SMPP variant: S7.
 ## S4 — Real Call: baresip → RTPEngine → Vosk  ·  ~4 min
 
 **PURPOSE** — the heart of the demo: a **real `baresip` voice call** (containerized
-`mvno-baresip:1.0.0` rig), auto-answered, media anchored by RTPEngine which
-records a pcap per call; then the `live_tap.sh` zero-Python extraction and the
-Vosk transcript.
+`mvno-baresip:1.1.0` rig, **compose-managed**), auto-answered, media anchored by
+RTPEngine which records a pcap per call; then the `live_tap.sh` zero-Python
+extraction and the Vosk transcript.
 
 > **FLOW (this is the call path, live)**:
 > ```
@@ -189,17 +190,24 @@ Vosk transcript.
 >   │  ├─ INTERCEPT REST callout → mvno-api:8080 (allow)
 >   │  └─ rtpengine_manage → RTPEngine @10.89.0.48 (UDP 10000-20000)
 >   ▼
-> CALLEE (baresip-rx @10.89.0.60 — streams the scam phrase via aufile)
+> CALLEE (baresip-rx @10.89.0.60 — YOUR MIC too when Pulse is up; aufile scam
+>         phrase only as the headless fallback)   [Issue 8.47: full-duplex live]
 >   └─ every RTP packet → RTPEngine pcap → state/spool/pcaps/ → live_tap → Vosk
 > ```
 
-> **The rig**: `demo_call.sh` builds the `mvno-baresip:1.0.0` container (libre
-> v4.9.0 + baresip v4.10.0, stdio + aufile + pulse + g711 modules) and runs two
-> UAs: `baresip-tx` (caller `15553332211`) and `baresip-rx` (callee
-> `15559998888`). The **callee streams the scam phrase**; the **caller leg is
-> YOUR LIVE MIC** when the host Pulse socket exists and the terminal is a TTY —
-> `demo_call.sh` then prompts **"SPEAK NOW"** for ~12 s and Vosk transcribes
-> *your* voice. No mic → canned tone caller (deterministic guard).
+> **The rig**: `demo_call.sh` does NOT build/run containers anymore — `baresip-tx`
+> and `baresip-rx` are **compose services** in `docker-compose.yml` (image
+> `mvno-baresip:1.1.0`, libre v4.9.0 + baresip v4.10.0, stdio + aufile + pulse +
+> g711 modules; `make up` brings them up, `make clean` removes them). The script
+> only writes their `/cfg` configs into `state/baresip/{tx,rx}` and calls
+> `podman compose up -d baresip-rx baresip-tx` to apply them. Caller
+> `15553332211` (tx), callee `15559998888` (rx, auto-answer). **Both legs are
+> YOUR LIVE MIC** when the host Pulse socket exists — full-duplex (Issue 8.47
+> recipe): the caller leg is live mic → phone/rig, the callee leg is live mic →
+> the other direction, with the remote leg played on your laptop speakers.
+> `demo_call.sh dial` then prompts **"SPEAK NOW"** for ~10 s and Vosk transcribes
+> your voice on both legs. No Pulse socket → the callee falls back to the aufile
+> scam phrase and the caller to a canned tone (deterministic guard).
 >
 > **Audible go-cue**: the moment the speaking window opens (and the instant
 > `mic_record.sh` starts capturing), a short two-tone **pep sound** plays over
@@ -236,9 +244,15 @@ Vosk transcript.
 **COMMANDS** (T-B)
 
 ```bash
-bash scripts/testing/demo_call.sh setup   # speech file + both UAs register (~15 s)
+bash scripts/testing/demo_call.sh setup   # writes /cfg configs + both UAs register (~15 s)
 bash scripts/testing/demo_call.sh dial    # real call; callee streams the phrase; SPEAK NOW for ~12 s
 ```
+> **Preflight for S4** (skip if S1 preflight passed): verify UFW allows the RTP
+> media range (`sudo ufw allow 5060/udp && sudo ufw allow 10000:20000/udp` on
+> Ubuntu — else the phone leg rings with no audio) and that the Pulse socket
+> exists (`test -S "$XDG_RUNTIME_DIR/pulse/native"` — needed for the live-mic
+> legs; `demo_call.sh setup` exports `PULSE_SOCK`/`PULSE_DIR`/`PULSE_COOKIE`
+> from your runtime dir automatically).
 **EXPECT** — `setup` prints `rx registrations (expect >= 2)`/`tx registrations (expect >= 2)`
 and the phrase; `dial` prints
 `CALL_OUTGOING → CALL_RINGING → CALL_ANSWERED → CALL_ESTABLISHED →

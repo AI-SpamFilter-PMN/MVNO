@@ -54,10 +54,23 @@ Manual equivalents:
 
 | Distro | Command |
 |--------|---------|
-| Ubuntu/Debian | `apt install podman docker-compose-v2 sqlite3 lksctp-tools espeak-ng ffmpeg` |
-| Fedora/RHEL | `dnf install podman podman-compose sqlite3 lksctp-tools espeak-ng ffmpeg` |
-| Arch/CachyOS | `pacman -S podman docker-compose sqlite3 lksctp-tools espeak-ng ffmpeg` |
+| Ubuntu/Debian | `apt install podman docker-compose-v2 sqlite3 lksctp-tools espeak-ng ffmpeg pipewire-pulse` |
+| Fedora/RHEL | `dnf install podman podman-compose sqlite3 lksctp-tools espeak-ng ffmpeg pipewire-pulse` |
+| Arch/CachyOS | `pacman -S podman docker-compose sqlite3 lksctp-tools espeak-ng ffmpeg pipewire-pulse` |
 | **All** | `sudo modprobe sctp` (verify: `lsmod \| grep sctp`) |
+
+> **UFW (Ubuntu default firewall) — the #1 silent phone-media killer:** with UFW
+> active, SIP (5060) passes but the phone's RTP media (UDP 10000-20000) is
+> silently dropped — calls ring but carry no audio. Allow both:
+> `sudo ufw allow 5060/udp && sudo ufw allow 10000:20000/udp`. `preflight.sh`
+> detects this and warns.
+
+> **Pulse/PipeWire (live-mic demo legs):** the baresip rig captures the real
+> laptop mic via the host Pulse daemon. `pipewire-pulse` (or `pulseaudio`) must
+> be **running** and `$XDG_RUNTIME_DIR/pulse/native` must exist. The compose
+> baresip services default to uid-1000 paths; if your UID differs, export
+> `PULSE_SOCK` / `PULSE_DIR` / `PULSE_COOKIE` before `demo_call.sh setup`
+> (the script exports them for you from your own runtime dir).
 
 > `espeak-ng` + `ffmpeg` are used by `demo_call.sh setup` to synthesize the
 > canned callee scam phrase ("You have won a prize, call us now or your account
@@ -66,7 +79,8 @@ Manual equivalents:
 > the 9b verdict; it re-arches the live recorded call. `deploy.sh` installs them.
 
 > **Note**: SCTP kernel module is mandatory for 5G NGAP (gNB ↔ AMF). Without it, gNB never connects.
-> **Image source**: the 8 custom images (`mvno-*`) are **public on Docker Hub**
+> **Image source**: the 9 custom images (`mvno-*`, incl. `mvno-baresip:1.1.0` rig)
+> are **public on Docker Hub**
 > (`docker.io/5attab007/mvno-*`) — `./scripts/pull-images.sh` pulls + retags them.
 > Vendor images pull from their own public namespaces. `deploy.sh` does this for you;
 > use `./scripts/bootstrap.sh` + `./scripts/load-offline.sh` only for air-gapped setups.
@@ -101,9 +115,9 @@ cd MVNO
 **Step-by-step (what deploy.sh wraps):**
 
 ```bash
-./scripts/pull-images.sh # pull the 8 custom images from docker.io/5attab007/mvno-*
+./scripts/pull-images.sh # pull the 9 custom images from docker.io/5attab007/mvno-*
 make init-db             # creates SQLite WAL DBs + seeds test subscribers
-make up                  # offline-first launch (32 containers)
+make up                  # offline-first launch (36 services: 34 core + 2 baresip rig)
 make seed-mongo          # Open5GS 5G subscribers — AFTER up (execs into mongodb)
 make test                # runs test-vty + test-api + test-sms + test-call
 ```
@@ -116,7 +130,7 @@ make test                # runs test-vty + test-api + test-sms + test-call
 
 | Target | Purpose |
 |--------|---------|
-| `make up` | Start container stack (offline-first, uses pre-loaded images; 32 containers) |
+| `make up` | Start container stack (offline-first, uses pre-loaded images; 36 services: 34 core + 2 baresip rig) |
 | `make down` | Stop container stack |
 | `make ps` | List active container services |
 | `make logs` | Stream live container logs across microservices |
@@ -244,6 +258,9 @@ never stalls the spool loop.
 | NFs de-register from NRF every ~30s | Rebuilt Open5GS from source | Use the layered Dockerfile on `mvno-open5gs:2.8.0-base` — never rebuild from source (`docs/ISSUES.md` S5.6) |
 | 5G-path SIP times out on first packet | Neighbor-resolution warm-up after UPF/bridge restarts | Re-run the simulator — subsequent exchanges are immediate |
 | UE can't reach bridge services via 5G | SNAT rule missing (UPF recreated) | Entrypoint installs it idempotently; verify `podman exec mvno-upf iptables -t nat -L POSTROUTING -n` |
+| Phone call rings but NO audio / `[UFW BLOCK]` in kernel log | Ubuntu UFW silently drops RTP media (UDP 10000-20000) | `sudo ufw allow 5060/udp && sudo ufw allow 10000:20000/udp` (preflight warns) |
+| baresip no mic / `pulse: ... failed` in `podman logs baresip-tx` | Host Pulse daemon not running, or wrong socket path | Start `pipewire-pulse`/`pulseaudio`; export `PULSE_SOCK`/`PULSE_DIR`/`PULSE_COOKIE` for a non-uid-1000 user, then `demo_call.sh setup` |
+| Stale baresip registrations survive `make down` | baresip containers left over from an old raw-`podman run` lifecycle | Run `podman compose up -d baresip-rx baresip-tx` (now compose-managed); `make clean` removes them |
 
 ---
 

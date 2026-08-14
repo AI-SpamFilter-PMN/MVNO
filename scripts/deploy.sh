@@ -129,7 +129,7 @@ step "Initialise subscriber databases"
 if make init-db >/dev/null 2>&1; then ok "init-db"; else fail "make init-db"; fi
 
 # ---- 6. Launch ---------------------------------------------------------------------------
-step "Launching 31-service stack"
+step "Launching 36-service stack"
 if [ "$BUILD" -eq 1 ]; then
   "$SCRIPT_DIR/up.sh" --build && ok "up.sh --build" || fail "up.sh --build"
 else
