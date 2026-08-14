@@ -94,6 +94,20 @@ def main():
 
     # ─── 3. Live 1-to-1 Voice Call + Real-Time Mic Capture ───
     banner("STAGE 3: LIVE 1-TO-1 VOICE CALL + REAL-TIME RTP MEDIA SWITCHING (8s CALL DURATION)")
+    # Self-contained rig precondition: the baresip tx/rx rig is COMPOSE-MANAGED
+    # and is torn down by `make proof`/`demo_live.sh --down`. This smoke test
+    # must NOT assume a caller rig is already up — provision it via demo_call.sh
+    # setup if baresip-tx is absent, so `make smoke-test` works from any state.
+    rig_check = run_cmd("podman ps --format '{{.Names}}' | grep -x baresip-tx")
+    if "baresip-tx" not in rig_check:
+        print("  [!] baresip caller rig not running — provisioning via demo_call.sh setup ...")
+        prov = run_cmd("bash scripts/testing/demo_call.sh setup", timeout=120)
+        if "rig ready" not in prov:
+            print(f"  rig provisioning output:\n{prov}")
+            raise RuntimeError("Fatal: could not provision baresip rig (demo_call.sh setup)")
+        print("  ✓ baresip rig provisioned")
+    else:
+        print("  ✓ baresip caller rig already running")
     print(f"• Initiating live SIP call: Laptop UE ({LAPTOP_UE1}) -> Rig Callee ({LAPTOP_UE2})...")
     dial_res = run_cmd("podman exec baresip-tx python3 /cfg/baresip_dial.py --uri sip:15559998888@10.89.0.23:5060 --timeout 14", timeout=16)
     print(f"  SIP Call Handshake:\n{dial_res}")

@@ -1,0 +1,34 @@
+================================================================
+COCKPIT PROOF — demo_live.sh run-evidence (2026-08-14 18:12:36)
+  mode: deterministic (tone caller)
+================================================================
+  pre-cleaned stale cockpit evidence (deterministic mode)
+[1/5] launching cockpit…
+[2/5] waiting for session + 3 windows x 4 panes (≤180s)…
+  ✓ session mvno-live up with 12 panes / call monitors sms (t≈25s)
+  ✓ window 'call' = 4 panes (≤4 per screen)
+  ✓ window 'monitors' = 4 panes (≤4 per screen)
+  ✓ window 'sms' = 4 panes (≤4 per screen)
+[3/5] sampling panes for startup markers…
+  ✓ P1 live_tap daemon polling
+  ✓ P2 capture pane active
+  ✓ P0 caller pane active
+  ✓ P4 Vosk LIVE transcript+verdict watch
+  ✓ P3 kamailio logs
+  ✓ P5 metrics watch
+  ✓ P7 evidence watch
+  ✓ watchdog log pane
+  ✓ S1 SMS MO tools
+  ✓ S2 smsc.db + bridge counters
+  ✓ S3 MT 2G receipts
+  ✓ S4 MT 5G/IMS receiver
+  ✓ pane markers: 12/12 core matched
+[4/5] waiting for mid-call evidence (≤180s, REALTIME_AUDIO budget)…
+  ✓ live-*.wav chunk: live-1e54af95c8d1d00e-cb7beb4a15bacc0e-10054-0.wav
+  ✓ archived transcript: live-01eb0959b7a889d6-3061171117336c34-10030-0.txt
+  ✓ fresh pcap: 1e54af95c8d1d00e-cb7beb4a15bacc0e.pcap
+  ✓ tshark decoded 680 RTP frames (30000 range)
+[5/5] teardown…
+  ✓ session torn down
+  ✓ baresip rigs removed
+✅ COCKPIT PROOF PASS — evidence: docs/evidence/demo-cockpit-2026-08-14.log
