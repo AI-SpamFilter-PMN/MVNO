@@ -21,7 +21,7 @@
 | SMSC System-ID | `MVNO_SMSC` |
 | Primary ESME creds | `mvno-api-route` / `changeme` |
 | Secondary ESME creds | `smsclient` / `password` |
-| Planned org flow | `sms-client → SMPP :2776 (Filteration-System decider) → :2775 (MVNO SMSC)` |
+| Planned org flow | `sms-client → SMPP :2076 (Filteration-System decider) → :2775 (MVNO SMSC)` |
 
 > Do **not** publish `2775` on a shared host — MVNO already publishes `2775:2775`.
 > Use container networking (`mvno_net` bridge / same compose network) instead.
@@ -78,5 +78,5 @@ Response: `{ "allow": boolean, "reason": string }` · missing/mismatched key →
   SUBMIT_SM against `127.0.0.1:2775`) and `scripts/testing/send_rest_sms.sh`.
 - Acceptance: `scripts/testing/sms_matrix.sh` — all 5 cells green
   (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block 403) — with **your** client in the loop.
-- When the Filteration-System decider is wired: re-point `smpp.port` `2775 → 2776`
+- When the Filteration-System decider is wired: re-point `smpp.port` `2775 → 2076`
   and keep the same cell assertions green.

@@ -935,7 +935,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   + Neon + login (`origin/main @ 1a388af`). The classic MVNO seam is `osmo-smsc:2775`
   (SMSC System-ID `MVNO_SMSC`; ESME `mvno-api-route`/`changeme` primary,
   `smsclient`/`password` secondary). The **planned** org flow re-points the client to the
-  Filteration-System decider `:2776` first (see INTEGRATION_CONTRACT §5 + handoff).
+  Filteration-System decider `:2076` first (see INTEGRATION_CONTRACT §5 + handoff).
 - REST interception: `POST /api/v1/intercept/sms` on `telecom-api:8080` with
   `X-API-Key: mvno-demo-key-2026` (missing/mismatched → `401`).
 

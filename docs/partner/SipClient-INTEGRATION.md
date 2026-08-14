@@ -19,10 +19,15 @@
 | RTP relay | UDP `10000-20000` (RTPEngine) — open these + `5060/udp` in the firewall |
 | 403 semantics | Zero-balance / EIR-fraud / AI-blocked calls → `SIP 403 Forbidden` — treat as **terminal** (no retry loop) |
 
-> Your repo now reads `src/main/resources/sip.properties` at startup. Point it at
-> the MVNO stack by setting `sip.server.host=<mvno-host-IP>` and
-> `sip.server.port=5060` (canonical). No source edit is needed to connect a new
-> host.
+> **IMPORTANT (verified 2026-08-14):** SipClient does **NOT** load
+> `src/main/resources/sip.properties` — **no such file exists** in the repo.
+> `com.sipclient.sip.config.SipConfig` is **hardcoded constants**
+> (`LOCAL_IP=127.0.0.1`, `LOCAL_PORT=5070`, `SERVER_PORT=5060`, `TRANSPORT=udp`).
+> To point SipClient at a different MVNO host you must **edit `SipConfig.java`
+> and recompile** (Maven). Recommended: file a PR in the SipClient repo to add
+> properties loading (`sip.server.host` / `sip.server.port` via `@Value` or
+> `System.getProperty`) so future hosts are config-only — MVNO never edits
+> external repos, so this is a SipClient-side change.
 
 ## Minimal registration trace (any Unicast/SIPDebugger/client)
 

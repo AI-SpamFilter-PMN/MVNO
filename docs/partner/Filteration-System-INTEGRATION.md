@@ -11,7 +11,7 @@
 ## Role in the architecture
 
 ```
-SMS : sms-client (ESME) ──SMPP 2776──▶ Filteration-System [DECIDES] ──SMPP 2775──▶ osmo-smsc ──▶ MT
+SMS : sms-client (ESME) ──SMPP 2076──▶ Filteration-System [DECIDES] ──SMPP 2775──▶ osmo-smsc ──▶ MT
 CALL: SipClient ─▶ MVNO (Kamailio/telecom-api: capture + Vosk ASR) ──sync HTTP──▶ Filteration-System [DECIDES]
                                                               (call hook to be added — §4 of the handoff)
 ```
@@ -22,7 +22,7 @@ every verdict (blocklist / sender policy / AI LLM).
 
 | Item | Spec |
 |---|---|
-| SMPP listener | Bind `:2776`, system-id `SpamFilter`, accept `BIND_TRANSCEIVER` (`smsclient`/`password`) |
+| SMPP listener | Bind `:2076`, system-id `SpamFilter`, accept `BIND_TRANSCEIVER` (`smsclient`/`password`) |
 | Decision hook | `isSpam(sender, receiver, body) → boolean` |
 | Decision order | whitelist → blocklist → AI LLM (agentrouter) |
 | Block semantics | spam → `STAT_ESME_RSUBMITFAIL` (never forwarded to MT) |
@@ -57,7 +57,7 @@ SLA** (1 s connect / 5 s read / circuit breaker → allow). `sms-client`'s
 
 ## Prove your integration
 
-1. `smpp.port=2776` in sms-client → MVNO `sms_matrix.sh` **5/5 cells green**.
+1. `smpp.port=2076` in sms-client → MVNO `sms_matrix.sh` **5/5 cells green**.
 2. `live_demo.sh` check 9b: scam speech → `allow:false` +
    `mvno_vosk_blocked_total` increments; check 9d: clean → `allow:true`.
 3. Kill the filter mid-run → calls/SMS **still pass** (fail-open,
