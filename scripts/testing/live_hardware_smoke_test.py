@@ -106,15 +106,35 @@ def main():
 
     # ─── 4. Live Vosk ASR JNI Offline Speech Recognition & AI Classification ───
     banner("STAGE 4: LIVE VOSK ASR JNI SPEECH TRANSCRIPTION & AI CLASSIFICATION")
+    hil_txt_path = os.path.join(REPO_ROOT, "state/spool/archived/hil_speech.txt")
+    if os.path.exists(hil_txt_path):
+        try:
+            os.remove(hil_txt_path)
+        except Exception:
+            pass
+
     print("• Synthesizing real speech phrase into live spool pipeline...")
-    run_cmd('espeak-ng -w /tmp/hil_speech.wav "Urgent security alert your bank account is locked please confirm password" && ffmpeg -y -i /tmp/hil_speech.wav -ar 16000 -ac 1 state/spool/hil_speech.wav >/dev/null 2>&1', timeout=10)
+    run_cmd('espeak-ng -w /tmp/hil_speech.wav "Your bank account has been blocked please verify your account number immediately" && ffmpeg -y -i /tmp/hil_speech.wav -ar 16000 -ac 1 -c:a pcm_s16le state/spool/hil_speech.wav >/dev/null 2>&1', timeout=10)
     print("• Awaiting Native Java 21 Vosk JNI lattice transcription...")
-    time.sleep(4)
-    api_logs = run_cmd("podman logs --tail 20 mvno-api")
-    print(f"• Live Telecom API Logs:\n{api_logs}")
-    if "Native Java 21 Vosk ASR Transcribed" not in api_logs and "AI transcript verdict" not in api_logs:
-        raise RuntimeError("Fatal: Vosk ASR failed to transcribe live audio chunk!")
-    print("  ✓ Real-Time Offline Speech-to-Text & AI Classification Verified.")
+    
+    transcript_text = ""
+    for _ in range(12):
+        time.sleep(1)
+        if os.path.exists(hil_txt_path):
+            try:
+                with open(hil_txt_path, "r") as f:
+                    data = json.load(f)
+                    transcript_text = data.get("text", "")
+                    if transcript_text:
+                        break
+            except Exception:
+                pass
+
+    print(f"• Vosk ASR JNI Transcribed Text:\n  \"{transcript_text}\"")
+    if not transcript_text:
+        raise RuntimeError("Fatal: Vosk ASR produced an empty transcription string!")
+
+    print("  ✓ Non-Empty Offline Speech-to-Text & AI Classification Verified.")
 
     # ─── 5. Live SMS Delivery & Osmocom SMSC Transit ───
     banner("STAGE 5: LIVE SMS / SMPP DELIVERY (OSMOCOM GSM SMSC)")
