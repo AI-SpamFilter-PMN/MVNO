@@ -2,14 +2,14 @@
 """
 live_hardware_smoke_test.py — Real-World Hardware-In-The-Loop (HIL) Telecom Smoke Test
 
-ZERO MOCKS. Executes 100% real-world carrier telecommunications flows across:
+Executes 100% real-world carrier telecommunications flows across:
   1. 🌐 Live Network & Physical Device Discovery (LAN IP, Android Handset Wi-Fi Reachability)
-  2. 📱 Physical Device SIP Registration & Location DB Verification (Kamailio USRLOC)
-  3. 🎙️ Live Voice Call + Real-Time Microphone Audio Streaming + RTPEngine Packet Capture
-  4. 🤖 Live Vosk ASR JNI Speech Recognition & Real-Time AI Spam/Scam Classification
+  2. 📱 Physical & Softphone SIP Registration & Location DB Verification (Kamailio USRLOC)
+  3. 🎙️ Live Voice Call + Real-Time RTP Media Switching & Packet Capture (RTPEngine)
+  4. 🤖 Live Vosk ASR JNI Speech Recognition & Real-Time AI Scam Keyword Flagging
   5. 💬 Live SMPP / SMS-over-IP Message Delivery & Osmocom SMSC Transit
   6. 👥 Live 3GPP RFC 4579 Multi-Party Conference Mixing (Asterisk ConfBridge)
-  7. 📊 Carrier Observability & Live Metrics Export (VictoriaMetrics & Grafana)
+  7. 📊 Carrier Observability & Strict Metric Assertions (VictoriaMetrics & Grafana)
 
 Usage:
   python3 scripts/testing/live_hardware_smoke_test.py
@@ -21,8 +21,9 @@ import os
 import time
 import subprocess
 import json
-import re
 import socket
+import urllib.request
+import urllib.parse
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 os.chdir(REPO_ROOT)
@@ -60,11 +61,25 @@ def get_host_ip():
     return "127.0.0.1"
 
 
+def query_vm_metric(promql):
+    url = f"http://localhost:8428/api/v1/query?query={urllib.parse.quote(promql)}"
+    try:
+        with urllib.request.urlopen(url, timeout=3) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            results = data.get("data", {}).get("result", [])
+            if results:
+                val = float(results[0].get("value", [0, 0])[1])
+                return val
+    except Exception:
+        pass
+    return None
+
+
 def main():
     print("╔" + "═" * 70 + "╗")
     print("║  REAL-WORLD HARDWARE-IN-THE-LOOP (HIL) TELECOM SMOKE TEST           ║")
     print("║  Standards: 3GPP Rel-16, GSMA IR.92, RFC 4579, SMPP v3.4             ║")
-    print("║  Mode: ZERO MOCKS — 100% REAL HARDWARE, LIVE MEDIA & PACKET ENGINES ║")
+    print("║  Mode: 100% REAL HARDWARE, LIVE MEDIA & CARRIER PACKET ENGINES      ║")
     print("╚" + "═" * 70 + "╝")
 
     # ─── 1. Live Network & Physical Handset Discovery ───
@@ -80,7 +95,9 @@ def main():
     has_adb = ADB_DEVICE in adb_devices
 
     if has_adb:
-        print(f"  ✓ Physical Android Handset ({ADB_DEVICE}) detected online via USB/Wi-Fi.")
+        print(f"  ✓ Physical Android Handset ({ADB_DEVICE}) detected online via ADB.")
+        # Ensure Linphone is awake on handset
+        run_cmd(f"adb -s {ADB_DEVICE} shell 'monkey -p org.linphone 1' >/dev/null 2>&1")
     else:
         print(f"  [!] Physical handset {ADB_DEVICE} not in ADB list — proceeding with live LAN softphone endpoints.")
 
@@ -88,16 +105,18 @@ def main():
     banner("STAGE 2: LIVE SIP REGISTRATION (KAMAILIO USRLOC DB)")
     usrloc = run_cmd('sqlite3 state/kamailio/kamailio.db "SELECT username, contact, user_agent FROM location;"')
     print(f"• Active Live Registered AoRs in Kamailio DB:\n{usrloc}")
-    if "1555" not in usrloc:
-        raise RuntimeError("Fatal: No active 1555 subscribers found in Kamailio location table!")
+    
+    # Assert minimum required AoRs
+    assert "15553332211" in usrloc, "Missing registered caller AoR 15553332211"
+    assert "15559998888" in usrloc, "Missing registered callee AoR 15559998888"
+    assert "15554443322" in usrloc, "Missing registered GSM SMS AoR 15554443322"
+    
+    if has_adb and HANDSET_MSISDN in usrloc:
+        print(f"  ✓ Physical Handset AoR ({HANDSET_MSISDN}) active in Kamailio USRLOC DB.")
     print("  ✓ Live SIP Registration & USRLOC DB Verified.")
 
-    # ─── 3. Live 1-to-1 Voice Call + Real-Time Mic Capture ───
+    # ─── 3. Live 1-to-1 Voice Call + Real-Time RTP Media Switching ───
     banner("STAGE 3: LIVE 1-TO-1 VOICE CALL + REAL-TIME RTP MEDIA SWITCHING (8s CALL DURATION)")
-    # Self-contained rig precondition: the baresip tx/rx rig is COMPOSE-MANAGED
-    # and is torn down by `make proof`/`demo_live.sh --down`. This smoke test
-    # must NOT assume a caller rig is already up — provision it via demo_call.sh
-    # setup if baresip-tx is absent, so `make smoke-test` works from any state.
     rig_check = run_cmd("podman ps --format '{{.Names}}' | grep -x baresip-tx")
     if "baresip-tx" not in rig_check:
         print("  [!] baresip caller rig not running — provisioning via demo_call.sh setup ...")
@@ -108,6 +127,7 @@ def main():
         print("  ✓ baresip rig provisioned")
     else:
         print("  ✓ baresip caller rig already running")
+
     print(f"• Initiating live SIP call: Laptop UE ({LAPTOP_UE1}) -> Rig Callee ({LAPTOP_UE2})...")
     dial_res = run_cmd("podman exec baresip-tx python3 /cfg/baresip_dial.py --uri sip:15559998888@10.89.0.23:5060 --timeout 14", timeout=16)
     print(f"  SIP Call Handshake:\n{dial_res}")
@@ -118,7 +138,7 @@ def main():
     time.sleep(8)
     run_cmd("make hangup", timeout=10)
 
-    # ─── 4. Live Vosk ASR JNI Offline Speech Recognition & AI Classification ───
+    # ─── 4. Live Vosk ASR JNI Speech Recognition & AI Classification ───
     banner("STAGE 4: LIVE VOSK ASR JNI SPEECH TRANSCRIPTION & AI CLASSIFICATION")
     hil_txt_path = os.path.join(REPO_ROOT, "state/spool/archived/hil_speech.txt")
     if os.path.exists(hil_txt_path):
@@ -127,7 +147,7 @@ def main():
         except Exception:
             pass
 
-    print("• Synthesizing real speech phrase into live spool pipeline...")
+    print("• Feeding acoustic speech phrase into Java 21 Vosk JNI media spool...")
     run_cmd('espeak-ng -w /tmp/hil_speech.wav "Your bank account has been blocked please verify your account number immediately" && ffmpeg -y -i /tmp/hil_speech.wav -ar 16000 -ac 1 -c:a pcm_s16le state/spool/hil_speech.wav >/dev/null 2>&1', timeout=10)
     print("• Awaiting Native Java 21 Vosk JNI lattice transcription...")
     
@@ -168,18 +188,28 @@ def main():
         raise RuntimeError("Fatal: Live 3-Way Conference Mixing failed!")
     print("  ✓ Multi-Party Full-Duplex Conference Audio Verified.")
 
-    # ─── 7. Live Carrier Observability & Metrics ───
-    banner("STAGE 7: LIVE CARRIER OBSERVABILITY & METRICS VERIFICATION")
-    metrics = run_cmd("curl -s http://localhost:8080/actuator/prometheus")
-    total_calls = re.search(r"mvno_call_requests_total\s+([0-9.]+)", metrics)
-    total_sms = re.search(r"mvno_sms_requests_total\s+([0-9.]+)", metrics)
-    print(f"• Prometheus Real-Time Telemetry:")
-    print(f"  - Total Call Requests: {total_calls.group(1) if total_calls else 'N/A'}")
-    print(f"  - Total SMS Requests:  {total_sms.group(1) if total_sms else 'N/A'}")
-    print(f"  - Grafana NOC URL:     http://{host_ip}:3000")
+    # ─── 7. Live Carrier Observability & Strict TSDB Metric Assertions ───
+    banner("STAGE 7: LIVE CARRIER OBSERVABILITY & STRICT TSDB METRIC ASSERTIONS")
+    total_calls = query_vm_metric("mvno_call_requests_total")
+    total_sms = query_vm_metric("mvno_sms_requests_total")
+    fiveg_sessions = query_vm_metric("fivegs_upffunction_upf_sessionnbr")
+    rtp_uptime = query_vm_metric("rtpengine_uptime_seconds")
+
+    print(f"• VictoriaMetrics Real-Time PromQL Metrics:")
+    print(f"  - Total Call Requests: {total_calls} (Target: >= 1)")
+    print(f"  - Total SMS Requests:  {total_sms} (Target: >= 1)")
+    print(f"  - 5G SA UPF Sessions:  {fiveg_sessions} (Target: == 3)")
+    print(f"  - RTPEngine Uptime:    {rtp_uptime}s (Target: > 0)")
+    print(f"  - Grafana NOC URL:     http://{host_ip}:3000/d/mvno-unified-noc")
+
+    # Strict Assertions
+    assert total_calls is not None and total_calls >= 1, f"Assertion failed: total_calls={total_calls} < 1"
+    assert total_sms is not None and total_sms >= 1, f"Assertion failed: total_sms={total_sms} < 1"
+    assert fiveg_sessions is not None and fiveg_sessions == 3, f"Assertion failed: 5G UPF sessions={fiveg_sessions} != 3"
+    assert rtp_uptime is not None and rtp_uptime > 0, f"Assertion failed: rtp_uptime={rtp_uptime} <= 0"
 
     print("\n" + "═" * 72)
-    print("🎉 ALL 7 REAL-WORLD CARRIER SMOKE TESTS PASSED EMPIRICALLY (0 MOCKS)!")
+    print("🎉 ALL 7 REAL-WORLD CARRIER SMOKE TESTS PASSED EMPIRICALLY!")
     print("═" * 72)
 
 
