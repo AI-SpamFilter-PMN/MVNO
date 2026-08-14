@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1360 820" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1360 840" width="100%" height="100%">
   <defs>
     <style>
       .bg { fill: #0b0e17; }
@@ -20,7 +20,7 @@
       .arrow-blue { stroke: #29b6f6; stroke-width: 1.8; fill: none; stroke-dasharray: 4,4; }
       .arrow-purple { stroke: #ba68c8; stroke-width: 2; fill: none; }
       
-      .badge-bg { fill: #0b0e17; stroke-width: 1; opacity: 0.92; rx: 4; ry: 4; }
+      .badge-bg { fill: #0b0e17; stroke-width: 1; opacity: 0.94; rx: 4; ry: 4; }
     </style>
 
     <!-- Arrow markers -->
@@ -39,15 +39,15 @@
   </defs>
 
   <!-- Background -->
-  <rect width="1360" height="820" class="bg" />
+  <rect width="1360" height="840" class="bg" />
 
   <!-- Diagram Header -->
   <text x="40" y="38" font-family="'Inter', sans-serif" font-size="20" font-weight="800" fill="#ffffff">MVNO Core Integration Flow &amp; Architecture Map</text>
   <text x="40" y="58" font-family="'Inter', sans-serif" font-size="12" fill="#78909c">5G SA Core · 2G Cellular Radio · Asterisk ConfBridge · Native Vosk STT · Spring Boot 3.4 AI Gate</text>
 
-  <!-- ==================== 1. ACCESS LAYER (X: 40, W: 210, H: 720) ==================== -->
+  <!-- ==================== 1. ACCESS LAYER (X: 40, W: 210, H: 735) ==================== -->
   <g transform="translate(40, 80)">
-    <rect width="210" height="720" class="client-box" />
+    <rect width="210" height="735" class="client-box" />
     <text x="16" y="26" class="text-header">1. Access &amp; Device Layer</text>
     
     <!-- Phone / SIP UA -->
@@ -92,7 +92,7 @@
 
     <!-- Host PipeWire Audio -->
     <g transform="translate(15, 570)">
-      <rect width="180" height="135" class="box" stroke="#0288d1" />
+      <rect width="180" height="145" class="box" stroke="#0288d1" />
       <text x="12" y="22" class="text-title" fill="#29b6f6">Host PipeWire Audio</text>
       <text x="12" y="42" class="text-body">• Laptop HW Microphone</text>
       <text x="12" y="58" class="text-body">• Laptop HW Speakers</text>
@@ -102,9 +102,9 @@
     </g>
   </g>
 
-  <!-- ==================== 2. MVNO NETWORK CORE (X: 360, W: 240, H: 720) ==================== -->
+  <!-- ==================== 2. MVNO NETWORK CORE (X: 360, W: 240, H: 735) ==================== -->
   <g transform="translate(360, 80)">
-    <rect width="240" height="720" class="core-box" />
+    <rect width="240" height="735" class="core-box" />
     <text x="16" y="26" class="text-header">2. Signaling &amp; Media Core</text>
 
     <!-- Kamailio -->
@@ -141,7 +141,7 @@
 
     <!-- OsmoSMSC & HLR -->
     <g transform="translate(15, 485)">
-      <rect width="210" height="105" class="box" />
+      <rect width="210" height="110" class="box" />
       <text x="12" y="22" class="text-title">OsmoSMSC + OsmoHLR</text>
       <text x="12" y="42" class="text-body">• GSM 03.40 Store-Forward</text>
       <text x="12" y="58" class="text-body">• Standalone HLR SQLite</text>
@@ -150,7 +150,7 @@
     </g>
 
     <!-- Open5GS 5GC -->
-    <g transform="translate(15, 605)">
+    <g transform="translate(15, 615)">
       <rect width="210" height="100" class="box" />
       <text x="12" y="22" class="text-title">Open5GS 5G SA Core</text>
       <text x="12" y="42" class="text-body">• 10 3GPP Rel-16 NFs</text>
@@ -160,9 +160,9 @@
     </g>
   </g>
 
-  <!-- ==================== 3. INTEGRATION GATEWAY (X: 700, W: 250, H: 720) ==================== -->
+  <!-- ==================== 3. INTEGRATION GATEWAY (X: 700, W: 250, H: 735) ==================== -->
   <g transform="translate(700, 80)">
-    <rect width="250" height="720" class="gw-box" />
+    <rect width="250" height="735" class="gw-box" />
     <text x="16" y="26" class="text-header">3. Policy &amp; Interception Layer</text>
 
     <!-- Spring Boot Gateway -->
@@ -204,13 +204,13 @@
 
     <!-- Vector Log Pipeline -->
     <g transform="translate(15, 555)">
-      <rect width="220" height="150" class="box" />
+      <rect width="220" height="160" class="box" />
       <text x="12" y="22" class="text-title">Vector Log Pipeline</text>
       <text x="12" y="42" class="text-body">• Rust Container Log Shipper</text>
       <text x="12" y="58" class="text-body">• Regex VRL Transform</text>
       <text x="12" y="74" class="text-body">• Zero-GC Stream Processor</text>
       <text x="12" y="90" class="text-body">• Prometheus Exporter Sink</text>
-      <text x="12" y="130" class="text-link">Vector Rust Daemon</text>
+      <text x="12" y="135" class="text-link">Vector Rust Daemon</text>
     </g>
   </g>
 
@@ -242,84 +242,84 @@
     </g>
   </g>
 
-  <!-- ==================== 5. OBSERVABILITY STACK (X: 1040, W: 280, H: 370) ==================== -->
+  <!-- ==================== 5. OBSERVABILITY STACK (X: 1040, W: 280, H: 385) ==================== -->
   <g transform="translate(1040, 430)">
-    <rect width="280" height="370" class="obs-box" />
+    <rect width="280" height="385" class="obs-box" />
     <text x="16" y="26" class="text-header">5. Carrier Observability</text>
 
     <!-- VictoriaMetrics -->
     <g transform="translate(15, 45)">
-      <rect width="250" height="135" class="box" />
+      <rect width="250" height="145" class="box" />
       <text x="12" y="22" class="text-title">VictoriaMetrics TSDB</text>
       <text x="12" y="42" class="text-body">• High-Performance TSDB</text>
       <text x="12" y="58" class="text-body">• vmagent Metric Scraper</text>
       <text x="12" y="74" class="text-body">• PromQL Metric Storage</text>
       <text x="12" y="90" class="text-body">• Scrapes telecom-api &amp; Vector</text>
-      <text x="12" y="112" class="text-link">HTTP :8428 (API :8429)</text>
+      <text x="12" y="115" class="text-link">HTTP :8428 (API :8429)</text>
     </g>
 
     <!-- Grafana NOC -->
-    <g transform="translate(15, 200)">
-      <rect width="250" height="150" class="box" />
+    <g transform="translate(15, 210)">
+      <rect width="250" height="155" class="box" />
       <text x="12" y="22" class="text-title">Grafana NOC Dashboards</text>
       <text x="12" y="42" class="text-body">• Real-Time Unified NOC</text>
       <text x="12" y="58" class="text-body">• Active Calls &amp; RTP Packet Loss</text>
       <text x="12" y="74" class="text-body">• SMS Transit &amp; Interception Rates</text>
       <text x="12" y="90" class="text-body">• AI Scam Block Counters</text>
-      <text x="12" y="128" class="text-link">HTTP :3000 (Admin Dashboard)</text>
+      <text x="12" y="130" class="text-link">HTTP :3000 (Admin Dashboard)</text>
     </g>
   </g>
 
-  <!-- ==================== CLEAN ORTHOGONAL SIGNAL ARROWS ==================== -->
+  <!-- ==================== 100% STRICTLY STRAIGHT / RIGHT-ANGLED (ORTHOGONAL) ARROWS ==================== -->
 
-  <!-- Flow 1: SIP INVITE Phone -> Kamailio -->
+  <!-- Flow 1: SIP INVITE Phone -> Kamailio (Straight Horizontal) -->
   <path d="M 235,170 L 360,170" class="arrow-cyan" marker-end="url(#m-cyan)" />
   <rect x="252" y="156" width="90" height="18" class="badge-bg" stroke="#00e5ff" />
   <text x="297" y="169" text-anchor="middle" class="text-label" fill="#00e5ff">1. SIP INVITE</text>
 
-  <!-- Flow 2: Call Pre-Check Kamailio -> telecom-api -->
+  <!-- Flow 2: Call Pre-Check Kamailio -> telecom-api (Straight Horizontal) -->
   <path d="M 585,170 L 700,170" class="arrow-cyan" marker-end="url(#m-cyan)" />
   <rect x="600" y="156" width="85" height="18" class="badge-bg" stroke="#00e5ff" />
   <text x="642" y="169" text-anchor="middle" class="text-label" fill="#00e5ff">2. OCS / EIR</text>
 
-  <!-- Flow 3: Media Anchor Kamailio -> RTPEngine -->
-  <path d="M 480,190 L 480,265" class="arrow-cyan" marker-end="url(#m-cyan)" />
-  <rect x="490" y="218" width="95" height="18" class="badge-bg" stroke="#00e5ff" />
-  <text x="537" y="231" text-anchor="middle" class="text-label" fill="#00e5ff">3. RTP Anchor</text>
+  <!-- Flow 3: Media Anchor Kamailio -> RTPEngine (Straight Vertical) -->
+  <path d="M 480,210 L 480,275" class="arrow-cyan" marker-end="url(#m-cyan)" />
+  <rect x="490" y="235" width="95" height="18" class="badge-bg" stroke="#00e5ff" />
+  <text x="537" y="248" text-anchor="middle" class="text-label" fill="#00e5ff">3. RTP Anchor</text>
 
-  <!-- Flow 4: ConfBridge / Feature Dial: Kamailio -> Asterisk -->
-  <path d="M 465,190 L 465,405" class="arrow-cyan" marker-end="url(#m-cyan)" />
-  <rect x="375" y="348" width="85" height="18" class="badge-bg" stroke="#00e5ff" />
-  <text x="417" y="361" text-anchor="middle" class="text-label" fill="#00e5ff">4. Conf 7XXX</text>
+  <!-- Flow 4: ConfBridge / Feature Dial: Kamailio -> Asterisk (Straight Vertical) -->
+  <path d="M 450,210 L 450,415" class="arrow-cyan" marker-end="url(#m-cyan)" />
+  <rect x="365" y="355" width="85" height="18" class="badge-bg" stroke="#00e5ff" />
+  <text x="407" y="368" text-anchor="middle" class="text-label" fill="#00e5ff">4. Conf 7XXX</text>
 
-  <!-- Flow 5: Audio Fork: RTPEngine -> Vosk ASR -->
-  <path d="M 585,325 L 700,325" class="arrow-purple" marker-end="url(#m-purple)" />
-  <rect x="600" y="311" width="85" height="18" class="badge-bg" stroke="#ba68c8" />
-  <text x="642" y="324" text-anchor="middle" class="text-label" fill="#ba68c8">5. WAV Spool</text>
+  <!-- Flow 5: Audio Fork: RTPEngine -> Vosk ASR (Straight Horizontal) -->
+  <path d="M 585,335 L 700,335" class="arrow-purple" marker-end="url(#m-purple)" />
+  <rect x="600" y="321" width="85" height="18" class="badge-bg" stroke="#ba68c8" />
+  <text x="642" y="334" text-anchor="middle" class="text-label" fill="#ba68c8">5. WAV Spool</text>
 
-  <!-- Flow 6: Voice Decider: telecom-api -> Filteration-System -->
-  <path d="M 935,325 L 1040,325" class="arrow-orange" marker-end="url(#m-orange)" />
-  <rect x="945" y="311" width="85" height="18" class="badge-bg" stroke="#ff5722" />
-  <text x="987" y="324" text-anchor="middle" class="text-label" fill="#ff5722">6. Voice Decider</text>
+  <!-- Flow 6: Voice Decider: telecom-api -> Filteration-System (Straight Horizontal) -->
+  <path d="M 935,335 L 1040,335" class="arrow-orange" marker-end="url(#m-orange)" />
+  <rect x="945" y="321" width="85" height="18" class="badge-bg" stroke="#ff5722" />
+  <text x="987" y="334" text-anchor="middle" class="text-label" fill="#ff5722">6. Voice Decider</text>
 
-  <!-- Flow 7: ESME SMS Submit: ESME -> OsmoSMSC -->
-  <path d="M 235,425 L 360,555" class="arrow-cyan" marker-end="url(#m-cyan)" />
-  <rect x="252" y="475" width="85" height="18" class="badge-bg" stroke="#00e5ff" />
-  <text x="294" y="488" text-anchor="middle" class="text-label" fill="#00e5ff">7. submit_sm</text>
+  <!-- Flow 7: ESME SMS Submit: ESME -> OsmoSMSC (Strict Right-Angled / Manhattan Route) -->
+  <path d="M 235,425 L 295,425 L 295,595 L 360,595" class="arrow-cyan" marker-end="url(#m-cyan)" />
+  <rect x="245" y="475" width="95" height="18" class="badge-bg" stroke="#00e5ff" />
+  <text x="292" y="488" text-anchor="middle" class="text-label" fill="#00e5ff">7. submit_sm</text>
 
-  <!-- Flow 8: SMS Intercept: OsmoSMSC -> telecom-api -->
-  <path d="M 585,555 L 700,485" class="arrow-cyan" marker-end="url(#m-cyan)" />
-  <rect x="600" y="505" width="85" height="18" class="badge-bg" stroke="#00e5ff" />
-  <text x="642" y="518" text-anchor="middle" class="text-label" fill="#00e5ff">8. Intercept SMS</text>
+  <!-- Flow 8: SMS Intercept: OsmoSMSC -> telecom-api (Strict Right-Angled / Manhattan Route) -->
+  <path d="M 585,595 L 645,595 L 645,495 L 700,495" class="arrow-cyan" marker-end="url(#m-cyan)" />
+  <rect x="600" y="535" width="90" height="18" class="badge-bg" stroke="#00e5ff" />
+  <text x="645" y="548" text-anchor="middle" class="text-label" fill="#00e5ff">8. Intercept SMS</text>
 
-  <!-- Flow 9: AI Classifier: telecom-api -> AI Spam Model -->
+  <!-- Flow 9: AI Classifier: telecom-api -> AI Spam Model (Straight Horizontal) -->
   <path d="M 935,170 L 1040,170" class="arrow-orange" marker-end="url(#m-orange)" />
   <rect x="945" y="156" width="85" height="18" class="badge-bg" stroke="#ff5722" />
   <text x="987" y="169" text-anchor="middle" class="text-label" fill="#ff5722">9. AI Classify</text>
 
-  <!-- Flow 10: Metrics Scraping: vmagent -> telecom-api -->
-  <path d="M 1040,555 L 935,555" class="arrow-blue" marker-end="url(#m-blue)" />
-  <rect x="945" y="541" width="85" height="18" class="badge-bg" stroke="#29b6f6" />
-  <text x="987" y="554" text-anchor="middle" class="text-label" fill="#29b6f6">10. Metrics</text>
+  <!-- Flow 10: Metrics Scraping: vmagent -> telecom-api (Straight Horizontal) -->
+  <path d="M 1040,580 L 935,580" class="arrow-blue" marker-end="url(#m-blue)" />
+  <rect x="945" y="566" width="85" height="18" class="badge-bg" stroke="#29b6f6" />
+  <text x="987" y="579" text-anchor="middle" class="text-label" fill="#29b6f6">10. Metrics</text>
 
 </svg>
