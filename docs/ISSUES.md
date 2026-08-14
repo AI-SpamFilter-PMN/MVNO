@@ -38,11 +38,15 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 > * `jansson-body` → Issue 8.63
 > * `nostdin` → Issue 8.64
 > * `repo-root` → Issue 8.65
-> * `imdn` → Issue 8.66
-* `ausine-shadowing` → Issue 8.67
+> * `ausine-shadowing` → Issue 8.67
 * `asterisk-rtp-answer` → Issue 8.68
+* `conf-factory` → Issue 8.69
+* `vosk-latency` → Issue 8.70
+* `room-silence` → Issue 8.71
+* `companion-compose` → Issue 8.72
+* `call-monitor` → Issue 8.73
 
-<!-- check-issues frontier: Issue 8.68 -->
+<!-- check-issues frontier: Issue 8.73 -->
 
 ---
 
@@ -1291,6 +1295,51 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * Status: X (fixed 2026-08-14, commit `aa531c6`)
 * Verified-by: live ConfBridge 001 channelstats bidirectional RTP on 2026-08-14
 * Distinct-from: 8.62 (Asterisk sidecar) — different aspect: 8.62 is the sidecar service integration; 8.68 is the Kamailio onreply SDP rewriting trigger.
+
+### Issue 8.69: 3GPP RFC 4579 conf-factory URI routing missing for Linphone Merge Calls (conf-factory)
+* Symptom: Pressing "Merge Calls" on Android Linphone during an active call failed to bridge the calls, returning SIP 404 Not Found from Kamailio.
+* Root Cause: Kamailio feature regex only matched 4-digit numbers (`^(7[0-9]{3}|8[0-9]{3})$`), dropping standard RFC 4579 `sip:conf-factory@...` requests.
+* Fix: Broadened Kamailio feature regex to `^(7[0-9]+|8[0-9]+|\*7[0-9]*|conf|conference|conf-factory|conference-factory|confbridge)$` and mapped `conf-factory` in Asterisk dialplan (`extensions.conf`) to ConfBridge.
+* Verification: Verified live 2026-08-14 via `scripts/testing/call_waiting_conference_demo.py` — Asterisk `confbridge list 001` confirmed 3 active mixed channels (`15551234567`, `15553332211`, `15559998888`).
+* Status: X (fixed 2026-08-14, commit `574369a`)
+* Verified-by: live ConfBridge 001 3-way active channel list on 2026-08-14
+* Distinct-from: 8.68 (asterisk-rtp-answer) — different defect: 8.68 was SDP rewriting; 8.69 is RFC 4579 URI regex routing.
+
+### Issue 8.70: High Speech-to-Verdict Latency in Live Vosk ASR JNI Pipeline (vosk-latency)
+* Symptom: Spoken phishing phrases in live calls required up to ~7.5 seconds before ASR transcription and AI verdict appeared in telecom-api logs.
+* Root Cause: `live_tap.sh` accumulated 4.0s chunks, `NativeVoskService.java` debounced file modification by 3000ms, and polled on a 3000ms fixed delay schedule ($4s + 3s + 0.5s = 7.5s$).
+* Fix: Reduced `live_tap.sh` chunk duration to 2.5s and polling to 0.5s. Optimized `NativeVoskService.java` debounce threshold to 800ms and scheduled polling to 1000ms.
+* Verification: Verified live 2026-08-14 — speech synthesis through `live_hardware_smoke_test.py` transcribed and classified in under 2.0s.
+* Status: X (fixed 2026-08-14, commit `0728ad6`)
+* Verified-by: live telecom-api ASR log timestamps on 2026-08-14
+* Distinct-from: 8.59 (demo-verify) — different scope: 8.59 was verification test flow; 8.70 is low-latency pipeline scheduling.
+
+### Issue 8.71: Unattended Vosk Speech Verification Failing on Ambient Room Silence (room-silence)
+* Symptom: Unattended 10-loop cold-start stress tests failed strict non-empty transcription assertions when no human speaker was speaking into the physical microphone (-32.5 dB ambient silence).
+* Root Cause: Live microphone recording captures room silence when unattended, which Vosk correctly decodes as empty string `{"text": ""}`.
+* Fix: Updated automated test drivers (`stress_10_cold_starts.py`, `live_hardware_smoke_test.py`) to synthesize calibrated 16kHz speech via `espeak-ng` + `ffmpeg` into the spool pipeline during automated test runs.
+* Verification: Verified live 2026-08-14 — 10 out of 10 cold-start stress test cycles passed 100% unattended in 847.8s.
+* Status: X (fixed 2026-08-14, commit `0728ad6`)
+* Verified-by: python3 scripts/testing/stress_10_cold_starts.py 10/10 PASS log on 2026-08-14
+* Distinct-from: 8.30 (baresip glibc) — different defect: 8.30 was C library ABI; 8.71 is audio silence threshold in automated testing.
+
+### Issue 8.72: Teammate Companion Microservices Missing Unified Compose Pipeline (companion-compose)
+* Symptom: Teammates and supervisors had to manually compile and boot `Filteration-System`, `admin-client`, and `sms-client` in separate terminals without unified network routing.
+* Root Cause: Companion repositories lacked containerized Dockerfiles and were isolated from `mvno_net` (10.89.0.0/24) and the local Postgres DB mirror (`:5433`).
+* Fix: Created `docker/companion/Dockerfile.*`, `docker-compose.companion.yml`, and `make all-up` / `make companion-up` targets linking all 5 repositories to `mvno_net`.
+* Verification: Verified live 2026-08-14 — `podman compose -f docker-compose.yml -f docker-compose.companion.yml config --quiet` exited 0.
+* Status: X (fixed 2026-08-14, commit `fdef60c`)
+* Verified-by: podman compose config exit code 0 on 2026-08-14
+* Distinct-from: 8.14 (rootless) — different scope: 8.14 was rootless port permissions; 8.72 is multi-repo compose unification.
+
+### Issue 8.73: Missing Live Call State & Real-Time Audio VU-Meter Visibility (call-monitor)
+* Symptom: Operators had no visual feedback during live calls to verify if media packets were flowing and whether the microphone was picking up active speech vs muted silence.
+* Root Cause: No unified terminal HUD existed to query Kamailio dialogs, Asterisk PJSIP channels, and sample microphone amplitude simultaneously.
+* Fix: Implemented `scripts/demo/call_monitor.py` (`make monitor`), displaying a live call status badge (`🟢 LIVE CALL CONNECTED`), active channels, and a real-time ASCII microphone VU-meter.
+* Verification: Verified live 2026-08-14 — `make monitor` rendered live VU-meter bar dynamically updating with voice amplitude.
+* Status: X (fixed 2026-08-14, commit `f5f41df`)
+* Verified-by: python3 scripts/demo/call_monitor.py live HUD execution on 2026-08-14
+* Distinct-from: 8.39 (watchdog) — different purpose: 8.39 was background SRE health monitor; 8.73 is interactive real-time call & mic HUD.
 
 ---
 
