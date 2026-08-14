@@ -39,8 +39,9 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 > * `nostdin` → Issue 8.64
 > * `repo-root` → Issue 8.65
 > * `imdn` → Issue 8.66
+* `ausine-shadowing` → Issue 8.67
 
-<!-- check-issues frontier: Issue 8.66 -->
+<!-- check-issues frontier: Issue 8.67 -->
 
 ---
 
@@ -1271,6 +1272,15 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * Status: AO (observed and documented 2026-08-14)
 * Verified-by: 2G MS receipt log vs Linphone UI badge comparison on 2026-08-14
 * Distinct-from: 8.52 (typing indicator filter) — different RFC: 8.52 is RFC 3994 iscomposing XML; 8.66 is RFC 5438 IMDN delivery receipts.
+
+### Issue 8.67: Baresip ausine/aufile module shadowing live pulse.so audio streaming during active calls (ausine-shadowing)
+* Symptom: Calls establish cleanly (CALL_ESTABLISHED in 0.6s) and PipeWire VoIP Player / Recorder streams open, but no real microphone or speaker audio is audible on the host; container logs show `audio rx pipeline: aufile <--- aubuf <--- PCMU` and `audio tx pipeline: ausine ---> aubuf ---> PCMU`.
+* Root Cause: When `module ausine.so` and `module aufile.so` are loaded in Baresip's `config` alongside `pulse.so`, Baresip's internal module registry gives priority to the test tone and WAV file writer modules, suppressing the live PulseAudio hardware stream (the ausine-shadowing defect).
+* Fix: Removed `ausine.so` and `aufile.so` from dynamic `state/baresip/*/config` and updated `scripts/testing/demo_call.sh` to only load `pulse.so` when `PULSE_OK=1` (host PulseAudio present), and load `ausine.so`/`aufile.so` exclusively during headless CI/CD fallback (`PULSE_OK=0`).
+* Verification: Verified live call on 2026-08-14 — `podman logs baresip-rx` confirmed `audio tx pipeline: pulse ---> aubuf ---> PCMU` and `audio rx pipeline: pulse <--- aubuf <--- PCMU` with real two-way hardware audio streaming.
+* Status: X (fixed 2026-08-14)
+* Verified-by: live baresip-rx audio pipeline log (`pulse ---> aubuf`) on 2026-08-14
+* Distinct-from: 8.47 (baresip container pulse mount) — different defect: 8.47 was socket permissions and SELinux label; 8.67 is module ordering/priority inside baresip.conf.
 
 ---
 

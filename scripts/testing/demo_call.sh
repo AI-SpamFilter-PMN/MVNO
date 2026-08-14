@@ -68,7 +68,24 @@ setup() {
     state/baresip/speech8k.wav
   echo "  callee phrase: ${SCAM_PHRASE}"
 
-  cat > state/baresip/rx/config <<EOF
+  if [ "$PULSE_OK" -eq 1 ]; then
+    cat > state/baresip/rx/config <<EOF
+$(module_path)
+module stdio.so
+module g711.so
+module g722.so
+module opus.so
+module pulse.so
+module uuid.so
+module_app account.so
+module_app menu.so
+module_app ctrl_tcp.so
+ctrl_tcp_listen 0.0.0.0:4444
+audio_source pulse,alsa_input.pci-0000_05_00.6.analog-stereo
+audio_player pulse,alsa_output.pci-0000_05_00.6.analog-stereo
+EOF
+  else
+    cat > state/baresip/rx/config <<EOF
 $(module_path)
 module stdio.so
 module g711.so
@@ -76,28 +93,13 @@ module g722.so
 module opus.so
 module ausine.so
 module aufile.so
-module pulse.so
 module uuid.so
 module_app account.so
 module_app menu.so
 module_app ctrl_tcp.so
-# Issue 8.59: the gate (demo-verify.sh) hangs up BOTH rigs before dialing;
-# rx needs its own ctrl_tcp socket for that cleanup to reach it.
 ctrl_tcp_listen 0.0.0.0:4444
-EOF
-  if [ "$PULSE_OK" -eq 1 ]; then
-    # Issue 8.47 proven recipe: full-duplex live audio both ends. The callee
-    # leg (baresip-rx) captures the laptop HW mic (pulse source) and plays the
-    # remote leg (phone mic) on the laptop speakers (pulse player) — so the
-    # laptop mic is LIVE in BOTH call directions (phone->rig and rig->phone).
-    cat >> state/baresip/rx/config <<EOF
-audio_source pulse,alsa_input.pci-0000_05_00.6.analog-stereo
-audio_player pulse,alsa_output.pci-0000_05_00.6.analog-stereo
-EOF
-  else
-    # Headless/tone fallback: callee streams the canned scam phrase.
-    cat >> state/baresip/rx/config <<EOF
 audio_source aufile,/media/speech8k.wav
+audio_player aufile,/dev/null
 EOF
   fi
   cat > state/baresip/rx/accounts <<EOF
@@ -107,18 +109,25 @@ EOF
   # baresip build (verified live 2026-08-14 — gate CALL_ESTABLISHED twice);
   # if a future baresip version stops auto-answering, add `;sip_autoanswer=yes`
   # to the account line above.
-  # Caller leg: use the live host mic when a Pulse socket exists, else a
-  # container-side speech tone (portable fallback — still a real call).
-  # Caller leg audio path (Issue 8.47, FIXED 2026-08-13): baresip's pulse.so
-  # DOES capture the real laptop HW mic in this rootless rig when the container
-  # runs as root (uid 0) with --security-opt label=disable, the host pulse
-  # socket + cookie mounted, and PULSE_SERVER/XDG_RUNTIME_DIR set. The aufile
-  # streaming workaround is no longer needed for live laptop-mic capture.
-  local tx_src="ausine"
+
   if [ "$PULSE_OK" -eq 1 ]; then
-    tx_src="pulse"
-  fi
-  cat > state/baresip/tx/config <<EOF
+    cat > state/baresip/tx/config <<EOF
+$(module_path)
+module stdio.so
+module g711.so
+module g722.so
+module opus.so
+module pulse.so
+module uuid.so
+module_app account.so
+module_app menu.so
+module_app ctrl_tcp.so
+ctrl_tcp_listen 0.0.0.0:4444
+audio_source pulse,alsa_input.pci-0000_05_00.6.analog-stereo
+audio_player pulse,alsa_output.pci-0000_05_00.6.analog-stereo
+EOF
+  else
+    cat > state/baresip/tx/config <<EOF
 $(module_path)
 module stdio.so
 module g711.so
@@ -126,23 +135,13 @@ module g722.so
 module opus.so
 module ausine.so
 module aufile.so
-module pulse.so
 module uuid.so
 module_app account.so
 module_app menu.so
 module_app ctrl_tcp.so
 ctrl_tcp_listen 0.0.0.0:4444
-EOF
-  if [ "$PULSE_OK" -eq 1 ]; then
-    # Live laptop mic + speakers via baresip's pulse module (Issue 8.47
-    # proven recipe): real-time full-duplex capture, no file, no feeder.
-    cat >> state/baresip/tx/config <<EOF
-audio_source pulse,alsa_input.pci-0000_05_00.6.analog-stereo
-audio_player pulse,alsa_output.pci-0000_05_00.6.analog-stereo
-EOF
-  else
-    cat >> state/baresip/tx/config <<EOF
 audio_source ausine
+audio_player aufile,/dev/null
 EOF
   fi
   cat > state/baresip/tx/accounts <<EOF
