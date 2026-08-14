@@ -972,3 +972,28 @@ services:
       mvno_net:
         ipv4_address: 10.89.0.61
     restart: unless-stopped
+
+  # ─── Asterisk media server (conference / voicemail / call screening) ───
+  # Sits BEHIND Kamailio on a SIP trunk (:5061): Kamailio stays the edge
+  # proxy/registrar/interceptor, Asterisk adds the media-plane features
+  # (ConfBridge mixing, IVR, voicemail) that rtpengine cannot. Distro-agnostic
+  # Debian container — runs identically on the CachyOS host and Ubuntu
+  # teammates. Feature numbers: 7XXXX conference, 8XXX voicemail, 8000
+  # screening. Media RTP 10000-20000/udp (inside the UFW-allowed window).
+  asterisk:
+    image: mvno-asterisk:1.0.0
+    container_name: mvno-asterisk
+    volumes:
+      - ./configs/asterisk:/etc/asterisk:z
+      - ./state/asterisk:/var/spool/asterisk:z
+      - ./state/asterisk/log:/var/log/asterisk:z
+    healthcheck:
+      test: ["CMD-SHELL", "asterisk -rx 'core show uptime' >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      mvno_net:
+        ipv4_address: 10.89.0.63
+    restart: unless-stopped

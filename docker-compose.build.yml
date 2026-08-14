@@ -46,3 +46,9 @@ services:
       dockerfile: Dockerfile.ms
     image: mvno-2g-ms:1.0.0
 
+  asterisk:
+    build:
+      context: ./configs/asterisk
+      dockerfile: Dockerfile
+    image: mvno-asterisk:1.0.0
+

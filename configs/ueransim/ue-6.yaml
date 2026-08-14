@@ -1,0 +1,43 @@
+supi: 'imsi-001010000000006'
+mcc: '001'
+mnc: '01'
+key: '987192A1645B30DD01EFF9C8FAB28268'
+op: '130C18F0D1239542D422D6437943DD0A'
+opc: '130C18F0D1239542D422D6437943DD0A'
+opType: 'OP'
+amf: '8000'
+gnbSearchList:
+  - ueransim-gnb
+uacAic:
+  mps: false
+  mcs: false
+uacAcc:
+  normalClass: 0
+  class11: false
+  class12: false
+  class13: false
+  class14: false
+  class15: false
+sessions:
+  - type: 'IPv4'
+    apn: 'internet'
+    slice:
+      sst: 1 # SST: 1 (eMBB)
+      sd: 0x000001 # SD: 0x000001 — MUST match 3-layer S-NSSAI slice in Subscriber MongoDB & 5G Core AMF/SMF for PDU session establishment
+configured-nssai:
+  - sst: 1
+    sd: 0x000001
+default-nssai:
+  - sst: 1
+    sd: 1
+integrity:
+  IA1: true
+  IA2: true
+  IA3: true
+ciphering:
+  EA1: true
+  EA2: true
+  EA3: true
+integrityMaxRate:
+  uplink: 'full'
+  downlink: 'full'
