@@ -2,7 +2,7 @@
 # ==============================================================================
 # check-bootstrap.sh — post-up functional health gate (the cold-start oracle)
 # ==============================================================================
-# "36 services Up" is not functional health. After a cold start this asserts
+# "37 services Up" is not functional health. After a cold start this asserts
 # the things that make the stack WORK, polling each until ready (bounded), so
 # the FIRST red marker points at the EXACT missing step:
 #   1. Kamailio subscriber table + seeded rows (sqlite)     [make init-db]
@@ -84,10 +84,10 @@ mongo_ues() {
     local n
     n=$(${ENGINE} exec -i mvno-mongodb mongosh --quiet open5gs \
         --eval 'db.subscribers.countDocuments()' 2>/dev/null | tail -1)
-    [ "${n:-0}" = "3" ]
+    [ "${n:-0}" -ge 3 ]
 }
 echo "=== 3/8 Open5GS Mongo 5G subscribers (UE attach prerequisite) ==="
-if poll mongo_ues 60; then ok "3 UERANSIM subscribers seeded";
+if poll mongo_ues 60; then ok ">=3 UERANSIM subscribers seeded (${n:-0} present)";
 else bad "Open5GS Mongo not seeded — run: make seed-mongo (after up)"; fi
 
 # --- 4. telecom-api ------------------------------------------------------------

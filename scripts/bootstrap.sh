@@ -281,7 +281,8 @@ for build_target in \
     "mvno-kamailio:$PROJECT_DIR/configs/kamailio/Dockerfile:$PROJECT_DIR" \
     "mvno-2g-core:$PROJECT_DIR/configs/2g/Dockerfile.core:$PROJECT_DIR/configs/2g" \
     "mvno-2g-ms:$PROJECT_DIR/configs/2g/Dockerfile.ms:$PROJECT_DIR/configs/2g" \
-    "mvno-baresip:$PROJECT_DIR/configs/baresip/Dockerfile:$PROJECT_DIR/configs/baresip"; do
+    "mvno-baresip:$PROJECT_DIR/configs/baresip/Dockerfile:$PROJECT_DIR/configs/baresip" \
+    "mvno-asterisk:$PROJECT_DIR/configs/asterisk/Dockerfile:$PROJECT_DIR/configs/asterisk"; do
     IFS=':' read -r tag dockerfile ctx <<< "$build_target"
     label="build:${tag}"
     try_log_quiet "$label" "$DOCKER_CMD build -t '${tag}:latest' -f '$dockerfile' '$ctx'"
@@ -291,6 +292,10 @@ done
 # (docker-compose.yml baresip-rx/baresip-tx use mvno-baresip:1.1.0) so a
 # bootstrap-built image satisfies the exact-tag gate.
 try_log_quiet "tag:mvno-baresip" "$DOCKER_CMD tag 'mvno-baresip:latest' 'mvno-baresip:1.1.0'"
+
+# Version-tag the Asterisk image to the tag the compose service pins
+# (docker-compose.yml asterisk uses mvno-asterisk:1.0.0).
+try_log_quiet "tag:mvno-asterisk" "$DOCKER_CMD tag 'mvno-asterisk:latest' 'mvno-asterisk:1.0.0'"
 
 # ─── Step 7: Save all images as tarballs ────────────────
 # Tag compose-built images with stable names
@@ -325,6 +330,7 @@ declare -A SAVE_IMAGES=(
     ["mvno-open5gs-webui-2.8.0"]="mvno-open5gs-webui:2.8.0"
     ["mvno-ueransim-3.2.6"]="mvno-ueransim:3.2.6"
     ["mvno-baresip-1.1.0"]="mvno-baresip:1.1.0"
+    ["mvno-asterisk-1.0.0"]="mvno-asterisk:1.0.0"
 )
 
 for name in "${!SAVE_IMAGES[@]}"; do

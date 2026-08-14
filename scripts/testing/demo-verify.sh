@@ -57,9 +57,21 @@ fi
 echo -e "${CYAN}==== [3/6] RIG CALL tx->rx (headless, live media assert) ====${NC}"
 PCAP_BEFORE=$(/usr/bin/ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1)
 BEFORE=$(podman ps -a --format '{{.Names}}' | grep -c baresip)
-CTRL_MSG="{\"command\":\"dial\",\"params\":\"sip:15559998888@10.89.0.23:5060\"}"
-podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; printf '${#CTRL_MSG}:${CTRL_MSG},' >&3; timeout 3 cat <&3" \
-  | grep -q CALL_ESTABLISHED && ok "call established (tx->rx)" || fail "call not established"
+# Clear any lingering call on BOTH rigs (a call left up by a manual test or a
+# previous aborted run makes rx refuse to auto-answer -> false gate FAIL).
+HANGUP_MSG='{"command":"hangup"}'
+for rig in baresip-tx baresip-rx; do
+  podman exec "$rig" bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; printf '${#HANGUP_MSG}:${HANGUP_MSG},' >&3; timeout 2 cat <&3" >/dev/null 2>&1
+  sleep 1
+done
+# Dial via a netstring-aware python helper: baresip ctrl_tcp streams events
+# in real-time, but `timeout N cat <&3 | grep` only sees them when podman
+# flushes the exec pipe (at teardown) — a call that establishes in 0.5 s
+# looked like a 12 s failure. The helper returns the instant CALL_ESTABLISHED
+# is observed (proven: 0.6 s warm). Right after a cold start the rig
+# re-REGISTERs to the freshly restarted Kamailio, so allow up to 30 s.
+podman exec baresip-tx python3 /cfg/baresip_dial.py --timeout 30 2>/dev/null \
+  && ok "call established (tx->rx)" || fail "call not established"
 # rx auto-answers (answermode=auto). Wait for media to accumulate.
 sleep 8
 PULSE_SINKS=$(pactl list short sink-inputs 2>/dev/null | wc -l)
@@ -69,9 +81,11 @@ PULSE_SRCS=$(pactl list short source-outputs 2>/dev/null | wc -l)
 RTP_PORTS=$(podman exec mvno-rtpengine ss -lun 2>/dev/null | grep -cE ':(1[0-9]{4}|2[0-9]{4})')
 [ "$RTP_PORTS" -ge 4 ] && ok "rtpengine ports bound (${RTP_PORTS})" || fail "rtpengine ports (${RTP_PORTS})"
 PCAP_NEW=$(/usr/bin/ls -t state/spool/pcaps/*.pcap 2>/dev/null | head -1)
-RTP_STREAMS=$(tshark -r "$PCAP_NEW" -d udp.port==10000,rtp -d udp.port==10022,rtp -Y "rtp" 2>/dev/null | wc -l)
+# rtpengine assigns RTP ports dynamically from the 10000-20000 pool (observed
+# 10032/10044 on 2026-08-14) — decode the WHOLE range, not hardcoded ports.
+RTP_STREAMS=$(tshark -r "$PCAP_NEW" -d udp.port==10000-20000,rtp -Y "rtp" 2>/dev/null | wc -l)
 [ "$RTP_STREAMS" -ge 100 ] && ok "RTP packets in fresh pcap (${RTP_STREAMS})" || fail "RTP packets (${RTP_STREAMS})"
-LOST=$(tshark -r "$PCAP_NEW" -d udp.port==10000,rtp -d udp.port==10022,rtp -q -z rtp,streams 2>/dev/null | grep -oE "[0-9]+ \(0\.0%\)" | head -1)
+LOST=$(tshark -r "$PCAP_NEW" -d udp.port==10000-20000,rtp -q -z rtp,streams 2>/dev/null | grep -oE "[0-9]+ \(0\.0%\)" | head -1)
 [ -n "$LOST" ] && ok "rtp streams loss ${LOST}" || fail "loss check"
 # hang up
 HANGUP_MSG='{"command":"hangup"}'

@@ -81,6 +81,9 @@ module uuid.so
 module_app account.so
 module_app menu.so
 module_app ctrl_tcp.so
+# Issue 8.59: the gate (demo-verify.sh) hangs up BOTH rigs before dialing;
+# rx needs its own ctrl_tcp socket for that cleanup to reach it.
+ctrl_tcp_listen 0.0.0.0:4444
 EOF
   if [ "$PULSE_OK" -eq 1 ]; then
     # Issue 8.47 proven recipe: full-duplex live audio both ends. The callee
@@ -100,6 +103,10 @@ EOF
   cat > state/baresip/rx/accounts <<EOF
 <sip:${CALLEE}@${SIP_HOST}:5060>;auth_user=${CALLEE};auth_pass=testpass;answermode=auto
 EOF
+  # Issue 8.48 note: `answermode=auto` alone auto-answers in the packaged
+  # baresip build (verified live 2026-08-14 — gate CALL_ESTABLISHED twice);
+  # if a future baresip version stops auto-answering, add `;sip_autoanswer=yes`
+  # to the account line above.
   # Caller leg: use the live host mic when a Pulse socket exists, else a
   # container-side speech tone (portable fallback — still a real call).
   # Caller leg audio path (Issue 8.47, FIXED 2026-08-13): baresip's pulse.so
