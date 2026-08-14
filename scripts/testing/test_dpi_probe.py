@@ -52,7 +52,15 @@ def main():
         time.sleep(2.0)
     print("  ✓ Compose-managed 5G DPI Probe running in Open5GS UPF netns.")
 
-    # 2. Transmit Real 5G DNS Packet from 5G UE (10.45.0.5) over uesimtun0
+    # 2. Record Baseline VictoriaMetrics TSDB Metrics before packet injection
+    print("[*] Recording baseline TSDB metrics prior to 5G packet injection...")
+    time.sleep(2.0)
+    init_bytes = query_vm('sum(mvno_dpi_bytes_total{protocol="dns"})') or 0.0
+    init_threats = query_vm('sum(mvno_dpi_threats_intercepted_total{protocol="dns"})') or 0.0
+    print(f"  - Initial Captured Bytes:   {init_bytes}")
+    print(f"  - Initial Threats Blocked: {init_threats}")
+
+    # 3. Transmit Real 5G DNS Packet from 5G UE (10.45.0.5) over uesimtun0
     dns_query_hex = "abcd010000010000000000000d7068697368696e672d62616e6b03636f6d0000010001"
     dns_query_len = len(bytes.fromhex(dns_query_hex))
     
@@ -70,22 +78,27 @@ print('  ✓ Sent 5G DNS query ({dns_query_len} bytes) from UE 10.45.0.5 -> UPF 
     if "Sent 5G DNS query" not in ue_res:
         raise RuntimeError(f"Fatal: 5G UE packet transmission failed: {ue_res}")
         
-    time.sleep(6.0) # Allow vmagent 5s scrape cycle
+    # 4. Fetch updated metrics from VictoriaMetrics TSDB & Live Probe Exporter
+    print("[*] Fetching ingested metrics from VictoriaMetrics (http://localhost:8428) & UPF Probe...")
+    time.sleep(5.5) # Wait for vmagent 5s scrape cycle
     
-    # 3. Fetch metrics from VictoriaMetrics TSDB
-    print("[*] Fetching ingested metrics from VictoriaMetrics (http://localhost:8428)...")
-    dns_bytes = query_vm('mvno_dpi_bytes_total{protocol="dns"}')
-    threats = query_vm('mvno_dpi_threats_intercepted_total{protocol="dns"}')
-    dns_flows = query_vm('mvno_dpi_flows_active{protocol="dns"}')
+    # Query live probe exporter inside container network
+    probe_metrics = run_cmd("podman exec mvno-vmagent wget -qO- http://upf:9094/metrics", timeout=5)
+    print(f"[*] Live UPF Probe Exporter Metrics:\n{probe_metrics.strip()}")
     
-    print(f"[*] VictoriaMetrics TSDB Telemetry:")
+    dns_bytes = query_vm('sum(mvno_dpi_bytes_total{protocol="dns"})') or 0.0
+    threats = query_vm('sum(mvno_dpi_threats_intercepted_total{protocol="dns"})') or 0.0
+    dns_flows = query_vm('sum(mvno_dpi_flows_active{protocol="dns"})') or 0.0
+    
+    print(f"[*] VictoriaMetrics TSDB Ingested Telemetry:")
     print(f"  - Captured 5G DNS Bytes:        {dns_bytes} (Expected: >= {dns_query_len})")
     print(f"  - Intercepted 5G Phishing Threat: {threats} (Expected: >= 1)")
     print(f"  - Active 5G DNS Flows:          {dns_flows} (Expected: >= 1)")
     
-    assert dns_bytes is not None and dns_bytes >= dns_query_len, f"5G DNS byte assertion failed: {dns_bytes}"
-    assert threats is not None and threats >= 1, f"5G Phishing threat assertion failed: {threats}"
-    assert dns_flows is not None and dns_flows >= 1, f"5G Active DNS flow assertion failed: {dns_flows}"
+    assert "mvno_dpi_bytes_total" in probe_metrics and "mvno_dpi_threats_intercepted_total" in probe_metrics, "Probe exporter missing metrics!"
+    assert dns_bytes is not None and dns_bytes >= dns_query_len, f"5G DNS byte assertion failed: {dns_bytes} < {dns_query_len}"
+    assert threats is not None and threats >= 1, f"5G Phishing threat assertion failed: {threats} < 1"
+    assert dns_flows is not None and dns_flows >= 1, f"5G Active DNS flow assertion failed: {dns_flows} < 1"
     
     print("\n[*] DPI Sniffer Interception Log from UPF ogstun interface:")
     dpi_logs = run_cmd("podman logs --tail 5 mvno-5g-dpi")

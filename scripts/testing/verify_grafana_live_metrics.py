@@ -18,16 +18,21 @@ import urllib.request
 import re
 import os
 
-VM_BASE = "http://localhost:8428"
-DASH_FILES = [
-    "configs/grafana/provisioning/dashboards/mvno_unified_noc.json",
-    "configs/grafana/provisioning/dashboards/mvno_soc_antifraud.json",
-    "configs/grafana/provisioning/dashboards/mvno_5g_core_dpi.json",
-    "configs/grafana/provisioning/dashboards/mvno_ims_voice_media.json"
-]
+import glob
 
+VM_BASE = "http://localhost:8428"
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 os.chdir(REPO_ROOT)
+
+DASH_DIR = os.path.join(REPO_ROOT, "configs/grafana/provisioning/dashboards")
+DASH_FILES = sorted(glob.glob(f"{DASH_DIR}/*.json"))
+if not DASH_FILES:
+    DASH_FILES = [
+        "configs/grafana/provisioning/dashboards/mvno_unified_noc.json",
+        "configs/grafana/provisioning/dashboards/mvno_soc_antifraud.json",
+        "configs/grafana/provisioning/dashboards/mvno_5g_core_dpi.json",
+        "configs/grafana/provisioning/dashboards/mvno_ims_voice_media.json"
+    ]
 
 def get_all_known_metrics():
     url = f"{VM_BASE}/api/v1/label/__name__/values"

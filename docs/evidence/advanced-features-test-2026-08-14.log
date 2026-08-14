@@ -44,7 +44,7 @@
  🔐 TEST 3: STIR/SHAKEN ES256 PASSporT (RFC 8224 / 8588) VALIDATION
 ==========================================================================
 [*] Generated SIP Identity Header:
-eyJhbGciOiJFUzI1NiIsInBwdCI6InNoYWtlbiIsInR5cCI6InBhc3Nwb3J0IiwieDV1IjoiaHR0cHM6Ly9jZXJ0Lm12bm8ubmV0L3Jvb3QucGVtIn0.eyJhdHRlc3QiOiJBIiwiZGVzdCI6eyJ0biI6WyIxNTU1OTk5ODg4OCJdfSwiaWF0IjoxNzg2NzM5NTYwLCJvcmlnIjp7InRuIjoiMTU1NTMzMzIyMTEifSwib3JpZ2lkIjoidXJuOnV1aWQ6NjUwMmZmZDYtYjhlNC00NTY4LTlkMTYtYmFmZWI3ODMwZjI0In0.v9LMUWul8ivsdmYWHza4x7LNZiXuE-Rif51Fm2f6LKqRrIxEDIZNTO-by8Q12dw_kWfAXNK_a9i85JCmpcFzvg;info=<https://cert.mvno.net/root.pem>;alg=ES256;ppt=shaken
+eyJhbGciOiJFUzI1NiIsInBwdCI6InNoYWtlbiIsInR5cCI6InBhc3Nwb3J0IiwieDV1IjoiaHR0cHM6Ly9jZXJ0Lm12bm8ubmV0L3Jvb3QucGVtIn0.eyJhdHRlc3QiOiJBIiwiZGVzdCI6eyJ0biI6WyIxNTU1OTk5ODg4OCJdfSwiaWF0IjoxNzg2NzQwMzM2LCJvcmlnIjp7InRuIjoiMTU1NTMzMzIyMTEifSwib3JpZ2lkIjoidXJuOnV1aWQ6NzE0MTUxOTAtYTRhMS00ZDdiLTgxYWMtMmI1MGRiMmQyMjdmIn0.Od1H6cEzTR_r3nWCYqHR_G7HKUf5G6QvxiKJWUYKhJDF5YsUXm5OwTxoEF08o0u0jw88jaK2Uz5m7j8MPrVDig;info=<https://cert.mvno.net/root.pem>;alg=ES256;ppt=shaken
 
 [*] Decoded JOSE Header: {
   "alg": "ES256",
@@ -59,11 +59,11 @@ eyJhbGciOiJFUzI1NiIsInBwdCI6InNoYWtlbiIsInR5cCI6InBhc3Nwb3J0IiwieDV1IjoiaHR0cHM6
       "15559998888"
     ]
   },
-  "iat": 1786739560,
+  "iat": 1786740336,
   "orig": {
     "tn": "15553332211"
   },
-  "origid": "urn:uuid:6502ffd6-b8e4-4568-9d16-bafeb7830f24"
+  "origid": "urn:uuid:71415190-a4a1-4d7b-81ac-2b50db2d227f"
 }
 [+] RFC 8588 Claims & Structure Verified.
 [*] Verification Result: {
@@ -111,16 +111,16 @@ Voucher redeemed successfully! Added 50 Credits ($50.00) to your balance.
   0.60s "type":"CALL_LOCAL_SDP"
   0.60s "type":"CALL_ANSWERED"
   0.60s "type":"CALL_REMOTE_SDP"
-  0.60s "type":"CALL_ESTABLISHED"
+  0.61s "type":"CALL_ESTABLISHED"
 [*] Call established. Streaming emergency audio for 10.0s to allow full PSAP prompt playback...
 
 [*] Kamailio Core Layer 0 Routing Log:
   ✓ 3(4) WARNING: <script>: EMERGENCY 911/112 PRIORITY CALL: 15553332211 -> 911 (Routing to PSAP Trunk)
   ✓ 3(4) WARNING: <script>: EMERGENCY 911/112 PRIORITY CALL: 15553332211 -> 911 (Routing to PSAP Trunk)
-  ✓ 1(2) WARNING: <script>: EMERGENCY 911/112 PRIORITY CALL: 15553332211 -> 911 (Routing to PSAP Trunk)
+  ✓ 2(3) WARNING: <script>: EMERGENCY 911/112 PRIORITY CALL: 15553332211 -> 911 (Routing to PSAP Trunk)
 
 [*] Asterisk PSAP Gateway Inbound Trunk & Audio Playback Log:
-  ✓ [1;30m    -- [0mExecuting [911@mvno:1] [1;36mNoOp[0m("[1;35mPJSIP/mvno-trunk-00000017[0m", "[1;35mMVNO-EMERGENCY-911: Emergency call from 15553332211[0m") in new stack
+  ✓ [1;30m    -- [0mExecuting [911@mvno:1] [1;36mNoOp[0m("[1;35mPJSIP/mvno-trunk-00000020[0m", "[1;35mMVNO-EMERGENCY-911: Emergency call from 15553332211[0m") in new stack
   ✓ Emergency PSAP Audio Prompts Streamed & Heard (Trunk bridged).
 
 🎉 REAL KAMAILIO LAYER 0 EMERGENCY 911/112 PRIORITY PREEMPTION PASSED EMPIRICALLY!
@@ -128,19 +128,41 @@ Voucher redeemed successfully! Added 50 Credits ($50.00) to your balance.
  📡 TEST 6: REAL 5G CORE GTP-U & OGSTUN L7 DPI PACKET INSPECTION
 ==========================================================================
   ✓ Compose-managed 5G DPI Probe running in Open5GS UPF netns.
+[*] Recording baseline TSDB metrics prior to 5G packet injection...
+  - Initial Captured Bytes:   560.0
+  - Initial Threats Blocked: 16.0
 [*] Triggering 5G UE (mvno-ueransim-ue-1, 10.45.0.5) transmission over 5G PDU session (uesimtun0)...
 ✓ Sent 5G DNS query (35 bytes) from UE 10.45.0.5 -> UPF ogstun 10.45.0.1:5353
-[*] Fetching ingested metrics from VictoriaMetrics (http://localhost:8428)...
-[*] VictoriaMetrics TSDB Telemetry:
-  - Captured 5G DNS Bytes:        280.0 (Expected: >= 35)
-  - Intercepted 5G Phishing Threat: 8.0 (Expected: >= 1)
-  - Active 5G DNS Flows:          8.0 (Expected: >= 1)
+[*] Fetching ingested metrics from VictoriaMetrics (http://localhost:8428) & UPF Probe...
+[*] Live UPF Probe Exporter Metrics:
+# HELP mvno_dpi_bytes_total Total Layer 7 payload bytes inspected by 5G UPF DPI engine.
+# TYPE mvno_dpi_bytes_total counter
+mvno_dpi_bytes_total{protocol="dns",slice="embb"} 595
+mvno_dpi_bytes_total{protocol="tls",slice="embb"} 0
+mvno_dpi_bytes_total{protocol="http",slice="embb"} 0
+mvno_dpi_bytes_total{protocol="rtp",slice="embb"} 0
+mvno_dpi_bytes_total{protocol="other",slice="embb"} 0
+
+# HELP mvno_dpi_flows_active Number of active application flows tracked by DPI.
+# TYPE mvno_dpi_flows_active gauge
+mvno_dpi_flows_active{protocol="dns"} 17
+mvno_dpi_flows_active{protocol="tls"} 0
+mvno_dpi_flows_active{protocol="http"} 0
+mvno_dpi_flows_active{protocol="rtp"} 0
+
+# HELP mvno_dpi_threats_intercepted_total Malicious L7 hostnames and phishing flows intercepted.
+# TYPE mvno_dpi_threats_intercepted_total counter
+mvno_dpi_threats_intercepted_total{threat_type="phishing",protocol="dns"} 17
+[*] VictoriaMetrics TSDB Ingested Telemetry:
+  - Captured 5G DNS Bytes:        560.0 (Expected: >= 35)
+  - Intercepted 5G Phishing Threat: 16.0 (Expected: >= 1)
+  - Active 5G DNS Flows:          16.0 (Expected: >= 1)
 
 [*] DPI Sniffer Interception Log from UPF ogstun interface:
   ⚠️ [DPI-ALERT] 5G USER-PLANE PHISHING BLOCKED: phishing-bank.com from UE 10.45.0.5
-[DPI-5G-DNS] 5G UE (10.45.0.5:36371) -> Intercepted DNS Query: phishing-bank.com
+[DPI-5G-DNS] 5G UE (10.45.0.5:49725) -> Intercepted DNS Query: phishing-bank.com
 ⚠️ [DPI-ALERT] 5G USER-PLANE PHISHING BLOCKED: phishing-bank.com from UE 10.45.0.5
-[DPI-5G-DNS] 5G UE (10.45.0.5:41784) -> Intercepted DNS Query: phishing-bank.com
+[DPI-5G-DNS] 5G UE (10.45.0.5:35999) -> Intercepted DNS Query: phishing-bank.com
 ⚠️ [DPI-ALERT] 5G USER-PLANE PHISHING BLOCKED: phishing-bank.com from UE 10.45.0.5
 
 🎉 100% REAL 5G CORE GTP-U & OGSTUN L7 DPI PACKET INSPECTION PASSED EMPIRICALLY!

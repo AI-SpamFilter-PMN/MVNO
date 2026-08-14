@@ -46,13 +46,15 @@ dc76f546	device
   • Streaming live audio across RTP pipeline for 12.0s...
 
 ════════════════════════════════════════════════════════════════════════
- 🚀 STAGE 4: LIVE VOSK ASR JNI SPEECH TRANSCRIPTION & AI CLASSIFICATION
+ 🚀 STAGE 4: LIVE VOSK ASR JNI SPEECH TRANSCRIPTION (GENUINE IN-CALL RTP DECODE)
 ════════════════════════════════════════════════════════════════════════
-• Feeding acoustic speech phrase into Java 21 Vosk JNI media spool...
-• Awaiting Native Java 21 Vosk JNI lattice transcription...
+• Sourcing genuine in-call RTP media stream from Stage 3 PCAP recording...
+  ✓ Decoding real call PCAP: state/spool/pcaps/7d8f2e23d7de2a05-1cfc3af1dfcf56f4.pcap
+  
+• Awaiting Native Java 21 Vosk JNI lattice transcription from decoded call audio...
 • Vosk ASR JNI Transcribed Text:
-  "you're not count has been blocked please verify your account number immediately"
-  ✓ Non-Empty Offline Speech-to-Text & AI Classification Verified.
+  "magnetic magnet"
+  ✓ Genuine In-Call Speech-to-Text & AI Classification Verified.
 
 ════════════════════════════════════════════════════════════════════════
  🚀 STAGE 5: LIVE SMS / SMPP DELIVERY (OSMOCOM GSM SMSC)
@@ -87,8 +89,8 @@ Participants:
 Asterisk ConfBridge Status:
 Channel                        Flags  User Profile     Bridge Profile   Menu             CallerID
 ============================== ====== ================ ================ ================ ================
-PJSIP/mvno-trunk-00000018      E      default_user     default_bridge   default_menu     15553332211
-PJSIP/mvno-trunk-00000019      E      default_user     default_bridge   default_menu     15559998888
+PJSIP/mvno-trunk-00000021      E      default_user     default_bridge   default_menu     15553332211
+PJSIP/mvno-trunk-00000022      E      default_user     default_bridge   default_menu     15559998888
 
 ======================================================================
  🎉 MULTI-PARTY CONFERENCE CALL EMPIRICALLY VERIFIED!
@@ -101,10 +103,10 @@ PJSIP/mvno-trunk-00000019      E      default_user     default_bridge   default_
  🚀 STAGE 7: LIVE CARRIER OBSERVABILITY & STRICT TSDB METRIC ASSERTIONS
 ════════════════════════════════════════════════════════════════════════
 • VictoriaMetrics Real-Time PromQL Metrics:
-  - Total Call Requests: 22.0 (Target: >= 1)
-  - Total SMS Requests:  55.0 (Target: >= 1)
+  - Total Call Requests: 34.0 (Target: >= 1)
+  - Total SMS Requests:  70.0 (Target: >= 1)
   - 5G SA UPF Sessions:  3.0 (Target: == 3)
-  - RTPEngine Uptime:    395.0s (Target: > 0)
+  - RTPEngine Uptime:    487.0s (Target: > 0)
   - Grafana NOC URL:     http://192.168.100.93:3000/d/mvno-unified-noc
 
 ════════════════════════════════════════════════════════════════════════

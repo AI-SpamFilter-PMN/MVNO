@@ -5,7 +5,22 @@
 # SQLite WAL database initialization, VTY control socket assertions, and REST API testing.
 # ==============================================================================
 
-.PHONY: up down logs ps init-db init-native-db up-native clean rebuild bootstrap test test-sms test-call test-api test-vty gate check-pins check-issues graduation
+.PHONY: up down logs ps init-db init-native-db up-native clean rebuild bootstrap test test-sms test-call test-api test-vty gate check-pins check-issues graduation demo-check cold-start-test evidence
+
+# Pre-flight health gate for live demonstrations
+demo-check:
+	bash ./scripts/demo-check.sh
+
+# Multi-cycle cold-start edge-case stress test
+cold-start-test:
+	python3 ./scripts/testing/test_cold_start_resilience.py --loops 3
+
+# Master SRE evidence generator
+evidence:
+	@mkdir -p docs/evidence
+	python3 ./scripts/testing/test_all_advanced_features.py | tee docs/evidence/advanced-features-test-2026-08-14.log
+	python3 ./scripts/testing/live_hardware_smoke_test.py | tee docs/evidence/e2e-smoke-test-2026-08-14.log
+	python3 ./scripts/testing/verify_grafana_live_metrics.py | tee docs/evidence/grafana-metrics-audit-2026-08-14.log
 
 # Launches all rootless container services using scripts/up.sh
 up:
