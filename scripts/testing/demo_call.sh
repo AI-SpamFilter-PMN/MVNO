@@ -155,8 +155,8 @@ EOF
   # change takes effect — it never leaves orphaned rig containers behind.
   podman compose up -d baresip-rx baresip-tx 2>&1 | tail -2
   sleep 3
-  echo "  rx registrations (expect >= 2): $(podman logs baresip-rx | grep -c '200 OK')"
-  echo "  tx registrations (expect >= 2): $(podman logs baresip-tx 2>&1 | grep -c '200 OK')"
+  local tx_src="pulse"
+  [ "$PULSE_OK" -eq 1 ] && tx_src="pulse,${PULSE_SOURCE:-default}"
   echo "  caller audio source: ${tx_src} (PULSE_OK=${PULSE_OK})"
   echo "  ✓ rig ready — paste: bash scripts/testing/demo_call.sh dial"
 }
