@@ -68,13 +68,20 @@ module uuid.so
 module_app account.so
 module_app menu.so
 module_app ctrl_tcp.so
-audio_source aufile,/media/speech8k.wav
 EOF
   if [ "$PULSE_OK" -eq 1 ]; then
-    # Issue 8.47 proven recipe: play the remote leg (phone mic) on the laptop
-    # speakers via baresip's pulse module — full-duplex live audio both ends.
+    # Issue 8.47 proven recipe: full-duplex live audio both ends. The callee
+    # leg (baresip-rx) captures the laptop HW mic (pulse source) and plays the
+    # remote leg (phone mic) on the laptop speakers (pulse player) — so the
+    # laptop mic is LIVE in BOTH call directions (phone->rig and rig->phone).
     cat >> state/baresip/rx/config <<EOF
+audio_source pulse,alsa_input.pci-0000_05_00.6.analog-stereo
 audio_player pulse,alsa_output.pci-0000_05_00.6.analog-stereo
+EOF
+  else
+    # Headless/tone fallback: callee streams the canned scam phrase.
+    cat >> state/baresip/rx/config <<EOF
+audio_source aufile,/media/speech8k.wav
 EOF
   fi
   cat > state/baresip/rx/accounts <<EOF

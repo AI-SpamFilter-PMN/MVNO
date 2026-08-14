@@ -105,7 +105,7 @@ make test-sms && make test-call            # policy-intercept endpoint checks
 | **Spring Boot Gateway** | `mvno-api` | `8080` | HTTP / REST | Interception policy control & subscriber API |
 | **Kamailio CSCF** | `mvno-kamailio` | `5060 (host) → 5060` | UDP / TCP | SIP signaling & registrar proxy |
 | **rtpengine NG** | `mvno-rtpengine` | `22222 (internal)` | UDP | Userspace media proxy control port |
-| **rtpengine Media** | `mvno-rtpengine` | `30000-30100`| UDP | RTP media audio stream relay range |
+| **rtpengine Media** | `mvno-rtpengine` | `10000-20000`| UDP | RTP media audio stream relay range |
 | **OsmoSMSC + OsmoHLR** | `mvno-osmosmsc` | `2775` | TCP / SMPP | Short Message Peer-to-Peer (SMPP 3.4) |
 | **OsmoHLR** | `mvno-osmo-hlr` | `4222 (internal)` | TCP / GSUP | Standalone subscriber location database |
 | **IP-SM-GW Bridge** | `mvno-ip-sm-gw` | `5090 (SIP)` + `2775 (SMPP)` | UDP / SMPP | TS 23.204 2G SMSC ↔ 5G/IMS SMS interworking bridge |

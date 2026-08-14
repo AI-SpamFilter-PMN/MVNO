@@ -16,7 +16,7 @@
 | Realm | `localhost` |
 | Credentials | `username = <MSISDN>` (e.g. `15553332211`), `password = testpass` |
 | Codec | **PCMU (G.711u, PT 0) ONLY** — the relay does not transcode; PCMA/OPUS fail media |
-| RTP relay | UDP `30000-30100` (RTPEngine) — open these + `5060/udp` in the firewall |
+| RTP relay | UDP `10000-20000` (RTPEngine) — open these + `5060/udp` in the firewall |
 | 403 semantics | Zero-balance / EIR-fraud / AI-blocked calls → `SIP 403 Forbidden` — treat as **terminal** (no retry loop) |
 
 > Your repo now reads `src/main/resources/sip.properties` at startup. Point it at

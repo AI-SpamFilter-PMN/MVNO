@@ -350,7 +350,7 @@ returning `{ "allow": boolean, "reason": "string" }`. Full JSON schemas:
   - REST Interception Endpoint: `POST http://telecom-api:8080/api/v1/intercept/sms` — **requires header `X-API-Key: mvno-demo-key-2026`** (missing/mismatched key → `401 Unauthorized`; demo key via env `X_API_KEY`)
 * **Voice Client (`SipClient`)**:
   - SIP Registrar & Proxy Target: `localhost:5060` on host (`5060:5060/udp`)
-  - RTP Media Port Range: `30000-30100/udp` (G.711u PCMU)
+  - RTP Media Port Range: `10000-20000/udp` (G.711u PCMU)
   - SIP INVITE Authentication: `INVITE` is challenged with `407 Proxy Authentication Required` (digest, realm `localhost`) — retry with `Authorization: Digest` using your REGISTER credentials
 
 ### Carrier SLA & Resilience Rules

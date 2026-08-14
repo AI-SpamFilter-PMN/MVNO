@@ -1,0 +1,19 @@
+=== 1/8 Kamailio subscriber DB (SIP digest auth + balance 403 contract) ===
+[0;32m  ✓ subscriber table seeded (>=6 rows, zero-balance contract)[0m
+=== 2/8 hlr.db IMSI map (2G SMS routing) ===
+[0;32m  ✓ 5 IMSI rows present (v7 schema, user_version=7)[0m
+=== 3/8 Open5GS Mongo 5G subscribers (UE attach prerequisite) ===
+[0;32m  ✓ 3 UERANSIM subscribers seeded[0m
+=== 4/8 telecom-api /actuator/health ===
+[0;31m  ✗ telecom-api not healthy after 150s — check: podman logs mvno-api[0m
+=== 5/8 ai-filter /health (AI classify endpoint) ===
+[0;32m  ✓ ai-filter healthy (200)[0m
+=== 6/8 static IP pins unique (compose hygiene) ===
+[0;32m  ✓ no duplicate ipv4_address pins[0m
+=== 7/8 bridge 2G AoRs registered (5G->2G relay path) ===
+[0;32m  ✓ both 2G AoRs registered in usrloc (/health 200)[0m
+=== 8/8 5G UE fleet attached at AMF (ran_ue == 3) ===
+[0;31m  ✗ UE fleet incomplete — run: bash scripts/testing/preflight_5g.sh --auto-recover[0m
+
+══════════════════════════════════════════════════════════════════
+[0;31m❌ BOOTSTRAP CHECK FAIL — 2/8 checks red; the ✗ markers name the exact fix[0m

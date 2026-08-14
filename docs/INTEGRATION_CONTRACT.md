@@ -209,16 +209,16 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   challenge and retry with an `Authorization: Digest` header using their subscriber-table
   credentials (`username: MSISDN`, realm `localhost`, password `testpass`). Applies to REGISTER and
   INVITE alike.
-- **RTP Media Relay:** RTPEngine ports `30000-30100/udp` (G.711u PCMU codec supported).
+- **RTP Media Relay:** RTPEngine ports `10000-20000/udp` (G.711u PCMU codec supported).
 - **Codec:** configure the client for **PCMU (G.711u, payload type 0) only** — the relay does not
   transcode; PCMA/opus negotiations fail media.
 - **Blocked calls:** zero-balance / EIR-fraud / AI-blocked calls are rejected with
   `SIP/2.0 403 Forbidden` — treat 403 as a terminal call failure (no retry loop).
-- **Firewall:** open UDP `30000-30100` (RTP relay range) and UDP `5060` (SIP) between client host
+- **Firewall:** open UDP `10000-20000` (RTP relay range) and UDP `5060` (SIP) between client host
   and MVNO host; the client's own RTP socket must be reachable (see `fix_nated_contact()` in
   `configs/kamailio/kamailio.cfg`).
 - **Any RFC-3261 softphone works (mobile/desktop)**: MVNO publishes `5060/udp` and RTP
-  `30000-30100/udp` on **all host interfaces** (`*`, verified live), so a phone on the same LAN can
+  `10000-20000/udp` on **all host interfaces** (`*`, verified live), so a phone on the same LAN can
   REGISTER directly with `username=<MSISDN>`, `password=testpass`, realm `localhost`, server
   `<host-ip>:5060`, codec **PCMU only**. See `docs/LIVE_DEMO.md` S15 and
   `docs/partner/SipClient-INTEGRATION.md` (drop-in for the repo's README).

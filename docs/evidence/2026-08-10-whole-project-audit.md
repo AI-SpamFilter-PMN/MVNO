@@ -102,13 +102,13 @@ caught by the read-only deep-run. Recorded so the record is not overstated:
 - **Kamailio 403 logic** (`kamailio.cfg:185/205`): blocks call/SMS only when
   `allow=false` from `mvno-api:8080/api/v1/intercept/{call,sms}` — gated on
   the zero-balance (15557654321) verdict, matching the SMS SVG "Kamailio 403".
-- **rtpengine**: `port-min=30000` (30000-30100), `listen-ng=0.0.0.0:22222`,
+- **rtpengine**: `port-min=30000` (10000-20000), `listen-ng=0.0.0.0:22222`,
   `recording-method=pcap`, `recording-dir=/var/spool/rtpengine` — matches both
   SVGs, compose, and the pcap→Vosk proof path.
 - **live_tap codec dispatch**: PT 0=G.711u, 8=G.711a, 9=G.722, 111=Opus
   (`dec="-f g722"` wideband) — docs' "codec-aware (G.711u/a, G.722; Opus
   fallback)" is **accurate**.
-- **Ports/IPs**: Kamailio 5066→5060 (10.89.0.23), rtpengine 30000-30100+9900
+- **Ports/IPs**: Kamailio 5066→5060 (10.89.0.23), rtpengine 10000-20000+9900
   (10.89.0.48), telecom-api 8080 (10.89.0.46), ai-filter 8008→8000 (10.89.0.44),
   filteration-system 8000 (10.89.0.65), osmo-smsc 2775 (10.89.0.49), ip-sm-gw
   5090/9100 (10.89.0.53), mongodb 27017, VictoriaMetrics 8428, vmagent 8429,

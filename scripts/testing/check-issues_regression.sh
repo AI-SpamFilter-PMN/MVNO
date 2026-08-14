@@ -43,4 +43,22 @@ echo '=== T5 (negative control): real file must stay green ==='
 bash scripts/check-issues.sh > /tmp/t5.out 2>&1
 echo "T5 rc=$? (expect 0)"
 tail -1 /tmp/t5.out
+
+echo
+echo '=== T6: same-domain issue WITH audited * Distinct-from: anchor — expect PASS ==='
+cp "$SRC" /tmp/fx6.md
+# Insert a FRESH ID (8.51) BEFORE the '## 11. Not-Issues' section so its
+# Status: AO line is not read as a Not-Issues entry (which requires C).
+awk '/^## 11\./{print "### Issue 8.51: baresip glibc regression after cold start"; print ""; print "* **Symptom**: x"; print "* **Root Cause**: x"; print "* **Fix**: x"; print "* **Verification**: x"; print "* **Status**: AO"; print "* Distinct-from: Issue 8.30 — different RCA (glibc ABI vs cold-start ordering)"; print "* Distinct-from: Issue 8.36 — different RCA (glibc ABI vs cold-start ordering)"; print "* Distinct-from: Issue 8.45 — different RCA (cold-start ordering vs glibc ABI)"; print ""; print ""} {print}' "$SRC" > /tmp/fx6.md
+CHECK_ISSUES_FILE=/tmp/fx6.md bash scripts/check-issues.sh > /tmp/t6.out 2>&1
+echo "T6 rc=$? (expect 0)"
+grep -E 'candidate duplicate|distinct-from|missing required' /tmp/t6.out | head -2
+
+echo
+echo '=== T7: same-domain issue WITHOUT Distinct-from — expect FAIL (re-file blocked) ==='
+cp "$SRC" /tmp/fx7.md
+awk '/^## 11\./{print "### Issue 8.51: baresip glibc regression after cold start"; print ""; print "* **Symptom**: x"; print "* **Root Cause**: x"; print "* **Fix**: x"; print "* **Verification**: x"; print "* **Status**: AO"; print ""; print ""} {print}' "$SRC" > /tmp/fx7.md
+CHECK_ISSUES_FILE=/tmp/fx7.md bash scripts/check-issues.sh > /tmp/t7.out 2>&1
+echo "T7 rc=$? (expect 1)"
+grep -E 'candidate duplicate' /tmp/t7.out | head -2
 rm -f /tmp/fx*.md /tmp/t*.out

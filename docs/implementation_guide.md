@@ -643,7 +643,7 @@ services:
     command: ["rtpengine", "--config-file=/etc/rtpengine/rtpengine.conf", "--foreground"]
     ports:
       - "22222:22222/udp"
-      - "30000-30100:30000-30100/udp"
+      - "10000-20000:10000-20000/udp"
       - "9900:9900/tcp"
     volumes:
       - ./configs/rtpengine:/etc/rtpengine:z

@@ -455,7 +455,7 @@ services:
       - --config-file=/etc/rtpengine/rtpengine.conf
       - --listen-http=9900
     ports:
-      - "30000-30100:30000-30100/udp"
+      - "10000-20000:10000-20000/udp"
       - "9900:9900"
     volumes:
       - ./configs/rtpengine:/etc/rtpengine:z
@@ -633,7 +633,7 @@ services:
 | Component | Target Port | Protocol | Usage | Podman Rootless Mode |
 | :--- | :--- | :--- | :--- | :--- |
 | **Kamailio** | `5060 (host) → 5060 (container)` | UDP / TCP | SIP signaling | Host port 5060 mapped to container port 5060 |
-| **rtpengine** | `30000-30100` | UDP | Media plane (RTP) | Native bind (no changes) |
+| **rtpengine** | `10000-20000` | UDP | Media plane (RTP) | Native bind (no changes) |
 | **OsmoSMSC** | `2775` | TCP | SMPP SMS delivery | Native bind (no changes) |
 | **Spring Boot** | `8080` | TCP | Interception REST API + actuator health | Native bind (no changes) |
 | **VictoriaMetrics** | `8428` | TCP | Metrics ingestion | Native bind (no changes) |

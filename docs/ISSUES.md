@@ -40,7 +40,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 |---|---|---|---|
 | **Osmocom (MSC/HLR)** | Installed via `apt install osmo-msc osmo-hlr`. Configs at `/etc/osmocom/`. Runs under `osmocom` user. | Built from `debian:bookworm-slim` binary packages. VTY bound to container network. | Native MSC/HLR connected to Containerized Gateway & 5GC via bridge interface. |
 | **Kamailio** | Installed via `apt install kamailio`. Modules at `/usr/lib/x86_64-linux-gnu/kamailio/modules/`. | Custom Alpine 3.19 build (`mvno-kamailio`). Modules at `/usr/lib/kamailio/modules/`. | Native Kamailio bound to host port 5060, communicating with containerized RTPEngine via `127.0.0.1:22222`. |
-| **RTPEngine** | Native kernel module `xt_RTPENGINE` + daemon. High packet throughput. | Userspace packet forwarding (`drachtio/rtpengine:latest`). Bound to UDP `30000-30100`. | Native kernel module with containerized signaling proxy. |
+| **RTPEngine** | Native kernel module `xt_RTPENGINE` + daemon. High packet throughput. | Userspace packet forwarding (`drachtio/rtpengine:latest`). Bound to UDP `10000-20000`. | Native kernel module with containerized signaling proxy. |
 | **Open5GS 5GC** | Installed via PPA (`ppa:open5gs/latest`). Creates `ogstun` via systemd. | Single image (`mvno-open5gs:latest`) with `NET_ADMIN` cap and `/dev/net/tun` mapping. | Native UPF with containerized Control Plane NFs (AMF/SMF/NRF). |
 | **UERANSIM** | Compiled from source with `cmake`. | Built on `ubuntu:24.04` GLIBC base image. | Native gNB running on test machine connecting to containerized AMF. |
 
@@ -738,9 +738,9 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   RTP on 10000-20000:
   - `configs/rtpengine/rtpengine.conf`: `port-min=10000`, `port-max=20000`.
   - `docker-compose.yml`: publish `10000-20000:10000-20000/udp` (was
-    `30000-30100:30000-30100/udp`).
+    `10000-20000:10000-20000/udp`).
   - `scripts/demo/demo_live.sh`, `scripts/testing/cockpit_proof.sh`:
-    tshark/wireshark RTP decode filters `portrange 30000-30100` →
+    tshark/wireshark RTP decode filters `portrange 10000-20000` →
     `10000-20000`.
   - `configs/grafana/provisioning/alerting/rules.yml`: RTP-free-port alert
     `port-min=30000` → `port-min=10000` wording.
@@ -756,6 +756,15 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * Status: X (resolved by e6a361a)
 * Verified-by: e6a361a — media range aligned to the UFW-allowlisted 10000-20000
   window; cross-LAN phone UDP now reaches the rtpengine container end-to-end.
+* Distinct-from: 8.20 (rootless-podman has no host route to container IPs) —
+  different layer: 8.20 is a routing/SNAT problem inside the bridge net;
+  8.46 is a host firewall (UFW) input-chain drop of LAN media before any
+  userspace socket, diagnosed via kernel [UFW BLOCK] logs.
+* Distinct-from: 8.27 (IMS voice INVITE never reaches callee) — different
+  symptom: 8.27 is SIP signaling not completing to the callee; 8.46 is the
+  phone's RTP media being firewall-dropped after a successful INVITE.
+* Distinct-from: 8.33 (nc -u never exits) — different issue: 8.33 is a test
+  tooling quirk (nc -u not sending EOS); 8.46 is a production firewall gap.
 * Best-practices note (industry-standard SIP/UDP mapping):
   SIP signaling `5060/udp+tcp`, RTP media on one contiguous even/odd
   even=audio/odd=RTCP window within `10000-20000`, 1:1 host→container port
@@ -764,6 +773,145 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   10.89.0.48). Any range is fine as long as it sits inside the host firewall
   allow-window; pick the documented 10000-20000 so zero firewall changes are
   needed for external SIP clients.
+
+### Issue 8.47: baresip `pulse` ausrc never captures — falls back to `ausine` (440 Hz tone) at call time (laptop-mic blocker)
+* Symptom: baresip-tx (the caller leg, `15553332211@10.89.0.23:5060`, container
+  on `mvno_mvno_net` at 10.89.0.61) is configured `audio_source pulse` and the
+  `pulse.so` module logs `pulse: initialized (Success [0])`, `ausrc: pulse`,
+  `auplay: pulse` at module load — yet at **call time** the TX pipeline runs
+  `ausine ---> aubuf ---> PCMU` (a mechanical 440 Hz tone, `ausine: ... frequency
+  440 Hz`), so the laptop hardware mic is **never** captured on the caller leg.
+* Root Cause (REVISED 2026-08-13 — the original inference was WRONG): baresip's
+  `pulse` capture DOES work in this rootless-Podman rig when the container is
+  launched with the correct recipe. The original "never records" conclusion was
+  based on a **flawed `parec`-based test** that (a) omitted the `PULSE_SERVER`
+  and `XDG_RUNTIME_DIR` env vars and (b) ran as uid 1000. Empirically re-verified
+  this session:
+  - A **fresh** container (uid 0, `--security-opt label=disable`, host pulse
+    socket `/run/user/1000/pulse/native` + cookie mounted, env
+    `PULSE_SERVER=unix:/run/user/1000/pulse/native` +
+    `XDG_RUNTIME_DIR=/run/user/1000`) running baresip's `pulse.so` module opens a
+    real record stream: `pactl list source-outputs` shows a baresip source-output
+    (`s16le 1ch 8000Hz`) bound to source 514 =
+    `alsa_input.pci-0000_05_00.6.analog-stereo` (the real laptop HW mic), and a
+    matching sink-input on sink 513 = the laptop speakers. No file, no aufile,
+    no feeder — genuine real-time full-duplex capture.
+  - The scratch `parec` used in the original RCA is **not a valid probe**: even
+    with the working recipe, a fresh-container `parec` returns 0 bytes, while
+    baresip's own `pulse.so` succeeds. The RCA's parec numbers (64000 B vs
+    120 B) therefore do not reflect baresip's behavior.
+  - The working recipe is reproducible in a fresh container (not a fluke of a
+    long-running process).
+* Fix: run the baresip container on the bridge
+  net as **root (uid 0)** with `--security-opt label=disable`, mount the host
+  pulse socket + cookie, set `PULSE_SERVER=unix:/run/user/1000/pulse/native` and
+  `XDG_RUNTIME_DIR=/run/user/1000`, and configure
+  `audio_source pulse,alsa_input.pci-0000_05_00.6.analog-stereo` +
+  `audio_player pulse,alsa_output.pci-0000_05_00.6.analog-stereo`. The `aufile`
+  WAV workaround is no longer needed for live laptop-mic capture.
+* Verification: a fresh container (uid 0, label=disable, host pulse socket +
+  cookie, PULSE_SERVER/XDG_RUNTIME_DIR set) shows `pactl list source-outputs`
+  with a baresip source-output (s16le 1ch 8000Hz) bound to source 514 = the
+  real laptop HW mic during an internal call; the TX pipeline runs the pulse
+  source, not the ausine tone fallback.
+* Status: X (fixed — real-time live laptop-mic capture via baresip `pulse` in a
+  rootless-Podman container is proven; the remaining open item is the separate
+  Android-Linphone NAT/reachability issue, tracked separately).
+* Verified-by: `pactl list source-outputs`/`sink-inputs` showing baresip
+  (client `application.name=baresip`) bound to source 514 / sink 513 during an
+  internal call; fresh-container reproduction (source-output 3353 → 514).
+* Distinct-from: 8.36 (glibc ABI load) — different root cause: 8.36 is a host
+  dynamic-loader/glibc mismatch at module load; 8.47 is pulse ausrc never
+  capturing at call time despite pulse.so loading fine.
+* Distinct-from: 8.27 (IMS voice INVITE never reaches callee) — different
+  issue: 8.27 is SIP signaling/media-plane delivery; 8.47 is the caller-leg
+  audio source (pulse ausrc) inside baresip-tx falling back to a tone.
+
+### Issue 8.48: callee `answermode=auto` alone does not auto-answer (add `sip_autoanswer=yes`)
+* Symptom: baresip-rx (`15559998888@10.89.0.23:5060`, the callee streaming the
+  scam phrase from `/media/speech8k.wav`) with account line
+  `...;answermode=auto` accepted incoming INVITE (logs `menu: ... Incoming
+  call ...`) but stayed at `180 Ringing` and never sent `200 OK`.
+* Root Cause: `answermode=auto` only enables auto-accept in the `menu`/`call`
+  layer when the account is registered and the `sip_autoanswer` account option
+  is also set; without `sip_autoanswer=yes` baresip answers the INVITE with
+  `180 Ringing` and waits for a human (or another auto-answer mechanism) to
+  accept.
+* Fix: add `sip_autoanswer=yes` (and `answerdelay=0`) to the rx account line so
+  the `menu`/`account` module actually answers. After the change the incoming
+  call completes (`Call answered`, `Call established`, `RTPESTAB`).
+* Verification: with `sip_autoanswer=yes` on the rx account, an inbound INVITE
+  completes with `200 OK`/`Call established`/`RTPESTAB` in baresip-rx logs
+  (was `180 Ringing` only).
+* Status: X (fixed in this session's `state/baresip/rx/accounts`).
+  NOTE: `state/baresip/rx/accounts` is a generated artifact (demo_call.sh writes
+  it with `answermode=auto`); upstream demo scripts should also emit
+  `sip_autoanswer=yes` to keep auto-answer reliable.
+
+### Issue 8.49: label_transcript.sh caller pattern `*55332211*` never matched 15553332211
+* Symptom: `scripts/testing/label_transcript.sh` side-labeled the callee
+   correctly (`*559998888*` → `[CALLEE (15559998888)]`) but reported the caller
+   leg as `[UNKNOWN]` even though the caller's RTCP SDES CNAME
+   (`sip:15553332211@10.89.0.23:5060`) was present.
+* Root Cause: the caller MSISDN is **15553332211** — digits
+   `1-5-5-5-3-3-3-2-2-1-1` (three 5s and three 3s) — so the literal glob
+   `*55332211*` (two 5s/two 3s) is **not** a substring and never matched.
+* Fix: match the unique stable tail `*3332211*`:
+   `*3332211*) side="CALLER (15553332211)" ;;`.
+* Verification: after the change the same pcap labels
+   `[CALLER (15553332211) | rtp-port 10570]` correctly.
+* Status: X (fixed in the working tree; safe to commit).
+
+### Issue 8.50: Android Linphone INVITEs loop back to Kamailio — rootlessport destroys the phone's source IP (self-loop contact `10.89.0.23:port`)
+* Symptom: the phone registers through the host port-map
+  (`192.168.100.93:5060 → kamailio:5060`) and the REGISTER succeeds, but
+  `fix_nated_contact()` stores a **self-loop contact** (`sip:15551234567@10.89.0.23:port`,
+  Kamailio's own bridge IP) in the location table, so INVITEs to the phone loop
+  back into Kamailio and never reach the device — the phone never rings.
+* Root Cause: the rootless bridge container was created **before**
+  `rootless_port_forwarder="pasta"` was set in `~/.config/containers/containers.conf`
+  (2026-08-11 23:59:40); the container still used the legacy `rootlessport`
+  userspace proxy, which rewrites the source IP of inbound LAN UDP to the bridge
+  gateway/NAT address. Kamailio therefore sees the phone's REGISTER arriving
+  from its own bridge IP and `fix_nated_contact()` mints a self-loop contact.
+  `save("location","0x04")` is NOT a fix (0x04 = contact dedup, not
+  received-address); `received_avp` would also record the NAT'd address.
+* Fix (industry-standard, Podman 6.0 PR #28478): keep Kamailio on the bridge
+  (mvno_net DNS to `rtpengine`/`mvno-api` intact) and switch rootless bridge
+  port forwarding from `rootlessport` to **pasta**, which preserves the real
+  client source IP:
+  - `~/.config/containers/containers.conf` `[network]`:
+    `rootless_port_forwarder = "pasta"` (already present; requires
+    `passt >= 0:20260526.g038c51e`; this rig has `2026_07_28.f8df3f1`).
+  - **Recreate** the container so the forwarder is picked up at creation time
+    (`podman compose up -d --force-recreate kamailio`). First kill the stale
+    `passt.avx2`/`rootlessport` processes holding the old port
+    (`kill <pid>`; `ss -ulpn | grep 5060` to confirm the fresh `passt.avx2`
+    owns it).
+  - Verify: `podman info` shows `RootlessNetworkCmd: pasta`; the phone's
+    re-REGISTER lands in the location table as its REAL address
+    (`sip:15551234567@192.168.100.31:port;transport=udp`), not a self-loop.
+* Verification (2026-08-13, live): baresip-tx dialed `15551234567`; the phone's
+  Linphone (adb dc76f546) answered — `CallActivity` foreground on the device,
+  `AudioPlaybackConfiguration ... USAGE_VOICE_COMMUNICATION` active, baresip-tx
+  reported `ESTABLISHED`, and rtpengine recorded **both** legs with real Vosk
+  transcripts (leg 11344: "hello hello hello", "conference calls"; leg 11358:
+  "hello hello", "are you calling from from poem or"). End-to-end live Android
+  call through the full pipeline proven.
+* Status: X (resolved 2026-08-13 — recreate container after pasta config)
+* Best-practices note: the port forwarder is chosen at container **creation**
+  time — changing `containers.conf` alone does not affect already-created
+  containers. `--network host` and macvlan were ruled out (host has no route to
+  10.89.0.0/24; rootless macvlan cannot reach the LAN).
+* Distinct-from: 8.22 (IP-SM-GW bridge tight recv loop) — different issue:
+  8.22 is the 2G/5G SMS bridge's socket read loop tripping Kamailio pike;
+  8.50 is the Android phone's SIP REGISTER source-IP being rewritten by
+  rootlessport so INVITEs self-loop in Kamailio.
+* Distinct-from: 8.46 (host UFW drops cross-LAN media) — different layer:
+  8.46 is a firewall input drop of RTP before userspace; 8.50 is a port
+  forwarder (rootlessport vs pasta) rewriting the phone's source IP so
+  fix_nated_contact() mints a self-loop — both phone-reachability, but
+  disjoint mechanisms and disjoint fixes.
 
 
 ---
@@ -795,7 +943,7 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 - SIP UDP at `127.0.0.1:5060` (host) → `kamailio:5060/udp`; works for any RFC-3261 softphone
   (desktop/mobile), not just this repo's client — see LIVE_DEMO S15. REGISTER **and** INVITE are
   digest-challenged (realm `localhost`, subscriber-table creds; `407` → retry with
-  `Authorization: Digest`). RTP relay `30000-30100/udp`, **PCMU only** (no transcode).
+  `Authorization: Digest`). RTP relay `10000-20000/udp`, **PCMU only** (no transcode).
 
 ---
 
@@ -813,6 +961,6 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Status**: C · audited 2026-08-08 (previously noted under Issue 8.43; moved here so the claim is not re-filed).
 
 ### Not-Issue N-2: tshark RTP decode-direction concern (audited-and-clear)
-* **Claim**: `-d udp.port==30000-30100,rtp` might decode 0 frames because the media relay uses only source ports, false-FAILing the proof harness.
-* **Why it is NOT a fault**: compose maps `30000-30100:30000-30100/udp` (1:1, both directions), so `udp.port==30000-30100` matches src and dst — the RTP decode works both ways.
+* **Claim**: `-d udp.port==10000-20000,rtp` might decode 0 frames because the media relay uses only source ports, false-FAILing the proof harness.
+* **Why it is NOT a fault**: compose maps `10000-20000:10000-20000/udp` (1:1, both directions), so `udp.port==10000-20000` matches src and dst — the RTP decode works both ways.
 * **Status**: C · audited 2026-08-08 (moved here from the Issue 8.43 note).

@@ -187,7 +187,7 @@ Vosk transcript.
 > CALLER (baresip-tx @10.89.0.61 — YOUR MIC when Pulse is up)
 >   │ SIP INVITE 407→digest→100→180→200  [Kamailio mvno-kamailio @10.89.0.23:5060]
 >   │  ├─ INTERCEPT REST callout → mvno-api:8080 (allow)
->   │  └─ rtpengine_manage → RTPEngine @10.89.0.48 (UDP 30000-30100)
+>   │  └─ rtpengine_manage → RTPEngine @10.89.0.48 (UDP 10000-20000)
 >   ▼
 > CALLEE (baresip-rx @10.89.0.60 — streams the scam phrase via aufile)
 >   └─ every RTP packet → RTPEngine pcap → state/spool/pcaps/ → live_tap → Vosk
@@ -260,14 +260,14 @@ The cockpit's `--wireshark` flag opens it live (P8); post-hoc, open the fresh
 pcap above directly:
 
 ```bash
-wireshark -r "$NEW" -d udp.port==30000-30100,rtp   # GUI decode of the RTP relay
+wireshark -r "$NEW" -d udp.port==10000-20000,rtp   # GUI decode of the RTP relay
 ```
 **EXPECT** — `200 Answering` = 1; Kamailio shows the INVITE/ACK/BYE dialog plus
 the `INTERCEPT QUERY: caller=15553332211 callee=15559998888` callout; `NEW` is a
 pcap newer than S4 started; the RTPEngine counter is present.
 
 > **Why the pcap "has no RTP" with `tshark -Y rtp`** — RTPEngine records pcaps on
-> its **relay ports UDP 30000-30100**, which Wireshark does not auto-decode as
+> its **relay ports UDP 10000-20000**, which Wireshark does not auto-decode as
 > RTP, so `-Y rtp` matches 0 and frames show as raw `data` (172-byte G.711).
 > Force-decode to see the ~700+ RTP packets:
 > ```bash
@@ -627,7 +627,7 @@ once**; switch with `Ctrl-b n` / `Ctrl-b p`, or
 |---|---|---|
 | **P0** (top-left) | `demo_call.sh setup && dial` — **SPEAK NOW = your mic** (+ side-tone) | S4 |
 | **P1** (top-right) | `live_tap.sh daemon` — pcap → 16 kHz WAV → Vosk chunks mid-call | S4/S5 |
-| **P2** (bottom-left) | live capture — RTP `30000-30100` + SIP `5060` on host loopback | S4 |
+| **P2** (bottom-left) | live capture — RTP `10000-20000` + SIP `5060` on host loopback | S4 |
 | **P4** (bottom-right) | **Vosk LIVE readout** — verdict logs **+ the raw recognized text** (`live-*.txt` tail) | S4/S5 |
 
 **Window `monitors`** — network + health:
@@ -679,7 +679,7 @@ once**; switch with `Ctrl-b n` / `Ctrl-b p`, or
 loopback, so capture targets `lo` (Issue 8.20 — host has no route to the bridge
 IPs) with a forced RTP decode. The plan's `udp.portrange` decode field is
 **not** valid in tshark 4.x; the working form (verified on this host) is
-`-d udp.port==30000-30100,rtp` (range as value). Two live views exist:
+`-d udp.port==10000-20000,rtp` (range as value). Two live views exist:
 
 - **P2 — CLI (default, headless-safe)**: live `tshark` tail of the loopback
   capture; if live capture lacks dumpcap permissions it falls back to tailing
@@ -697,7 +697,7 @@ IPs) with a forced RTP decode. The plan's `udp.portrange` decode field is
 ```bash
 # open the newest saved relay pcap in the Wireshark GUI (post-hoc, any time):
 wireshark -r "$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')" \
-  -d udp.port==30000-30100,rtp
+  -d udp.port==10000-20000,rtp
 ```
 
 **Teardown** keeps the evidence (pcaps, `live-*.wav`, archived transcripts),
@@ -847,9 +847,9 @@ softphone** (phone app / Zoiper / MicroSIP / Linphone / Blink, or the teammate
 through RTPEngine. This doubles as the integration test for the `SipClient`
 teammate repo (drop-in: `docs/partner/SipClient-INTEGRATION.md`).
 
-> Ports bind on `*` (verified live): `5060/udp` (SIP) and `30000-30100/udp`
+> Ports bind on `*` (verified live): `5060/udp` (SIP) and `10000-20000/udp`
 > (RTP) are reachable from any host on the same LAN. Keep firewall UDP
-> `5060` + `30000-30100` open.
+> `5060` + `10000-20000` open.
 
 **SETUP** (one provisioned number is enough — e.g. `15553332211`):
 
@@ -907,7 +907,7 @@ Issue 8.19); host ports are published for rootless Podman/Docker on
 | `127.0.0.1:9999` | open5gs-webui `:3000` | 5G subscriber UI | — |
 | `127.0.0.1:27017` | mongodb `:27017` | 5G core subscriber DB | — |
 | `127.0.0.1:9900` | rtpengine `:9900` | RTPEngine Prometheus metrics | S9 (T8) |
-| `127.0.0.1:30000-30100/udp` | rtpengine `:30000-30100` | RTP media relay range (G.711 PCMU) | S4, S5 |
+| `127.0.0.1:10000-20000/udp` | rtpengine `:10000-20000` | RTP media relay range (G.711 PCMU) | S4, S5 |
 | `127.0.0.1:9100` | ip-sm-gw `:9100` | bridge /metrics | — |
 
 > Host UDP `5060` is the canonical Kamailio published port (`5060:5060/udp`).
@@ -971,7 +971,7 @@ podman exec mvno-2g-ms sh -c "sleep 6; grep \"$BODY\" /root/.osmocom/bb/sms.txt"
 curl -s localhost:9100/metrics | grep -E 'sms_(2g5g|5g2g)'
 # 4) Open the newest relay pcap in the Wireshark GUI:
 wireshark -r "$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')" \
-  -d udp.port==30000-30100,rtp -Y 'sip || tcp || smpp || rtp'
+  -d udp.port==10000-20000,rtp -Y 'sip || tcp || smpp || rtp'
 ```
 
 **Call flow (same idea, voice):** start the cockpit (`bash scripts/demo/demo_live.sh

@@ -12,6 +12,10 @@
 # ==============================================================================
 FROM ubuntu:24.04 AS builder
 
+# MVNO live-demo patch: aufile streams a growing WAV file (host live-mic
+# feeder) instead of reading it once — makes the laptop real mic LIVE.
+COPY aufile-stream.patch /tmp/aufile-stream.patch
+
 # --- build deps for libre (re) + baresip core + the modules we select ---------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -41,6 +45,7 @@ RUN git clone --depth 1 --branch "${LIBRE_VERSION}" https://github.com/baresip/r
 ARG BARESIP_VERSION=v4.10.0
 RUN git clone --depth 1 --branch "${BARESIP_VERSION}" https://github.com/baresip/baresip.git /opt/baresip \
     && cd /opt/baresip \
+    && git apply /tmp/aufile-stream.patch \
     && cmake -B build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
