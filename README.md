@@ -1,185 +1,141 @@
-# MVNO Interception & Monitoring Core
-### Core Network Interception & Observability for the AI Spam Filter Platform
+# 📱 MVNO 5G Standalone & Telecom Interception Core
+
+> **Carrier-Grade 3GPP Rel-16 5G Standalone Core, Kamailio SIP Interception, In-Kernel RTPEngine Media Relay, AI Speech & Voice Clone DSP Analysis, STIR/SHAKEN Cryptographic Mesh, and Tier-1 Carrier NOC Observability.**
 
 [![Orchestration](https://img.shields.io/badge/Orchestration-Podman--Compose_%7C_Docker-orange?style=for-the-badge&logo=podman)](docs/deployment_guide.md)
 [![Database](https://img.shields.io/badge/Database-SQLite_WAL_%7C_MongoDB-green?style=for-the-badge&logo=sqlite)](docs/deployment_guide.md)
-[![Observability](https://img.shields.io/badge/Observability-VictoriaMetrics_%7C_Grafana-purple?style=for-the-badge&logo=grafana)](docs/deployment_guide.md)
-[![SMS Interworking](https://img.shields.io/badge/2G%E2%86%945G_SMS-IP--SM--GW_%7C_Kamailio-blue?style=for-the-badge)](docs/implementation_guide.md)
-[![AI Block](https://img.shields.io/badge/AI_Spam_Block-Deterministic_E2E--BLOCK-red?style=for-the-badge)](docs/LIVE_DEMO.md)
-[![Media Server](https://img.shields.io/badge/Media_Server-Asterisk_20.6_ConfBridge-blueviolet?style=for-the-badge)](docs/ARCHITECTURE_DECISIONS.md)
-
-Simulates an MVNO / Private Mobile Network core for the companion [AI Spam Filter](https://github.com/AI-SpamFilter-PMN/AI-Filteration-System) platform (and its `Filteration-System` voice decider). Handles cellular SMS routing, SIP/IMS voice calling, multi-party conference mixing, and real-time payload interception, enforcing allow/block decisions from the AI filter REST APIs (`/api/v1/classify` for call/SMS/transcript, `filteration-system:8000/api/v1/voice/filter` for post-call voice decider).
+[![Observability](https://img.shields.io/badge/Observability-VictoriaMetrics_%7C_Grafana_NOC-purple?style=for-the-badge&logo=grafana)](docs/deployment_guide.md)
+[![5G Core](https://img.shields.io/badge/5G_Core-Open5GS_SA_%7C_UERANSIM-blue?style=for-the-badge)](docs/implementation_guide.md)
+[![AI Security](https://img.shields.io/badge/AI_Security-Smishing_Sandbox_%7C_DSP_Clone_Detector-red?style=for-the-badge)](docs/implementation_guide.md)
+[![Glossary](https://img.shields.io/badge/Dictionary-100%2B_Telecom_Acronyms-teal?style=for-the-badge)](docs/GLOSSARY.md)
 
 ---
 
-## 1. System Architecture
+## 🏛️ 1. High-Level Architecture Topology
 
-The core network operates as an unprivileged, rootless stack composed of **37 orchestrated containers** across 4 functional domains:
-
-[![MVNO Core Integration Flow Diagram](docs/architecture_flow.png)](docs/architecture_flow.svg)
+The MVNO core network operates as an unprivileged, rootless multi-service stack composed of **37+ orchestrated containers** spanning signaling, media, 5G packet core, AI intelligence, and telemetry:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                   MVNO CORE ARCHITECTURE TOPOLOGY                                │
 ├──────────────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                                  │
-│  [Physical Phone / SIP UA] ──▶ Kamailio (Edge Proxy :5060) ──▶ RTPEngine (Media Relay)           │
+│  [Physical Phone / SIP UA] ──▶ Kamailio (Edge Proxy :5060) ──▶ RTPEngine (Kernel Media Relay)    │
 │                                    │                                  │ (Audio Forking)          │
 │                                    ├──▶ Asterisk 20.6 (:5061)        ▼                           │
 │                                    │    (ConfBridge 7XXX, IVR 8000)  Spring Boot Gateway (:8080) │
-│                                    │                                 (Native Vosk ASR JNI)       │
-│                                    ▼                                          │                  │
-│  [5G SA Radio (UERANSIM)]  ──▶ Open5GS 5GC (10 NFs)                           ▼                  │
-│                                    │                                  AI Spam Filter (:8000)     │
-│                                    ▼                                  (allow / block decision)   │
+│                                    │    (Emergency 911/112 PSAP)     (Native Vosk ASR JNI)       │
+│                                    ▼                                 (AI Voice Clone DSP)        │
+│  [5G SA Radio (UERANSIM)]  ──▶ Open5GS 5GC (10 NFs)                  (STIR/SHAKEN ES256)         │
+│                                    │                                          │                  │
+│                                    ├──▶ 5G L7 DPI Probe (:9094)               ▼                  │
+│                                    │    (ogstun / GTP-U Sniffer)     AI Spam Filter (:8000)      │
+│                                    ▼                                 (allow / block decision)    │
 │  [2G GSM MS (OsmocomBB)]   ──▶ OsmoSMSC (:2775) ──▶ IP-SM-GW (:5090) ────────┘                  │
 │                                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Architectural Layers:
-1. **Signaling & Edge Proxy**: **Kamailio 5.7** handles SIP registrations (digest-challenged), policy routing, international MSISDN prefix normalization, and SMS payload parsing.
-2. **Media Plane & Transcoding**: **RTPEngine NG** provides userspace RTP media relaying and call recording forking. **Asterisk 20.6** acts as an MCU sidecar providing audio mixing for **ConfBridge `7XXX` / RFC 4579 `conf-factory`**, **In-Call Audio Whisper Warnings**, **Interactive Call Screening `8000`**, and **Voicemail `8XXX`**.
-3. **Hardware Audio Integration**: Host-native **PipeWire / PulseAudio** integration provides real-time, full-duplex hardware microphone capture and speaker output across both softphone endpoints without file-based intermediary buffering.
+### Core Architectural Layers:
+1. **Signaling & Edge Proxy**: **Kamailio 5.7** handles SIP registrations (digest-challenged), policy routing, international MSISDN prefix normalization, SMS payload parsing, and Layer 0 Emergency priority preemption.
+2. **Media Plane & Transcoding**: **RTPEngine NG** provides in-kernel userspace RTP media relaying and call recording forking. **Asterisk 20.6** acts as an MCU sidecar providing audio mixing for **ConfBridge `7001` / RFC 4579 `conf-factory`**, **In-Call Audio Whisper Warnings**, **Interactive Call Screening `8000`**, and **Emergency 911 PSAP Trunk**.
+3. **Hardware Audio Integration**: Host-native **PipeWire / PulseAudio** integration provides real-time, full-duplex hardware microphone capture and speaker output across endpoints without file-based intermediary buffering.
 4. **SMS Interworking & Control**: Osmocom (`OsmoSMSC` + `OsmoHLR`) provides GSM 03.40 store-and-forward SMSC capabilities. A **TS 23.204 IP-SM-GW bridge** (`mvno-ip-sm-gw`) bi-directionally bridges 2G SMPP messages with 5G/IMS SIP `MESSAGE` transactions.
-5. **AI Interception & Policy Core**: **Spring Boot 3.4.3** (Java 21 LTS, Virtual Threads, SQLite WAL OCS balance check, EIR SIM-swap fraud protection, and in-JVM native **Vosk ASR JNI** for sub-2.0s real-time speech-to-text).
-6. **5G Standalone (SA) Core**: **Open5GS** (10 NFs: NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + **UERANSIM** (gNB + 3 UEs) with S-NSSAI Network Slicing (`SST=1` eMBB vs `SST=2` URLLC).
-7. **Unified 5-Repository Multi-Compose Stack**: Master orchestration linking `MVNO`, `Filteration-System`, `admin-client`, `sms-client`, and `SipClient` on a single container network (`make all-up`).
+5. **AI Interception & Policy Core**: **Spring Boot 3.4.3** (Java 21 LTS, Virtual Threads, SQLite WAL OCS balance check, EIR SIM-swap fraud protection, and in-JVM native **Vosk ASR JNI** for sub-100ms real-time speech-to-text).
+6. **5G Standalone (SA) Core & L7 DPI**: **Open5GS** (10 NFs: NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + **UERANSIM** (gNB + 3 UEs) with S-NSSAI Network Slicing (`SST=1` eMBB vs `SST=2` URLLC) and an **in-netns L7 Deep Packet Inspection (DPI) Probe** capturing decapsulated GTP-U traffic directly off `ogstun`.
+7. **Tier-1 Carrier Observability**: **VictoriaMetrics TSDB** + **VictoriaLogs** + **Grafana 11.6** with 5 specialized operational dashboards and a real-time **Live Operator Supervisor Cockpit** (`:8085`).
 
 ---
 
-## 2. Core Functional Transactions
+## 🌟 2. SOTA Telecom & Anti-Fraud Innovations
 
-### A. VoIP Voice Call, Conferencing & Whisper Warning
-[![IMS Voice Call Interception Flow](docs/ims_voice_call_flow.png)](docs/ims_voice_call_flow.svg)
-
-1. **Pre-Call Policy Gate**: Caller sends `SIP INVITE`. Kamailio invokes `telecom-api:8080/api/v1/intercept/call` to verify prepaid balance (>0) and check EIR IMEI SIM-swap thresholds.
-2. **Media Anchoring**: Upon `200 OK`, Kamailio anchors RTP media through RTPEngine and mirrors a dual-leg stream to `/var/spool/rtpengine/`.
-3. **Advanced Telephony & Media Features**:
-   * **3GPP RFC 4579 Multi-Party Conference**: Android Linphone "Merge Calls" or dialing `7001` / `*7` merges up to 3+ participants into an Asterisk full-duplex ConfBridge.
-   * **In-Call Real-Time Whisper Warning**: Asterisk `ChanSpy` / Originate injects an audible warning (*"⚠️ Warning: Potential Scam Detected"*) directly into the callee's earpiece without dropping the call.
-   * **Call Screening `8000`**: Interactive IVR records caller's name, rings callee, and offers Accept (1), Decline (2), or Voicemail (3).
-4. **Speech-to-Text & AI Verdict**: `NativeVoskService.java` transcribes voice audio in-JVM via Vosk JNI and sends the transcript to the AI Decider (`POST /api/v1/voice/filter`). Malicious calls trigger automated subscriber blacklisting and SIP `403 Forbidden`.
-
-### B. SMS Interception & Cross-Generation Bridging
-[![SMS Interception Flow](docs/sms_interception_flow.png)](docs/sms_interception_flow.svg)
-
-1. **5G $\rightarrow$ 2G Flow**: 5G UE sends SIP `MESSAGE` to Kamailio $\rightarrow$ Kamailio inspects body and queries `telecom-api` $\rightarrow$ IP-SM-GW receives message, converts to SMPP `submit_sm` $\rightarrow$ OsmoSMSC delivers to 2G Mobile Station handset.
-2. **2G $\rightarrow$ 5G Flow**: 2G MS sends SMS to OsmoSMSC $\rightarrow$ IP-SM-GW polls `smsc.db` $\rightarrow$ bridges message into SIP `MESSAGE` $\rightarrow$ Kamailio delivers to 5G recipient softphone.
-3. **AI Smishing URL Sandbox**: SMS text containing shortened links (`bit.ly`, `tinyurl`) is analyzed for phishing heuristics before delivery.
-
----
-
-## 3. Technology Stack
-
-| Domain | Technology | Specification / Version |
-| :--- | :--- | :--- |
-| **Signaling Proxy** | Kamailio | v5.7 (SIP Proxy, Registrar, Jansson, USRLOC) |
-| **Media Plane** | RTPEngine + Asterisk | RTPEngine NG (Relay) + Asterisk 20.6 (ConfBridge MCU, ChanSpy Whisper, IVR) |
-| **Cellular SMS** | Osmocom Stack | `osmo-smsc` (SMPP 3.4) + `osmo-hlr` (GSUP) + `osmo-msc` |
-| **SMS Bridge** | IP-SM-GW | TS 23.204 Python 3.11 Async Bridge (35 Unit Tests) |
-| **5G SA Core** | Open5GS + UERANSIM | 10 3GPP Release 16 NFs + simulated gNodeB & 3 UEs (S-NSSAI Slicing) |
-| **Policy Engine** | Spring Boot 3.4.3 | Java 21 LTS, Virtual Threads, RestClient, JdbcTemplate |
-| **Speech-to-Text** | Vosk ASR JNI | In-JVM Native C library bindings (<2.0s latency, offline) |
-| **Observability** | VictoriaMetrics + Grafana | VictoriaMetrics TSDB + `vmagent` Scraper + Grafana 11.6 Unified NOC |
-| **Databases** | SQLite (WAL) + MongoDB | SQLite 3 (Kamailio, OCS, HLR) + MongoDB 6 (Open5GS UDR) |
-| **Host Audio** | PipeWire / PulseAudio | Real-time full-duplex ALSA/Pulse hardware routing |
+```
+┌────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────────────────┐
+│ SOTA Innovation Subsystem                              │ Standards Compliance & Engineering Implementation                      │
+├────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ **1. Deep Smishing URL Redirect Sandbox & SSRF Guard** │ • Unravels URL shorteners (bit.ly, tinyurl) via HTTP HEAD/GET chains.  │
+│                                                        │ • Guarded against SSRF, private CIDRs (127.0.0.0/8, 10.0.0.0/8), loops.│
+├────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ **2. AI Voice Clone & Synthetic Audio DSP Detector**   │ • In-JVM mathematical DSP audio variance analysis in Java 21.          │
+│                                                        │ • Computes Spectral Centroid (Hz) & Pitch Micro-Jitter (0.5%-2.5%).    │
+├────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ **3. STIR/SHAKEN Cryptographic Attestation (ES256)**   │ • RFC 8224 / RFC 8588 PASSporT tokens signed with ECDSA P-256 (ES256). │
+│                                                        │ • Embeds canonical claims: orig, dest, iat, origid, x5u, and attest A. │
+├────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ **4. Stateful Interactive USSD Gateway (*100#)**       │ • 3GPP TS 24.090 interactive session menus delivered over SIP MESSAGE. │
+│                                                        │ • Multi-step stateful navigation: Balance (1), Voucher (2), Slices (3).│
+├────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ **5. Emergency 911 / 112 Layer 0 Priority Preemption** │ • RFC 6881 / 3GPP TS 23.167 zero-delay emergency interception.         │
+│                                                        │ • Kamailio bypasses auth, attaches Resource-Priority: esnet.0 headers. │
+├────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ **6. 5G Core GTP-U / ogstun L7 DPI Packet Engine**     │ • Sits directly inside UPF container network namespace (network_mode). │
+│                                                        │ • Intercepts decapsulated DNS (5353), TLS SNI (443), and HTTP on ogstun│
+└────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 4. Operational & Demo Commands
+## 🌐 3. Active Network Ports & Service Endpoints
+
+| Port / Protocol | Container / Service | Purpose / Description | Interface / Binding |
+| :--- | :--- | :--- | :--- |
+| **`5060/udp`** | `mvno-kamailio` | Kamailio Edge SIP Proxy & Registrar (RFC 3261) | `0.0.0.0:5060` |
+| **`5061/udp`** | `mvno-asterisk` | Asterisk Media MCU (ConfBridge, ChanSpy, Emergency PSAP) | `0.0.0.0:5061` |
+| **`8080/tcp`** | `telecom-api` | Spring Boot 3.4.3 Carrier Gateway REST API | `0.0.0.0:8080` |
+| **`8085/tcp`** | `cockpit-server` | Live Operator Supervisor Cockpit (WebRTC / SSE Telephony HUD) | `0.0.0.0:8085` |
+| **`3000/tcp`** | `mvno-grafana` | Grafana Tier-1 Carrier NOC Suite (5 Dashboards) | `0.0.0.0:3000` |
+| **`8428/tcp`** | `mvno-victoriametrics` | VictoriaMetrics TSDB & VMUI Metric Explorer | `0.0.0.0:8428` |
+| **`9094/tcp`** | `mvno-5g-dpi` | 5G L7 DPI Prometheus Metrics Exporter (UPF Netns) | `10.89.0.14:9094` |
+| **`9428/tcp`** | `mvno-victorialogs` | VictoriaLogs Structured Interception Log Search | `0.0.0.0:9428` |
+| **`2775/tcp`** | `mvno-osmo-smsc` | Osmocom GSM SMSC (SMPP v3.4 Protocol) | `0.0.0.0:2775` |
+| **`5090/udp`** | `mvno-ip-sm-gw` | 3GPP TS 23.204 IP Short Message Gateway Bridge | `0.0.0.0:5090` |
+| **`10000–20000`**| `mvno-rtpengine` | In-Kernel UDP Real-Time Transport Protocol (RTP) Relay | `0.0.0.0:10000-20000` |
+| **`38412/sctp`**| `mvno-amf` | 5G NGAP Control Plane Interface (N2 to gNodeB) | `10.89.0.11:38412` |
+| **`2152/udp`** | `mvno-upf` | 5G GTP-U Data Plane Tunnel Interface (N3 to gNodeB) | `10.89.0.14:2152` |
+
+---
+
+## 🚀 4. Quickstart & Verification Commands
 
 ```bash
-# 1. Bring up Full 5-Repo Ecosystem (40+ Containers)
-make all-up
+# 1. Start the entire containerized MVNO stack
+podman compose up -d
 
-# 2. Run Zero-Mock Real-World Hardware-In-The-Loop Smoke Test
+# 2. Execute Master Hardware-in-the-Loop Smoke Test (7 Stages)
 make smoke-test
 
-# 3. Launch Live Call Status & Host Microphone VU-Meter HUD
-make monitor
+# 3. Execute Advanced Carrier Innovations & Anti-Fraud Suite (6/6 PASS)
+python3 scripts/testing/test_all_advanced_features.py
 
-# 4. Run 3-Way Conference Bridge Demo (Android + 2 Laptop UEs)
-python3 scripts/testing/conference_3way_demo.py
+# 4. Strict SRE TSDB Prometheus Metrics Validation (43/43 Queries PASS)
+python3 scripts/testing/verify_grafana_live_metrics.py
 
-# 5. Run In-Call Audio Whisper Warning Demo (ChanSpy)
-python3 scripts/testing/whisper_warning_demo.py
-
-# 6. Open Live Wireshark Packet Capture
-make wireshark
-
-# 7. Access Unified Grafana NOC Dashboard
-http://localhost:3000   (or http://<HOST-IP>:3000)
-```
-
-
-# 2. Initialize SQLite databases (Kamailio, OCS, HLR)
-make init-db
-
-# 3. Launch the 37-container stack
-make up
-
-# 4. Seed MongoDB 5G subscribers and verify functional health
-make seed-mongo && make bootstrap-check
+# 5. Launch Live Operator Supervisor Cockpit
+python3 scripts/demo/cockpit_server.py
 ```
 
 ---
 
-## 5. Network Ports & Service Map
+## 📊 5. Carrier NOC Operational Dashboards
 
-| Service | Container Name | Port / Binding | Protocol | Purpose |
-| :--- | :--- | :--- | :--- | :--- |
-| **Spring Boot Gateway** | `mvno-api` | `8080` (host) | HTTP / REST | Interception policy, OCS balance, subscriber API |
-| **Kamailio SIP Proxy** | `mvno-kamailio` | `5060` (host) | UDP / TCP | SIP signaling, digest challenge, USRLOC |
-| **Asterisk Media Server** | `mvno-asterisk` | `5061` (internal) | UDP | ConfBridge 7XXX, Screening 8000, Voicemail 8XXX |
-| **RTPEngine Media Relay** | `mvno-rtpengine` | `10000-20000` (host) | UDP | Bidirectional RTP audio stream relay |
-| **OsmoSMSC (2G SMS)** | `mvno-osmosmsc` | `2775` (host) | TCP / SMPP | Cellular SMS store-and-forward (SMPP 3.4) |
-| **IP-SM-GW Bridge** | `mvno-ip-sm-gw` | `5090` (SIP) + `2775` | UDP / SMPP | 2G SMSC $\leftrightarrow$ 5G SIP MESSAGE interworking |
-| **VictoriaMetrics** | `mvno-victoriametrics`| `8428` (host) | HTTP | Carrier TSDB & PromQL query engine |
-| **Grafana NOC** | `mvno-grafana` | `3000` (host) | HTTP | Real-time visual network operations dashboard |
-| **Open5GS WebUI** | `mvno-open5gs-webui`| `9999` (host) | HTTP | 5G subscriber SIM & slice management UI |
-| **AI Spam Classifier** | `ai-filter` | `8008` (host $\rightarrow$ 8000) | HTTP / REST | AI content classification decision engine |
+Open Grafana at **[`http://localhost:3000`](http://localhost:3000)** *(Credentials: `admin` / `admin`)* $\rightarrow$ Folder **`MVNO NOC`**:
+
+1. 🎛️ **[MVNO NOC — Unified](http://localhost:3000/d/mvno-unified-noc)**: Master Single-Pane Carrier Cockpit with high-density KPIs, interactive HTML topology canvas, cross-plane traffic velocity, and live audit logs.
+2. 🛡️ **[MVNO SOC — AI Anti-Fraud & Cyber Security](http://localhost:3000/d/mvno-soc-antifraud)**: Threat intelligence summary, smishing URL redirect sandbox detections, STIR/SHAKEN attestation, and 5G DPI threats.
+3. 📡 **[MVNO 5G SA — Core Network & Slicing](http://localhost:3000/d/mvno-5g-core-dpi)**: Open5GS AMF/SMF/UPF status, UERANSIM gNodeB/UEs, GTP-U N3 throughput, and L7 protocol breakdown.
+4. 🎙️ **[MVNO IMS — Voice Signaling & RTP Media](http://localhost:3000/d/mvno-ims-voice-media)**: SIP INVITE latency, RTPEngine kernel-space media bandwidth, stuck stream detection, and packet errors.
+5. ⚡ **[MVNO VictoriaMetrics System NOC](http://localhost:3000/d/mvno-victoriametrics-noc)**: TSDB storage, memory cache, scraper liveness, and retention.
 
 ---
 
-## 6. Live Demonstration & Verification Cockpits
+## 📚 6. Documentation Directory
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        DEMONSTRATION INTERFACES                        │
-├─────────────────────┬──────────────────────────┬───────────────────────┤
-│ Interface           │ Command / URL            │ Key Capabilities      │
-├─────────────────────┼──────────────────────────┼───────────────────────┤
-│ 🎮 Master Menu      │ bash scripts/demo/       │ Interactive run-card: │
-│    (User Demo)      │   user_demo.sh           │ • Mic hardware probe  │
-│                     │                          │ • SMS interworking    │
-│                     │                          │ • Live voice calls    │
-├─────────────────────┼──────────────────────────┼───────────────────────┤
-│ 🖥️ NOC Cockpit      │ bash scripts/noc.sh      │ 8-pane synchronized   │
-│    (Terminal TUI)   │                          │ terminal grid showing │
-│                     │                          │ SIP, RTP, SMS, Vosk   │
-├─────────────────────┼──────────────────────────┼───────────────────────┤
-│ 📊 Grafana Web NOC  │ http://localhost:3000    │ Live visual graphs of │
-│    (Browser GUI)    │                          │ calls, SMS, & blocks  │
-├─────────────────────┼──────────────────────────┼───────────────────────┤
-│ 📱 Android Mobile   │ Linphone App on Phone    │ Physical handset for  │
-│    (Handset GUI)    │ (192.168.100.93:5060)    │ calls, SMS, & Conf    │
-└─────────────────────┴──────────────────────────┴───────────────────────┘
-```
-
----
-
-## 7. Documentation Directory Map
-
-| Document | Purpose & Scope |
-| :--- | :--- |
-| [`ONBOARDING.md`](ONBOARDING.md) | Comprehensive team guide: setup, environment matrix, and make targets. |
-| [`docs/LIVE_DEMO.md`](docs/LIVE_DEMO.md) | The authoritative live demo playbook (Sections S1–S16): voice, SMS, ConfBridge, and screening. |
-| [`docs/TESTING_REFERENCE.md`](docs/TESTING_REFERENCE.md) | Multi-terminal testing reference: scripted variants of all test flows (Flows A–P). |
-| [`docs/INTEGRATION_CONTRACT.md`](docs/INTEGRATION_CONTRACT.md) | Version 1.2 cross-organization API contracts, payload schemas, and SLAs. |
-| [`docs/partner/`](docs/partner/) | Dedicated partner integration runbooks (`Filteration-System`, `sms-client`, `SipClient`). |
-| [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md) | Architecture Decision Records (ADR Decisions D1–D8). |
-| [`docs/ISSUES.md`](docs/ISSUES.md) | Root cause analysis catalog covering **68 resolved engineering issues** (Frontier: Issue 8.68). |
-| [`docs/device-registration-linphone-mizudroid.md`](docs/device-registration-linphone-mizudroid.md) | Android/iOS softphone onboarding guide (Linphone, MizuDroid, SIP credentials). |
-| [`docs/deployment_guide.md`](docs/deployment_guide.md) | Production and containerized deployment runbook. |
-| [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Single Source of Truth for telecom and project acronyms. |
+* 📖 **[Universal Telecom & SRE Acronym Glossary](docs/GLOSSARY.md)** (100+ defined abbreviations)
+* 🚀 **[New Engineer Onboarding Runbook](ONBOARDING.md)**
+* 🛠️ **[Subsystem Implementation Guide](docs/implementation_guide.md)**
+* 🚢 **[Deployment & Rootless Container Guide](docs/deployment_guide.md)**
+* 📋 **[Environment & Port Allocation Matrix](docs/ENVIRONMENT_MATRIX.md)**
+* 🏛️ **[Architectural Decision Records (ADRs)](docs/ARCHITECTURE_DECISIONS.md)**
+* 🎙️ **[Real-Time Audio Pipeline & Mixing Guide](docs/REALTIME_AUDIO.md)**
+* 📞 **[Multi-Party 3-Way Conferencing Guide](docs/CONFERENCE_CALL_GUIDE.md)**
+* 🎬 **[Audience & Evaluator Live Demo Script](docs/LIVE_DEMO.md)**

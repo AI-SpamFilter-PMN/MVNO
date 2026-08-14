@@ -31,11 +31,12 @@ This repository contains a **complete Mobile Virtual Network Operator (MVNO) 5G 
 ```
 
 **Components:**
-- **5G SA Core**: Open5GS 10 NFs (NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + UERANSIM gNB + 3 UEs (User Equipment)
-- **Osmocom Stack**: HLR (GSUP) + SMSC (Short Message Peer-to-Peer (SMPP) 3.4) via `osmo-hlr` + `osmo-smsc` containers (the `osmo-msc` binary runs in SMSC mode)
-- **Interception Gateway**: Kamailio Session Initiation Protocol (SIP) registrar/proxy → `rtpengine` media fork → Vosk ASR (native JNI) → Spring Boot gateway (Java 21, virtual threads)
+- **5G SA Core & L7 DPI**: Open5GS 10 NFs (NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + UERANSIM gNB + 3 UEs (User Equipment) + in-netns 5G L7 DPI Probe sniffing `ogstun` GTP-U user-plane.
+- **Media Plane & Sidecar MCU**: `rtpengine` kernel media relay + Asterisk 20.6 sidecar (ConfBridge `7001`, ChanSpy whisper, screening `8000`, and 911 emergency PSAP trunk).
+- **Osmocom Stack**: HLR (GSUP) + SMSC (Short Message Peer-to-Peer (SMPP) 3.4) via `osmo-hlr` + `osmo-smsc` containers (the `osmo-msc` binary runs in SMSC mode) + TS 23.204 IP-SM-GW bridge.
+- **Interception & Anti-Fraud Gateway**: Kamailio SIP registrar/proxy + Spring Boot 3.4.3 (Java 21 LTS, Virtual Threads, in-JVM Vosk ASR JNI, mathematical AI Voice Clone DSP Detector, STIR/SHAKEN ES256 attestation, and stateful USSD).
 - **AI Spam Filter**: External REST service at `http://ai-filter:8000/api/v1/classify`
-- **Observability**: Vector (stdout log driver) → VictoriaMetrics (metrics TSDB) → Grafana (2 dashboards: Unified Network Operations Center (NOC) + VictoriaMetrics System NOC)
+- **Observability & HUD**: VictoriaMetrics TSDB + VictoriaLogs + Grafana 11.6 (5 specialized operational dashboards in folder `MVNO NOC`) + Live Operator Supervisor Cockpit (`http://localhost:8085`).
 
 **Diagrams:** `docs/architecture_flow.svg`, `docs/ims_voice_call_flow.svg`, `docs/sms_interception_flow.svg`
 
@@ -229,16 +230,26 @@ python3 scripts/testing/call_waiting_conference_demo.py
 
 ---
 
-## 9. Observability
+## 9. Observability & Monitoring Cockpits
 
 | Tool | URL | Purpose |
 |------|-----|---------|
-| Grafana | `http://localhost:3000` (admin/admin) | Dashboards: MVNO NOC — Unified, MVNO VictoriaMetrics System NOC (auto-provisioned, hot-reload; 4 alert rules) |
-| VictoriaMetrics | `http://localhost:8428` | Raw PromQL queries |
-| vmagent | `http://localhost:8429` | Scrape config |
-| Vector | Internal | Log pipeline (console stdout driver; VictoriaLogs on Roadmap) |
+| **Live Operator Cockpit** | `http://localhost:8085` | Live active call matrix, Vosk ASR transcript streaming, AI Voice Clone DSP gauge, and 1-click ChanSpy whisper warning. |
+| **Grafana Tier-1 NOC** | `http://localhost:3000` (admin/admin) | 5 Dashboards in folder `MVNO NOC`: Master Unified NOC, SOC Anti-Fraud, 5G SA Core & DPI, IMS Voice & Media, TSDB Infrastructure. |
+| **VictoriaMetrics (VMUI)** | `http://localhost:8428/vmui` | Interactive PromQL metrics explorer & time-series database. |
+| **VictoriaLogs** | `http://localhost:9428/select/vmui` | High-speed structured carrier interception log search engine. |
+| **5G DPI Probe** | `http://upf:9094/metrics` | Decapsulated GTP-U user-plane L7 traffic & threat metrics. |
 
-**Key metrics (12 families):** `mvno_sms_requests_total`, `mvno_sms_blocked_total`, `mvno_call_requests_total`, `mvno_call_blocked_total`, `mvno_call_blocked_eir_total`, `mvno_subscriber_lookups_total`, `mvno_eir_sim_swap_detected_total`, `mvno_eir_cache_size` (gauge), `mvno_vosk_transcriptions_total`, `mvno_vosk_decode_errors_total`, `mvno_vosk_model_ready` (gauge 0/1), `mvno_ai_failopen_total{reason}` — lazily registered: 11 families export at idle; `mvno_ai_failopen_total` appears only after the first SLA fail-open.
+### 📞 Special Telephony Dial Codes
+
+| Dial Code | Subsystem | Operational Behavior |
+| :--- | :--- | :--- |
+| **`7001`** *(or `*7`)* | Asterisk ConfBridge | Bridges caller into 3-way multi-party conference room with full-duplex mixing. |
+| **`8000`** | Call Screening Demo | Interactive IVR greeting $\rightarrow$ records caller name $\rightarrow$ rings callee (Accept 1, Decline 2, Voicemail 3). |
+| **`8XXX`** | Voicemail Box | Accesses voicemail mailbox `XXX` with recorded message playback. |
+| **`911` / `112`** | Emergency PSAP Gateway | Kamailio Layer 0 unauthenticated routing to Asterisk emergency bridge with `Priority: emergency` headers. |
+| **`*100#`** | Stateful USSD Portal | Interactive GSM/5G text menu (1: Balance, 2: Voucher Recharge, 3: 5G Network Slicing). |
+| **`*100`** | Subscriber Voice Portal | Interactive Voice Self-Care portal. |
 
 ---
 

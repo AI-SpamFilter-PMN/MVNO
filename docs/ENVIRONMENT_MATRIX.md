@@ -27,13 +27,23 @@ Run `./scripts/preflight.sh` to auto-verify these requirements on your host.
 - **arm64 (Apple Silicon):** the vendored amd64 image tarballs and the Vosk native JNI will not load/run; rebuild every custom image from source (`docker-compose.build.yml`) — untested.
 - **Rootful Docker on macOS/Windows:** no `/dev/net/tun`, no SCTP, no rootless socket — same blockers as above.
 
-## 3. Kamailio host SIP port (canonical = 5060)
+## 3. Host Port Bindings & Service Endpoints
 
-- The MVNO Kamailio is host-published as **`5060:5060/udp`** (the standard SIP port).
-- On the author's original dev host a **host-level Asterisk** (since removed) held `0.0.0.0:5060/udp`, which is why earlier docs used `5066:5060/udp` and gated the 5060 publish behind a `MVNO_PUBLISH_5060` override. **That Asterisk is gone**, so the canonical published port is now directly **5060**.
-- On a fresh Ubuntu host (no Asterisk, no competing SIP stack), UDP 5060 is free and Kamailio binds it directly — no override needed.
-- If **another** SIP daemon happens to hold `0.0.0.0:5060/udp` on some host, stop it, or temporarily map Kamailio to a spare port (e.g. `5066:5060/udp`) — but the default/standard is **5060**.
-- **External SIP clients (SipClient / Linphone / softphones) target `<host-LAN-IP>:5060`** (UDP) — or `127.0.0.1:5060` when testing on the host itself. See `docs/INTEGRATION_CONTRACT.md`.
+| Port / Protocol | Container | Subsystem / Function | Canonical Target |
+| :--- | :--- | :--- | :--- |
+| **`5060/udp`** | `mvno-kamailio` | Kamailio SIP Edge Proxy & Registrar (RFC 3261) | `<host-LAN-IP>:5060` |
+| **`5061/udp`** | `mvno-asterisk` | Asterisk Media MCU (ConfBridge 7001, ChanSpy, 911 PSAP) | `10.89.0.63:5061` |
+| **`8080/tcp`** | `telecom-api` | Spring Boot 3.4.3 Interception Gateway REST API | `http://localhost:8080` |
+| **`8085/tcp`** | `cockpit-server` | Live Operator Supervisor Cockpit (WebRTC / SSE HUD) | `http://localhost:8085` |
+| **`3000/tcp`** | `mvno-grafana` | Grafana Tier-1 Carrier NOC Suite (5 Dashboards) | `http://localhost:3000` |
+| **`8428/tcp`** | `mvno-victoriametrics` | VictoriaMetrics TSDB & VMUI Metrics Explorer | `http://localhost:8428` |
+| **`9094/tcp`** | `mvno-5g-dpi` | 5G L7 DPI Prometheus Exporter (in UPF Netns) | `http://upf:9094/metrics` |
+| **`9428/tcp`** | `mvno-victorialogs` | VictoriaLogs Structured Interception Log Search | `http://localhost:9428` |
+| **`2775/tcp`** | `mvno-osmo-smsc` | Osmocom GSM SMSC (SMPP v3.4 Protocol) | `localhost:2775` |
+| **`5090/udp`** | `mvno-ip-sm-gw` | 3GPP TS 23.204 IP Short Message Gateway Bridge | `10.89.0.53:5090` |
+| **`10000–20000`**| `mvno-rtpengine` | In-Kernel UDP Real-Time Transport Protocol (RTP) Relay | `0.0.0.0:10000-20000` |
+| **`38412/sctp`**| `mvno-amf` | 5G NGAP Control Plane Interface (N2 to gNodeB) | `10.89.0.11:38412` |
+| **`2152/udp`** | `mvno-upf` | 5G GTP-U Data Plane Tunnel Interface (N3 to gNodeB) | `10.89.0.14:2152` |
 
 ## 3a. Kamailio number normalization (dialplan, dpid=4)
 

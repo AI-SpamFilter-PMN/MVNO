@@ -33,6 +33,19 @@ detect_runtime() {
 
 detect_runtime
 
+# ─── Dynamic Host IP Auto-Detection (Env-Agnostic Advertised IP) ─────────────
+DETECTED_HOST_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}' | head -n1 || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+export HOST_IP="${HOST_IP:-$DETECTED_HOST_IP}"
+echo "HOST_IP=${HOST_IP}" > .env
+
+# Dynamically synchronize advertised IP in Kamailio & RTPEngine configs
+if [ -f configs/kamailio/kamailio.cfg ]; then
+    sed -i -E "s/advertise [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:5060/advertise ${HOST_IP}:5060/g" configs/kamailio/kamailio.cfg
+fi
+if [ -f configs/rtpengine/rtpengine.conf ]; then
+    sed -i -E "s/interface=eth0![0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/interface=eth0!${HOST_IP}/g" configs/rtpengine/rtpengine.conf
+fi
+
 export PODMAN_USER_UID=$(id -u)
 
 CUSTOM_IMAGES=(

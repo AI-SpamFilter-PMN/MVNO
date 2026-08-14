@@ -2703,3 +2703,81 @@ the SMSC VTY shell (the VTY is unpublished and the container lacks
    5G→2G deliveries) and the sender never got its final response. Fixed with a
    prefix-strip in `scripts/ip_sm_gw.py`.
 
+---
+
+## 16. SOTA Carrier Innovations & Anti-Fraud Security Mesh
+
+### 16.1 Deep Smishing URL Redirect Sandbox & SSRF Guard
+* **Source Implementation**: [`telecom-api/src/main/java/com/mvno/intercept/service/AiFilterService.java`](file:///home/zkhattab/AI-SpamFilter-PMN/MVNO/telecom-api/src/main/java/com/mvno/intercept/service/AiFilterService.java)
+* **Threat Model**: Modern smishing campaigns disguise weaponized malware and phishing endpoints behind multi-hop URL shorteners (`bit.ly`, `tinyurl.com`, `t.co`) to bypass static regex and keyword filters.
+* **Engineering Architecture**:
+  1. **Regex Extraction**: Ingests incoming SMS text, extracting URLs matching `https?://[^\s]+`.
+  2. **Safe Head/Get Traversal**: Executes HTTP `HEAD` / `GET` requests following `301`, `302`, `307`, and `308` redirect headers up to a strict limit of 5 hops.
+  3. **SSRF Guard**: Resolves DNS IP addresses before connection. Proactively aborts and blocks any redirect targeting private, loopback, link-local, or cloud metadata CIDRs (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.169.254`).
+  4. **Heuristic & AI Classification**: Feeds the final expanded destination URL and redirect chain into the AI Classifier (`/api/v1/classify`). If marked malicious, Kamailio returns `403 Forbidden` and increments `mvno_smishing_url_blocked_total`.
+
+### 16.2 AI Voice Clone & Synthetic Audio DSP Spectral Detector
+* **Source Implementation**: [`telecom-api/src/main/java/com/mvno/intercept/dsp/VoiceCloneDetector.java`](file:///home/zkhattab/AI-SpamFilter-PMN/MVNO/telecom-api/src/main/java/com/mvno/intercept/dsp/VoiceCloneDetector.java)
+* **Threat Model**: AI voice synthesis (TTS, deepfakes, voice cloning) presents zero acoustic natural variation. Neural TTS engines produce mathematically perfect fundamental pitch periods and static frequency energy distributions.
+* **DSP Mathematical Algorithm**:
+  1. **Linear 16-bit PCM Decapsulation**: Ingests raw audio frames from RTPEngine recording stream at 8kHz / 16kHz.
+  2. **Spectral Centroid Calculation**: Computes the spectral center of mass across frequency bins:
+     $$\text{Spectral Centroid} = \frac{\sum_{k=0}^{N-1} f(k) \cdot |X(k)|}{\sum_{k=0}^{N-1} |X(k)|}$$
+  3. **Pitch Micro-Jitter (Period Perturbation)**: Extracts consecutive pitch periods $T_i$ via time-domain autocorrelation and evaluates cycle-to-cycle relative perturbation:
+     $$\text{Jitter (\%)} = \frac{\frac{1}{N-1}\sum_{i=1}^{N-1} |T_i - T_{i+1}|}{\frac{1}{N}\sum_{i=1}^{N} T_i} \times 100$$
+  4. **Classification Heuristic**:
+     - Biological Human Speech: Jitter typically spans $\approx 0.5\% - 5.5\%$ due to physiological vocal cord biomechanics.
+     - Synthetic AI Voice: Jitter $< 0.15\%$ with unnaturally static spectral centroids triggers `syntheticSuspect: true`.
+
+### 16.3 STIR/SHAKEN ES256 PASSporT Cryptographic Attestation
+* **Source Implementation**: [`telecom-api/src/main/java/com/mvno/intercept/security/StirShakenCryptoService.java`](file:///home/zkhattab/AI-SpamFilter-PMN/MVNO/telecom-api/src/main/java/com/mvno/intercept/security/StirShakenCryptoService.java)
+* **Standards Compliance**: **IETF RFC 8224**, **IETF RFC 8225**, **IETF RFC 8588**, and **ATIS-1000074**.
+* **Cryptographic Signing Flow**:
+  1. **JOSE Header Construction**: Builds Base64URL-encoded header `{"alg":"ES256","ppt":"shaken","typ":"passport","x5u":"https://cert.mvno.net/root.pem"}`.
+  2. **PASSporT Payload Claims**: Embeds canonical caller claims `{"attest":"A","dest":{"tn":["15559998888"]},"iat":1786737413,"orig":{"tn":"15553332211"},"origid":"urn:uuid:..."}`.
+  3. **ECDSA P-256 (ES256) Digital Signature**: Signs `Header.Payload` using the carrier's private EC key (`SHA256withECDSA`).
+  4. **SIP Identity Header Injection**: Appends the signed identity header into SIP `INVITE`:
+     ```http
+     Identity: <JWT_TOKEN>;info=<https://cert.mvno.net/root.pem>;alg=ES256;ppt=shaken
+     ```
+
+### 16.4 Stateful Interactive USSD Gateway (*100#)
+* **Source Implementation**: [`telecom-api/src/main/java/com/mvno/intercept/ussd/UssdSessionService.java`](file:///home/zkhattab/AI-SpamFilter-PMN/MVNO/telecom-api/src/main/java/com/mvno/intercept/ussd/UssdSessionService.java)
+* **Standards Compliance**: **3GPP TS 24.090** (USSD Stage 3).
+* **Architecture**:
+  - Intercepts dialed shortcodes (`*100#`) transmitted over SIP `MESSAGE`.
+  - Maintains stateful in-memory session contexts (`activeMenu`, `subscriberMsisdn`, `sessionExpiry`).
+  - Interactive Menus:
+    - `1`: Account Balance Inquiry ($100.00 Active).
+    - `2`: Voucher PIN Redemption (Adds +50 credits upon 6-digit PIN submission).
+    - `3`: 5G Network Slicing Status (`SST=1` eMBB Consumer Active, URLLC Available).
+    - `4`: Active Plan & Bundles.
+
+### 16.5 Emergency 911 / 112 Layer 0 Priority Preemption
+* **Source Implementation**: [`configs/kamailio/kamailio.cfg`](file:///home/zkhattab/AI-SpamFilter-PMN/MVNO/configs/kamailio/kamailio.cfg) & [`configs/asterisk/extensions.conf`](file:///home/zkhattab/AI-SpamFilter-PMN/MVNO/configs/asterisk/extensions.conf)
+* **Standards Compliance**: **IETF RFC 6881** & **3GPP TS 23.167**.
+* **Routing Enforcement**:
+  1. **Top-of-Script Route Interception**: Kamailio inspects `$rU =~ "^(911|112|999|122|123)$"` at the very top of `request_route` before authentication or location checks.
+  2. **Unauthenticated Relay**: Never challenges emergency calls with `407 Proxy Authentication Required`.
+  3. **Emergency Header Attachment**: Appends `Priority: emergency` and `Resource-Priority: esnet.0`.
+  4. **PSAP Trunk Routing**: Relays directly via `t_relay_to_udp("10.89.0.63", "5061")` to Asterisk PSAP Emergency Gateway.
+
+### 16.6 5G Core GTP-U & ogstun L7 Deep Packet Inspection (DPI) Probe
+* **Source Implementation**: [`scripts/dpi/dpi_probe.py`](file:///home/zkhattab/AI-SpamFilter-PMN/MVNO/scripts/dpi/dpi_probe.py) & [`docker-compose.yml`](file:///home/zkhattab/AI-SpamFilter-PMN/MVNO/docker-compose.yml)
+* **Network Namespace Placement**: Runs inside `mvno-upf` container netns (`network_mode: "service:upf"`).
+* **Capture Architecture**:
+  - Unprivileged socket listener binding `0.0.0.0:5353` (DNS), `0.0.0.0:15000` (RTP), and HTTP `:9094/metrics`.
+  - Captures decapsulated IP packets from 5G UE (`10.45.0.5`) across virtual TUN interface `ogstun` (`10.45.0.1/16`).
+  - Intercepts malicious domains (e.g., `phishing-bank.com`), increments `mvno_dpi_threats_intercepted_total`, and tracks flow state across slices.
+  - Telemetry scraped automatically every 5s by `vmagent` into VictoriaMetrics TSDB.
+
+### 16.7 Live Operator Supervisor Cockpit & Grafana Tier-1 NOC Suite
+* **Supervisor Cockpit**: [`scripts/demo/cockpit_server.py`](file:///home/zkhattab/AI-SpamFilter-PMN/MVNO/scripts/demo/cockpit_server.py) (`http://localhost:8085`) providing live active call matrix, Vosk ASR transcript lattice streaming, AI voice clone DSP meters, and 1-click ChanSpy whisper warning injection.
+* **Grafana NOC Suite**: 5 specialized dashboards deployed in folder `MVNO NOC`:
+  1. `mvno-unified-noc`: Master Single-Pane Carrier Cockpit.
+  2. `mvno-soc-antifraud`: Security Operations Center Threat Intelligence.
+  3. `mvno-5g-core-dpi`: 5G SA Core & Data Plane Slicing.
+  4. `mvno-ims-voice-media`: Voice Signaling & Media Relay Health.
+  5. `mvno-victoriametrics-noc`: Platform TSDB Infrastructure.
+
+

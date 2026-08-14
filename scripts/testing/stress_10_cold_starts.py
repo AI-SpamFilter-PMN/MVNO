@@ -26,8 +26,23 @@ ADB_DEVICE = "dc76f546"
 HANDSET_MSISDN = "15551234567"
 LAPTOP_CALLER = "15553332211"
 LAPTOP_CALLEE = "15559998888"
-SIP_HOST = "192.168.100.93"
-TOTAL_LOOPS = 10
+def get_host_ip():
+    if "SIP_HOST" in os.environ:
+        return os.environ["SIP_HOST"]
+    if "HOST_IP" in os.environ:
+        return os.environ["HOST_IP"]
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+SIP_HOST = get_host_ip()
+SIP_PORT = 5060
 
 
 def run_cmd(cmd, cwd=REPO_ROOT, timeout=120, check=True):
