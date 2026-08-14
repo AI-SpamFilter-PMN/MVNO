@@ -14,7 +14,8 @@
     "plane:core",
     "component:unified",
     "noc",
-    "sota"
+    "sota",
+    "carrier-grade"
   ],
   "time": {
     "from": "now-15m",
@@ -39,7 +40,7 @@
         "y": 0
       },
       "id": 100,
-      "title": "\u26a1 HIGH-DENSITY KPI HERO OVERVIEW",
+      "title": "\u26a1 CARRIER OPERATIONS CENTER (NOC) \u2014 HIGH-DENSITY HERO KPI OVERVIEW",
       "type": "row"
     },
     {
@@ -63,8 +64,7 @@
             ]
           },
           "unit": "short"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
         "h": 4,
@@ -96,7 +96,8 @@
           "refId": "A"
         }
       ],
-      "title": "Total SMS Requests",
+      "title": "\ud83d\udcf1 Total SMS Processed",
+      "description": "Total incoming SMS messages ingested and analyzed through the MVNO core network.",
       "type": "stat"
     },
     {
@@ -108,20 +109,19 @@
         "defaults": {
           "color": {
             "mode": "fixed",
-            "fixedColor": "#7928CA"
+            "fixedColor": "#00E676"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "#7928CA",
+                "color": "#00E676",
                 "value": null
               }
             ]
           },
           "unit": "short"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
         "h": 4,
@@ -153,67 +153,8 @@
           "refId": "A"
         }
       ],
-      "title": "Total Voice Call Requests",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#00E676",
-                "value": null
-              },
-              {
-                "color": "#FF0844",
-                "value": 1
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 1
-      },
-      "id": 3,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "sum(mvno_eir_sim_swap_detected_total) default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "EIR SIM-Swaps Detected",
+      "title": "\ud83c\udf99\ufe0f Total Voice Calls",
+      "description": "Total SIP voice calls initiated and handled across Kamailio and RTPEngine.",
       "type": "stat"
     },
     {
@@ -225,25 +166,28 @@
         "defaults": {
           "color": {
             "mode": "fixed",
-            "fixedColor": "#FF9100"
+            "fixedColor": "#FF0055"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "#FF9100",
+                "color": "#00E676",
                 "value": null
+              },
+              {
+                "color": "#FF0055",
+                "value": 1
               }
             ]
           },
           "unit": "short"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 12,
+        "x": 8,
         "y": 1
       },
       "id": 4,
@@ -266,11 +210,12 @@
             "type": "prometheus",
             "uid": "victoriametrics"
           },
-          "expr": "(sum(mvno_sms_blocked_total) + sum(mvno_call_blocked_total) + sum(mvno_call_blocked_eir_total)) default 0",
+          "expr": "sum(mvno_sms_blocked_total) + sum(mvno_call_blocked_total) default 0",
           "refId": "A"
         }
       ],
-      "title": "Interceptions Blocked",
+      "title": "\ud83d\udee1\ufe0f Threats Blocked (AI Filter)",
+      "description": "Malicious smishing URLs, spam text, and fraudulent voice calls blocked by the AI Gateway.",
       "type": "stat"
     },
     {
@@ -282,172 +227,25 @@
         "defaults": {
           "color": {
             "mode": "fixed",
-            "fixedColor": "#00E676"
+            "fixedColor": "#7928CA"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "#00E676",
+                "color": "#7928CA",
                 "value": null
               }
             ]
           },
           "unit": "short"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 16,
+        "x": 12,
         "y": 1
-      },
-      "id": 5,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_eir_cache_size default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "Active EIR Cache Size",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#FF0844",
-                "value": null
-              },
-              {
-                "color": "#00E676",
-                "value": 7
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 1
-      },
-      "id": 6,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "sum(up) default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "Active Scrape Targets",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 5
-      },
-      "id": 105,
-      "title": "\ud83c\udf10 DYNAMIC CANVAS TOPOLOGY & TELECOM DATA FLOW",
-      "type": "row"
-    },
-    {
-      "gridPos": {
-        "h": 7,
-        "w": 20,
-        "x": 0,
-        "y": 6
-      },
-      "id": 106,
-      "options": {
-        "content": "<div style=\"display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(15,23,42,0.6); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);\">\n  <div style=\"font-size: 12px; color: rgba(255,255,255,0.7);\">VOICE PATH \u2014 SipClient (SIP 5066)</div>\n  <div style=\"display: flex; align-items: center; justify-content: space-around;\">\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,242,254,0.15), rgba(0,242,254,0.05)); border:1px solid #00F2FE; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udcde</div><div style=\"font-weight:bold; color:#00F2FE; font-size:13px;\">SipClient UA</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">SIP RFC 3261 \u00b7 5066:5060/udp</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(121,40,202,0.15), rgba(121,40,202,0.05)); border:1px solid #7928CA; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udce1</div><div style=\"font-weight:bold; color:#7928CA; font-size:13px;\">Kamailio SIP Proxy</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">REGISTER+INVITE 407 digest \u00b7 INTERCEPT callout</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(255,145,0,0.15), rgba(255,145,0,0.05)); border:1px solid #FF9100; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udee1\ufe0f</div><div style=\"font-weight:bold; color:#FF9100; font-size:13px;\">Telecom Gateway</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">Spring Boot \u00b7 X-API-Key \u00b7 OCS \u00b7 EIR</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,230,118,0.05)); border:1px solid #00E676; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83e\udd16</div><div style=\"font-weight:bold; color:#00E676; font-size:13px;\">AI Classifier</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">POST /api/v1/classify \u00b7 SLA fail-open</div>\n    </div>\n  </div>\n  <div style=\"font-size:12px; color:rgba(255,255,255,0.7);\">SMS PATH \u2014 sms-client (SMPP 3.4)</div>\n  <div style=\"display: flex; align-items: center; justify-content: space-around;\">\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,230,118,0.12), rgba(0,230,118,0.04)); border:1px solid #00E676; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udcac</div><div style=\"font-weight:bold; color:#00E676; font-size:13px;\">sms-client ESME</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">SMPP 3.4 \u00b7 deliver_sm</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,242,254,0.12), rgba(0,242,254,0.04)); border:1px solid #00F2FE; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\uddc4\ufe0f</div><div style=\"font-weight:bold; color:#00F2FE; font-size:13px;\">OsmoSMSC</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">SMPP 2775 \u00b7 hold &amp; verify</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(255,145,0,0.12), rgba(255,145,0,0.04)); border:1px solid #FF9100; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udee1\ufe0f</div><div style=\"font-weight:bold; color:#FF9100; font-size:13px;\">Telecom Gateway</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">POST /intercept/sms + X-API-Key</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(0,230,118,0.12), rgba(0,230,118,0.04)); border:1px solid #00E676; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83e\udd16</div><div style=\"font-weight:bold; color:#00E676; font-size:13px;\">AI Classifier</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">POST /api/v1/classify</div>\n    </div>\n  </div>\n  <div style=\"font-size:12px; color:rgba(255,255,255,0.7);\">5G RADIO TRACK \u2014 registration only (voice/SMS are external-path demos; SMS-over-NAS on roadmap)</div>\n  <div style=\"display: flex; align-items: center; justify-content: space-around;\">\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(121,40,202,0.12), rgba(121,40,202,0.04)); border:1px solid #7928CA; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\ud83d\udcf1</div><div style=\"font-weight:bold; color:#7928CA; font-size:13px;\">UERANSIM</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">gNB + 3 UEs \u00b7 ran_ue gauge</div>\n    </div>\n    <div style=\"color:#00F2FE; font-size:16px;\">\u2794</div>\n    <div style=\"flex:1; margin:0 6px; padding:10px; background: linear-gradient(135deg, rgba(121,40,202,0.12), rgba(121,40,202,0.04)); border:1px solid #7928CA; border-radius:10px; text-align:center;\">\n      <div style=\"font-size:20px;\">\u2699\ufe0f</div><div style=\"font-weight:bold; color:#7928CA; font-size:13px;\">Open5GS 5GC</div><div style=\"font-size:11px; color:rgba(255,255,255,0.6);\">AMF \u00b7 SMF \u00b7 UPF \u00b7 NRF \u2014 NGAP 38412 \u00b7 PFCP 8805</div>\n    </div>\n  </div>\n</div>",
-        "mode": "html"
-      },
-      "title": "MVNO Core Interception Path Topology Flow",
-      "type": "text"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#FF0844",
-                "value": null
-              },
-              {
-                "color": "#00E676",
-                "value": 3
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 4,
-        "x": 20,
-        "y": 6
       },
       "id": 99,
       "options": {
@@ -470,570 +268,11 @@
             "uid": "victoriametrics"
           },
           "expr": "fivegs_upffunction_upf_sessionnbr default 0",
-          "legendFormat": "Active 5G PDU Sessions",
           "refId": "A"
         }
       ],
-      "title": "5G SA UE Registration",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 13
-      },
-      "id": 101,
-      "title": "\ud83d\udce1 TELECOM TRAFFIC & INTERCEPTION THROUGHPUT",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "fillOpacity": 30,
-            "gradientMode": "opacity",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "SMS Requests Total"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#00F2FE",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "SMS Blocked Total"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#FF0844",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 14
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_sms_requests_total default 0",
-          "legendFormat": "SMS Requests Total",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_sms_blocked_total default 0",
-          "legendFormat": "SMS Blocked Total",
-          "refId": "B"
-        }
-      ],
-      "title": "SMS Interception Traffic Volume",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "fillOpacity": 30,
-            "gradientMode": "opacity",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Call Requests Total"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#7928CA",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Call Blocked Total"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#FF9100",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Call Blocked (EIR Fraud)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#FF0844",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 14
-      },
-      "id": 8,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_call_requests_total default 0",
-          "legendFormat": "Call Requests Total",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_call_blocked_total default 0",
-          "legendFormat": "Call Blocked Total",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_call_blocked_eir_total default 0",
-          "legendFormat": "Call Blocked (EIR Fraud)",
-          "refId": "C"
-        }
-      ],
-      "title": "Voice Call Interception Traffic Volume",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 22
-      },
-      "id": 102,
-      "title": "\ud83d\udee1\ufe0f SECURITY & ANTI-FRAUD DECISION PIPELINE",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "fillOpacity": 30,
-            "gradientMode": "opacity",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "SIM Swap Anomalies"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#FF0844",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Tracked IMEIs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#00E676",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 23
-      },
-      "id": 9,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_eir_sim_swap_detected_total default 0",
-          "legendFormat": "SIM Swap Anomalies",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_eir_cache_size default 0",
-          "legendFormat": "Tracked IMEIs",
-          "refId": "B"
-        }
-      ],
-      "title": "Equipment Identity Register (EIR) SIM-Swap Tracker",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "fillOpacity": 30,
-            "gradientMode": "opacity",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "OCS Subscriber Queries"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#FFD600",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 23
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_subscriber_lookups_total default 0",
-          "legendFormat": "OCS Subscriber Queries",
-          "refId": "A"
-        }
-      ],
-      "title": "Prepaid Online Charging System (OCS) Queries",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 14
-      },
-      "id": 200,
-      "title": "\ud83e\udd16 REAL-TIME VOSK ASR & 3GPP MULTI-PARTY CONFERENCING",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "fillOpacity": 80,
-            "gradientMode": "opacity",
-            "lineWidth": 1
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 15
-      },
-      "id": 201,
-      "options": {
-        "displayMode": "gradient",
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "values": false
-        },
-        "showUnfilled": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "topk(10, sum by (word) (mvno_vosk_scamflag_total))",
-          "legendFormat": "Scam Keyword: {{word}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Top Detected Phishing & Scam Keywords (Vosk ASR Lattice)",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          },
-          "unit": "reqps"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 15
-      },
-      "id": 202,
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rate(mvno_vosk_transcriptions_total[1m]) default 0",
-          "legendFormat": "ASR Speech Transcription Rate",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rate(mvno_vosk_classified_total[1m]) default 0",
-          "legendFormat": "AI Classifier Throughput",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rate(mvno_vosk_flagged_total[1m]) default 0",
-          "legendFormat": "Phishing Detection Rate",
-          "refId": "C"
-        }
-      ],
-      "title": "ASR Speech-to-Text & AI Classification Velocity",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 107,
-      "title": "\ud83c\udf09 IP-SM-GW 2G\u21945G SMS BRIDGE",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#00c49a"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#00c49a",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 0,
-        "y": 10
-      },
-      "id": 108,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "sum(mvno_bridge_sms_2g_to_5g_total) default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "IP-SM-GW 2G\u21925G Relay",
+      "title": "\ud83d\udce1 5G SA Active Sessions",
+      "description": "Active 5G Standalone PDU sessions registered on Open5GS UPF (ogstun).",
       "type": "stat"
     },
     {
@@ -1045,491 +284,7 @@
         "defaults": {
           "color": {
             "mode": "fixed",
-            "fixedColor": "#ab47bc"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#ab47bc",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 4,
-        "y": 10
-      },
-      "id": 109,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "sum(mvno_bridge_sms_5g_to_2g_total) default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "IP-SM-GW 5G\u21922G Backhaul",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#ef5350"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#ef5350",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 8,
-        "y": 10
-      },
-      "id": 110,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "sum(mvno_bridge_sms_failures_total) default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "IP-SM-GW Delivery Failures",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#ffb74d"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#ffb74d",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 12,
-        "y": 10
-      },
-      "id": 111,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "(sum(mvno_bridge_sms_2g_to_5g_total) + sum(mvno_bridge_sms_5g_to_2g_total)) default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "IP-SM-GW Total Bridged SMS",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "fillOpacity": 30,
-            "gradientMode": "opacity",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "2G\u21925G Relayed"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#00c49a",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "5G\u21922G Backhauled"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#ab47bc",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 17
-      },
-      "id": 112,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_bridge_sms_2g_to_5g_total default 0",
-          "legendFormat": "2G\u21925G Relayed",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "mvno_bridge_sms_5g_to_2g_total default 0",
-          "legendFormat": "5G\u21922G Backhauled",
-          "refId": "B"
-        }
-      ],
-      "title": "2G\u21945G SMS Bridge Traffic",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 30
-      },
-      "id": 103,
-      "title": "\ud83d\udda5\ufe0f INFRASTRUCTURE & MEDIA PLANE HEALTH",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "fillOpacity": 30,
-            "gradientMode": "opacity",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 31
-      },
-      "id": 11,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "up{job=~\"telecom-api|rtpengine|vmagent|open5gs|mongodb|victoria-metrics\"} default 0",
-          "legendFormat": "{{job}} ({{instance}})",
-          "refId": "A"
-        }
-      ],
-      "title": "Service Target Liveness (up)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "fillOpacity": 30,
-            "gradientMode": "opacity",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 31
-      },
-      "id": 12,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rtpengine_sessions default 0",
-          "legendFormat": "Active Sessions ({{type}})",
-          "refId": "A"
-        }
-      ],
-      "title": "RTPEngine Media Relay Performance",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 38
-      },
-      "id": 104,
-      "title": "RTP ENGINE DEEP DIVE",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#00F2FE",
-                "value": null
-              }
-            ]
-          },
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 39
-      },
-      "id": 20,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rtpengine_uptime_seconds default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "RTPEngine Uptime",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#00F2FE",
-                "value": null
-              },
-              {
-                "color": "#FF9100",
-                "value": 15
-              },
-              {
-                "color": "#FF0844",
-                "value": 25
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 39
-      },
-      "id": 13,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rtpengine_sessions default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "Active RTP Sessions",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
+            "fixedColor": "#FF5252"
           },
           "thresholds": {
             "mode": "absolute",
@@ -1539,447 +294,19 @@
                 "value": null
               },
               {
-                "color": "#FF0844",
-                "value": 0.0001
-              }
-            ]
-          },
-          "unit": "ops"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 39
-      },
-      "id": 113,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rate(rtpengine_zero_packet_streams_total[5m]) default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "Zero-Packet RTP Streams (media stuck)",
-      "type": "stat",
-      "description": "New RTP streams that received zero packets in the last 5m (rate). >0 = media fault right now; a cumulative counter would sit permanently red."
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#00F2FE",
-                "value": null
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 39
-      },
-      "id": 14,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rtpengine_bytes_total default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "Media Bytes Total",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#00F2FE",
-                "value": null
-              },
-              {
-                "color": "#FF9100",
-                "value": 100
-              },
-              {
-                "color": "#FF0844",
-                "value": 500
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 39
-      },
-      "id": 15,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rtpengine_packet_errors_total default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "Packet Errors",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#FF0844",
-                "value": null
-              },
-              {
-                "color": "#FF9100",
-                "value": 10
-              },
-              {
-                "color": "#00E676",
-                "value": 50
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 39
-      },
-      "id": 16,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.6.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rtpengine_ports_free default 0",
-          "refId": "A"
-        }
-      ],
-      "title": "Media Ports Free",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "drawPoints": "off",
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 39
-      },
-      "id": 17,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rtpengine_sessions_total default 0",
-          "legendFormat": "Total Sessions",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rtpengine_closed_sessions_total default 0",
-          "legendFormat": "Closed ({{reason}})",
-          "refId": "B"
-        }
-      ],
-      "title": "Session Lifecycle",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "drawPoints": "off",
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          },
-          "unit": "pps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 12,
-        "x": 0,
-        "y": 43
-      },
-      "id": 18,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rate(rtpengine_packets_total[$__rate_interval]) default 0",
-          "legendFormat": "Packets/s",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rate(rtpengine_packet_errors_total[$__rate_interval]) default 0",
-          "legendFormat": "Errors/s",
-          "refId": "B"
-        }
-      ],
-      "title": "Packet Rate & Errors",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "drawPoints": "off",
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          },
-          "unit": "decBps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 12,
-        "x": 12,
-        "y": 43
-      },
-      "id": 19,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoriametrics"
-          },
-          "expr": "rate(rtpengine_bytes_total[$__rate_interval]) default 0",
-          "legendFormat": "Bytes/s",
-          "refId": "A"
-        }
-      ],
-      "title": "Media Throughput",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 47
-      },
-      "id": 116,
-      "title": "📡 5G CORE L7 DEEP PACKET INSPECTION (DPI) & CARRIER ANTI-FRAUD MESH",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoriametrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#FF0055",
-            "mode": "fixed"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#00E676",
-                "value": null
-              },
-              {
-                "color": "#FF0055",
+                "color": "#FF5252",
                 "value": 1
               }
             ]
           },
           "unit": "short"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 0,
-        "y": 48
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
       },
       "id": 117,
       "options": {
@@ -2005,7 +332,8 @@
           "refId": "A"
         }
       ],
-      "title": "5G Phishing Threats Blocked",
+      "title": "\ud83d\udea8 5G L7 Phishing Intercepts",
+      "description": "Malicious DNS domain names and HTTP hostnames intercepted live on the 5G data plane.",
       "type": "stat"
     },
     {
@@ -2016,8 +344,92 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "#00F2FE",
-            "mode": "fixed"
+            "mode": "fixed",
+            "fixedColor": "#38BDF8"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#38BDF8",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 20,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_uptime_seconds default 0",
+          "refId": "A"
+        }
+      ],
+      "title": "\u23f1\ufe0f RTPEngine Core Uptime",
+      "description": "Continuous uptime of the high-throughput in-kernel RTPEngine media relay.",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 105,
+      "title": "\ud83c\udf10 END-TO-END TELECOM TOPOLOGY & DATA FLOW PIPELINE",
+      "type": "row"
+    },
+    {
+      "gridPos": {
+        "h": 8,
+        "w": 18,
+        "x": 0,
+        "y": 6
+      },
+      "id": 106,
+      "options": {
+        "content": "<div style=\"display:flex; flex-direction:column; gap:12px; padding:12px; background:rgba(15,23,42,0.7); border-radius:12px; border:1px solid rgba(255,255,255,0.12);\">\n  <!-- VOICE -->\n  <div style=\"font-size:12px; font-weight:bold; color:#00F2FE; text-transform:uppercase; letter-spacing:0.5px;\">\ud83d\udcde Voice Signaling & Media Path (SIP RFC 3261 + RTP Relay)</div>\n  <div style=\"display:flex; align-items:center; justify-content:space-between; gap:8px;\">\n    <div style=\"flex:1; padding:10px; background:linear-gradient(135deg, rgba(0,242,254,0.15), rgba(0,242,254,0.05)); border:1px solid #00F2FE; border-radius:8px; text-align:center;\">\n      <div style=\"font-size:18px;\">\ud83d\udcf1</div><div style=\"font-weight:bold; color:#00F2FE; font-size:12px;\">Caller UE</div><div style=\"font-size:10px; color:rgba(255,255,255,0.7);\">15553332211</div>\n    </div>\n    <div style=\"color:#00F2FE; font-weight:bold;\">\u2794</div>\n    <div style=\"flex:1; padding:10px; background:linear-gradient(135deg, rgba(121,40,202,0.15), rgba(121,40,202,0.05)); border:1px solid #7928CA; border-radius:8px; text-align:center;\">\n      <div style=\"font-size:18px;\">\ud83d\udce1</div><div style=\"font-weight:bold; color:#7928CA; font-size:12px;\">Kamailio SIP Proxy</div><div style=\"font-size:10px; color:rgba(255,255,255,0.7);\">5060/UDP (407 Auth)</div>\n    </div>\n    <div style=\"color:#7928CA; font-weight:bold;\">\u2794</div>\n    <div style=\"flex:1; padding:10px; background:linear-gradient(135deg, rgba(255,145,0,0.15), rgba(255,145,0,0.05)); border:1px solid #FF9100; border-radius:8px; text-align:center;\">\n      <div style=\"font-size:18px;\">\ud83d\udee1\ufe0f</div><div style=\"font-weight:bold; color:#FF9100; font-size:12px;\">Telecom Gateway</div><div style=\"font-size:10px; color:rgba(255,255,255,0.7);\">Java 21 / OCS / EIR</div>\n    </div>\n    <div style=\"color:#FF9100; font-weight:bold;\">\u2794</div>\n    <div style=\"flex:1; padding:10px; background:linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,230,118,0.05)); border:1px solid #00E676; border-radius:8px; text-align:center;\">\n      <div style=\"font-size:18px;\">\ud83c\udf99\ufe0f</div><div style=\"font-weight:bold; color:#00E676; font-size:12px;\">RTPEngine Relay</div><div style=\"font-size:10px; color:rgba(255,255,255,0.7);\">10000-20000/UDP</div>\n    </div>\n    <div style=\"color:#00E676; font-weight:bold;\">\u2794</div>\n    <div style=\"flex:1; padding:10px; background:linear-gradient(135deg, rgba(0,242,254,0.15), rgba(0,242,254,0.05)); border:1px solid #00F2FE; border-radius:8px; text-align:center;\">\n      <div style=\"font-size:18px;\">\ud83d\udcf2</div><div style=\"font-weight:bold; color:#00F2FE; font-size:12px;\">Callee Handset</div><div style=\"font-size:10px; color:rgba(255,255,255,0.7);\">15551234567 / 9998888</div>\n    </div>\n  </div>\n\n  <!-- 5G USER PLANE & DPI -->\n  <div style=\"font-size:12px; font-weight:bold; color:#7928CA; text-transform:uppercase; letter-spacing:0.5px;\">\ud83d\udce1 5G Standalone Data Plane & Deep Packet Inspection (GTP-U TS 29.281)</div>\n  <div style=\"display:flex; align-items:center; justify-content:space-between; gap:8px;\">\n    <div style=\"flex:1; padding:10px; background:linear-gradient(135deg, rgba(121,40,202,0.15), rgba(121,40,202,0.05)); border:1px solid #7928CA; border-radius:8px; text-align:center;\">\n      <div style=\"font-size:18px;\">\ud83d\udcf6</div><div style=\"font-weight:bold; color:#7928CA; font-size:12px;\">5G UE (UERANSIM)</div><div style=\"font-size:10px; color:rgba(255,255,255,0.7);\">10.45.0.5 (uesimtun0)</div>\n    </div>\n    <div style=\"color:#7928CA; font-weight:bold;\">\u2794</div>\n    <div style=\"flex:1; padding:10px; background:linear-gradient(135deg, rgba(56,189,248,0.15), rgba(56,189,248,0.05)); border:1px solid #38BDF8; border-radius:8px; text-align:center;\">\n      <div style=\"font-size:18px;\">\ud83d\uddfc</div><div style=\"font-weight:bold; color:#38BDF8; font-size:12px;\">5G gNodeB</div><div style=\"font-size:10px; color:rgba(255,255,255,0.7);\">NGAP 38412 / GTP-U</div>\n    </div>\n    <div style=\"color:#38BDF8; font-weight:bold;\">\u2794</div>\n    <div style=\"flex:1; padding:10px; background:linear-gradient(135deg, rgba(255,0,85,0.15), rgba(255,0,85,0.05)); border:1px solid #FF0055; border-radius:8px; text-align:center;\">\n      <div style=\"font-size:18px;\">\u2699\ufe0f</div><div style=\"font-weight:bold; color:#FF0055; font-size:12px;\">Open5GS UPF</div><div style=\"font-size:10px; color:rgba(255,255,255,0.7);\">10.45.0.1 (ogstun)</div>\n    </div>\n    <div style=\"color:#FF0055; font-weight:bold;\">\u2794</div>\n    <div style=\"flex:1; padding:10px; background:linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,230,118,0.05)); border:1px solid #00E676; border-radius:8px; text-align:center;\">\n      <div style=\"font-size:18px;\">\ud83d\udd0d</div><div style=\"font-weight:bold; color:#00E676; font-size:12px;\">5G L7 DPI Probe</div><div style=\"font-size:10px; color:rgba(255,255,255,0.7);\">DNS / TLS SNI / HTTP</div>\n    </div>\n  </div>\n</div>",
+        "mode": "html"
+      },
+      "title": "\ud83d\uddfa\ufe0f Live Carrier Network Architecture Topology",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#00F2FE"
           },
           "thresholds": {
             "mode": "absolute",
@@ -2029,14 +441,13 @@
             ]
           },
           "unit": "decbytes"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
-        "h": 5,
+        "h": 8,
         "w": 6,
-        "x": 6,
-        "y": 48
+        "x": 18,
+        "y": 6
       },
       "id": 118,
       "options": {
@@ -2062,8 +473,21 @@
           "refId": "A"
         }
       ],
-      "title": "5G UPF Inspected Payload",
+      "title": "\ud83d\udcca Total 5G L7 Inspected Payload",
+      "description": "Total user-plane payload bytes decapsulated and inspected on ogstun by the 5G DPI probe.",
       "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 101,
+      "title": "\ud83d\udce1 CARRIER TRAFFIC & INTERCEPTION VELOCITY",
+      "type": "row"
     },
     {
       "datasource": {
@@ -2073,8 +497,212 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "#00E676",
-            "mode": "fixed"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ingested SMS"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00F2FE",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Blocked Spam"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0055",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(mvno_sms_requests_total) default 0",
+          "legendFormat": "Ingested SMS",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(mvno_sms_blocked_total) default 0",
+          "legendFormat": "Blocked Spam",
+          "refId": "B"
+        }
+      ],
+      "title": "\ud83d\udcf1 SMS Ingestion vs Spam Neutralization Volume",
+      "description": "Real-time rate of incoming SMS messages versus scam/smishing messages blocked by the AI Gateway.",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": false
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Processed Calls"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00E676",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Blocked Fraud Calls"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF0055",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(mvno_call_requests_total) default 0",
+          "legendFormat": "Processed Calls",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(mvno_call_blocked_total) default 0",
+          "legendFormat": "Blocked Fraud Calls",
+          "refId": "B"
+        }
+      ],
+      "title": "\ud83c\udf99\ufe0f Voice Call Signaling & Interception Volume",
+      "description": "Voice call signaling attempts routed through Kamailio SIP core and blocked robocalls.",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 116,
+      "title": "\ud83d\udee1\ufe0f 5G CORE L7 DEEP PACKET INSPECTION (DPI) & ANTI-FRAUD SECURITY MESH",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#00E676"
           },
           "thresholds": {
             "mode": "absolute",
@@ -2086,14 +714,13 @@
             ]
           },
           "unit": "short"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 12,
-        "y": 48
+        "h": 6,
+        "w": 10,
+        "x": 0,
+        "y": 23
       },
       "id": 119,
       "options": {
@@ -2120,8 +747,64 @@
           "refId": "A"
         }
       ],
-      "title": "Active 5G Data Plane Flows",
+      "title": "\ud83d\udce1 Active 5G Data Plane Flows by Protocol",
+      "description": "Current active application flows (DNS, TLS, HTTP, RTP) tracked across 5G SA PDU sessions.",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": false
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 14,
+        "x": 10,
+        "y": 23
+      },
+      "id": 120,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum by (protocol) (mvno_dpi_bytes_total)",
+          "legendFormat": "{{protocol}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcc8 5G UPF L7 User-Plane Traffic by Protocol",
+      "description": "Cumulative decapsulated data volume across DNS queries, TLS handshakes, and HTTP traffic.",
+      "type": "timeseries"
     },
     {
       "collapsed": false,
@@ -2129,33 +812,101 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 29
       },
-      "id": 114,
-      "title": "📋 INTERCEPTION LOGS (VictoriaLogs)",
+      "id": 200,
+      "title": "\ud83e\udd16 REAL-TIME VOSK ASR SPEECH RECOGNITION & PHONEME KEYWORD LATTICE",
       "type": "row"
     },
     {
       "datasource": {
-        "type": "victoriametrics-logs-datasource",
-        "uid": "victorialogs"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "fixed",
-            "fixedColor": "#00F2FE"
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00E676",
+                "value": null
+              },
+              {
+                "color": "#FF9100",
+                "value": 2
+              },
+              {
+                "color": "#FF0055",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 201,
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum by (keyword) (mvno_speech_keyword_hits_total)",
+          "legendFormat": "{{keyword}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udd11 Top Flagged Phishing & Fraud Keywords",
+      "description": "Frequency of high-risk financial and phishing terms transcribed live from call media via Vosk JNI.",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
           },
           "custom": {
-            "lineWidth": 1,
-            "showLabels": true
-          }
+            "axisCenteredZero": false,
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": false
+          },
+          "unit": "short"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "log"
+              "options": "Transcriptions Processed"
             },
             "properties": [
               {
@@ -2170,10 +921,677 @@
         ]
       },
       "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 202,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(mvno_speech_transcriptions_total) default 0",
+          "legendFormat": "Transcriptions Processed",
+          "refId": "A"
+        }
+      ],
+      "title": "\u26a1 Vosk ASR Speech Transcription Velocity",
+      "description": "Number of audio call segments successfully decoded into text lattices by the offline Vosk engine.",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 107,
+      "title": "\ud83c\udf09 IP-SM-GW 2G\u21945G SMS INTERWORKING & CHARGING LEDGER",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#00F2FE"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00F2FE",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 38
+      },
+      "id": 108,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(ipsmgw_messages_total{direction=\"2g_to_5g\"}) default 0",
+          "refId": "A"
+        }
+      ],
+      "title": "2G \u2794 5G Relay",
+      "description": "SMS messages received via Osmocom GSM SMSC and bridged into the 5G IMS core.",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#7928CA"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#7928CA",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 38
+      },
+      "id": 109,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(ipsmgw_messages_total{direction=\"5g_to_2g\"}) default 0",
+          "refId": "A"
+        }
+      ],
+      "title": "5G \u2794 2G Backhaul",
+      "description": "SIP MESSAGE SMS from 5G softphones converted to SMPP and delivered to GSM handsets.",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FF0055"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00E676",
+                "value": null
+              },
+              {
+                "color": "#FF0055",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 38
+      },
+      "id": 110,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(ipsmgw_delivery_failures_total) default 0",
+          "refId": "A"
+        }
+      ],
+      "title": "Bridge Failures",
+      "description": "Number of unroutable or timed-out cross-network SMS interworking deliveries.",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": false
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      },
+      "id": 112,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum by (direction) (ipsmgw_messages_total)",
+          "legendFormat": "{{direction}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83c\udf09 2G\u21945G SMS Interworking Traffic",
+      "description": "Cumulative volume of bidirectional SMS packets traversing the IP-SM-GW protocol converter.",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 104,
+      "title": "\u26a1 RTPENGINE KERNEL MEDIA RELAY & INFRASTRUCTURE HEALTH",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#00F2FE"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00F2FE",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 43
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_current_sessions default 0",
+          "refId": "A"
+        }
+      ],
+      "title": "Active RTP Sessions",
+      "description": "Active full-duplex RTP audio streams currently bridged by RTPEngine.",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FF0055"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00E676",
+                "value": null
+              },
+              {
+                "color": "#FF0055",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 43
+      },
+      "id": 113,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(rtpengine_zeropacket_sessions) default 0",
+          "refId": "A"
+        }
+      ],
+      "title": "Stuck RTP Streams",
+      "description": "RTP media sessions created but receiving 0 media packets (dead audio / NAT traversal failure).",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FF9100"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00E676",
+                "value": null
+              },
+              {
+                "color": "#FF9100",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 43
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(rtpengine_packet_errors_total) default 0",
+          "refId": "A"
+        }
+      ],
+      "title": "RTP Packet Errors",
+      "description": "Corrupted or out-of-order UDP media packets dropped by RTPEngine.",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#00E676"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#00E676",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 43
+      },
+      "id": 16,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rtpengine_ports_free default 0",
+          "refId": "A"
+        }
+      ],
+      "title": "Available RTP Ports",
+      "description": "Free UDP port allocations in the 10000-20000 media relay pool.",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#38BDF8"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#38BDF8",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 43
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "sum(up)",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udfe2 Live Infrastructure Health Targets (up=1)",
+      "description": "Number of active telecom core services answering Prometheus health checks (10/10 expected).",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoriametrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "spanNulls": false
+          },
+          "unit": "Bps"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoriametrics"
+          },
+          "expr": "rate(rtpengine_bytes_total[$__rate_interval]) default 0",
+          "legendFormat": "Media Bandwidth (Bytes/s)",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcc8 RTPEngine Real-Time Media Bandwidth Throughput",
+      "description": "Real-time media plane bandwidth streamed across active voice and conference sessions.",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "id": 114,
+      "title": "\ud83d\udccb CARRIER INTERCEPTION & SECURITY AUDIT LOGS (VICTORIALOGS)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#00F2FE",
+            "mode": "fixed"
+          },
+          "custom": {
+            "lineWidth": 1,
+            "showLabels": true
+          }
+        }
+      },
+      "gridPos": {
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 54
       },
       "id": 115,
       "options": {
@@ -2196,7 +1614,8 @@
           "refId": "A"
         }
       ],
-      "title": "Interception Logs (VictoriaLogs)",
+      "title": "\ud83d\udd0d Real-Time Interception Stream",
+      "description": "Live log entries for carrier-intercepted messages, phishing threats, and subscriber state transitions.",
       "type": "logs"
     }
   ]
