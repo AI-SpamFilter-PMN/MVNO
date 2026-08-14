@@ -39,23 +39,25 @@ The core network operates as an unprivileged, rootless stack composed of **37 or
 
 ### Key Architectural Layers:
 1. **Signaling & Edge Proxy**: **Kamailio 5.7** handles SIP registrations (digest-challenged), policy routing, international MSISDN prefix normalization, and SMS payload parsing.
-2. **Media Plane & Transcoding**: **RTPEngine NG** provides userspace RTP media relaying and call recording forking. **Asterisk 20.6** acts as an MCU sidecar providing audio mixing for **ConfBridge `7XXX`**, **Interactive Call Screening `8000`**, and **Voicemail `8XXX`**.
+2. **Media Plane & Transcoding**: **RTPEngine NG** provides userspace RTP media relaying and call recording forking. **Asterisk 20.6** acts as an MCU sidecar providing audio mixing for **ConfBridge `7XXX` / RFC 4579 `conf-factory`**, **In-Call Audio Whisper Warnings**, **Interactive Call Screening `8000`**, and **Voicemail `8XXX`**.
 3. **Hardware Audio Integration**: Host-native **PipeWire / PulseAudio** integration provides real-time, full-duplex hardware microphone capture and speaker output across both softphone endpoints without file-based intermediary buffering.
 4. **SMS Interworking & Control**: Osmocom (`OsmoSMSC` + `OsmoHLR`) provides GSM 03.40 store-and-forward SMSC capabilities. A **TS 23.204 IP-SM-GW bridge** (`mvno-ip-sm-gw`) bi-directionally bridges 2G SMPP messages with 5G/IMS SIP `MESSAGE` transactions.
-5. **AI Interception & Policy Core**: **Spring Boot 3.4.3** (Java 21 LTS, Virtual Threads, SQLite WAL OCS balance check, EIR SIM-swap fraud protection, and in-JVM native **Vosk ASR JNI** for real-time speech-to-text).
-6. **5G Standalone (SA) Core**: **Open5GS** (10 NFs: NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + **UERANSIM** (gNB + 3 UEs) with live PDU session establishment (`10.45.0.0/16`).
+5. **AI Interception & Policy Core**: **Spring Boot 3.4.3** (Java 21 LTS, Virtual Threads, SQLite WAL OCS balance check, EIR SIM-swap fraud protection, and in-JVM native **Vosk ASR JNI** for sub-2.0s real-time speech-to-text).
+6. **5G Standalone (SA) Core**: **Open5GS** (10 NFs: NRF, AMF, SMF, UPF, AUSF, UDM, UDR, PCF, NSSF, BSF) + **UERANSIM** (gNB + 3 UEs) with S-NSSAI Network Slicing (`SST=1` eMBB vs `SST=2` URLLC).
+7. **Unified 5-Repository Multi-Compose Stack**: Master orchestration linking `MVNO`, `Filteration-System`, `admin-client`, `sms-client`, and `SipClient` on a single container network (`make all-up`).
 
 ---
 
 ## 2. Core Functional Transactions
 
-### A. VoIP Voice Call & Conference Interception
+### A. VoIP Voice Call, Conferencing & Whisper Warning
 [![IMS Voice Call Interception Flow](docs/ims_voice_call_flow.png)](docs/ims_voice_call_flow.svg)
 
 1. **Pre-Call Policy Gate**: Caller sends `SIP INVITE`. Kamailio invokes `telecom-api:8080/api/v1/intercept/call` to verify prepaid balance (>0) and check EIR IMEI SIM-swap thresholds.
 2. **Media Anchoring**: Upon `200 OK`, Kamailio anchors RTP media through RTPEngine and mirrors a dual-leg stream to `/var/spool/rtpengine/`.
-3. **Advanced Media Features**:
-   * **ConfBridge `7XXX`**: Multi-party group calling mixed in real time by Asterisk 20.6.
+3. **Advanced Telephony & Media Features**:
+   * **3GPP RFC 4579 Multi-Party Conference**: Android Linphone "Merge Calls" or dialing `7001` / `*7` merges up to 3+ participants into an Asterisk full-duplex ConfBridge.
+   * **In-Call Real-Time Whisper Warning**: Asterisk `ChanSpy` / Originate injects an audible warning (*"⚠️ Warning: Potential Scam Detected"*) directly into the callee's earpiece without dropping the call.
    * **Call Screening `8000`**: Interactive IVR records caller's name, rings callee, and offers Accept (1), Decline (2), or Voicemail (3).
 4. **Speech-to-Text & AI Verdict**: `NativeVoskService.java` transcribes voice audio in-JVM via Vosk JNI and sends the transcript to the AI Decider (`POST /api/v1/voice/filter`). Malicious calls trigger automated subscriber blacklisting and SIP `403 Forbidden`.
 
@@ -64,7 +66,7 @@ The core network operates as an unprivileged, rootless stack composed of **37 or
 
 1. **5G $\rightarrow$ 2G Flow**: 5G UE sends SIP `MESSAGE` to Kamailio $\rightarrow$ Kamailio inspects body and queries `telecom-api` $\rightarrow$ IP-SM-GW receives message, converts to SMPP `submit_sm` $\rightarrow$ OsmoSMSC delivers to 2G Mobile Station handset.
 2. **2G $\rightarrow$ 5G Flow**: 2G MS sends SMS to OsmoSMSC $\rightarrow$ IP-SM-GW polls `smsc.db` $\rightarrow$ bridges message into SIP `MESSAGE` $\rightarrow$ Kamailio delivers to 5G recipient softphone.
-3. **Deterministic Spam Block**: Any message containing `E2E-BLOCK` is blocked by the AI Policy Gate $\rightarrow$ Kamailio returns `403 Forbidden - SMS Blocked`, incrementing Prometheus telemetry.
+3. **AI Smishing URL Sandbox**: SMS text containing shortened links (`bit.ly`, `tinyurl`) is analyzed for phishing heuristics before delivery.
 
 ---
 
@@ -73,31 +75,43 @@ The core network operates as an unprivileged, rootless stack composed of **37 or
 | Domain | Technology | Specification / Version |
 | :--- | :--- | :--- |
 | **Signaling Proxy** | Kamailio | v5.7 (SIP Proxy, Registrar, Jansson, USRLOC) |
-| **Media Plane** | RTPEngine + Asterisk | RTPEngine NG (Relay) + Asterisk 20.6 (ConfBridge MCU, IVR) |
+| **Media Plane** | RTPEngine + Asterisk | RTPEngine NG (Relay) + Asterisk 20.6 (ConfBridge MCU, ChanSpy Whisper, IVR) |
 | **Cellular SMS** | Osmocom Stack | `osmo-smsc` (SMPP 3.4) + `osmo-hlr` (GSUP) + `osmo-msc` |
 | **SMS Bridge** | IP-SM-GW | TS 23.204 Python 3.11 Async Bridge (35 Unit Tests) |
-| **5G SA Core** | Open5GS + UERANSIM | 10 3GPP Release 16 NFs + simulated gNodeB & 3 UEs |
+| **5G SA Core** | Open5GS + UERANSIM | 10 3GPP Release 16 NFs + simulated gNodeB & 3 UEs (S-NSSAI Slicing) |
 | **Policy Engine** | Spring Boot 3.4.3 | Java 21 LTS, Virtual Threads, RestClient, JdbcTemplate |
-| **Speech-to-Text** | Vosk ASR JNI | In-JVM Native C library bindings (Zero GC, offline) |
-| **Observability** | VictoriaMetrics + Grafana | VictoriaMetrics TSDB + `vmagent` Scraper + Grafana 10.x |
+| **Speech-to-Text** | Vosk ASR JNI | In-JVM Native C library bindings (<2.0s latency, offline) |
+| **Observability** | VictoriaMetrics + Grafana | VictoriaMetrics TSDB + `vmagent` Scraper + Grafana 11.6 Unified NOC |
 | **Databases** | SQLite (WAL) + MongoDB | SQLite 3 (Kamailio, OCS, HLR) + MongoDB 6 (Open5GS UDR) |
 | **Host Audio** | PipeWire / PulseAudio | Real-time full-duplex ALSA/Pulse hardware routing |
 
 ---
 
-## 4. Quickstart & Deployment
+## 4. Operational & Demo Commands
 
-### One-Command Deployment (Recommended)
 ```bash
-git clone https://github.com/AI-SpamFilter-PMN/MVNO.git
-cd MVNO
-./scripts/deploy.sh      # Installs dependencies, pulls images, seeds DBs, launches stack
+# 1. Bring up Full 5-Repo Ecosystem (40+ Containers)
+make all-up
+
+# 2. Run Zero-Mock Real-World Hardware-In-The-Loop Smoke Test
+make smoke-test
+
+# 3. Launch Live Call Status & Host Microphone VU-Meter HUD
+make monitor
+
+# 4. Run 3-Way Conference Bridge Demo (Android + 2 Laptop UEs)
+python3 scripts/testing/conference_3way_demo.py
+
+# 5. Run In-Call Audio Whisper Warning Demo (ChanSpy)
+python3 scripts/testing/whisper_warning_demo.py
+
+# 6. Open Live Wireshark Packet Capture
+make wireshark
+
+# 7. Access Unified Grafana NOC Dashboard
+http://localhost:3000   (or http://<HOST-IP>:3000)
 ```
 
-### Manual Step-by-Step Bring-Up
-```bash
-# 1. Pull published container images
-./scripts/pull-images.sh
 
 # 2. Initialize SQLite databases (Kamailio, OCS, HLR)
 make init-db

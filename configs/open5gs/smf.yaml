@@ -40,6 +40,12 @@ smf:
       range: # UE address pool: starts at .2 so ogstun gateway .1 is never allocated to a UE
         - 10.45.0.2-10.45.0.254
       dnn: internet
+      s_nssai:
+        - sst: 1
+          sd: "000001"
+        - sst: 2
+          sd: "000002"
+
   dns:
     - 8.8.8.8
     - 8.8.4.4

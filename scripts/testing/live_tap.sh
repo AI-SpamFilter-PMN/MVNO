@@ -131,7 +131,7 @@ mux_leg() {
     esac
 
     if tail -c +$((off + 1)) "$hex" | xxd -r -p | \
-        ffmpeg -nostdin -loglevel error $dec -ac 1 -i pipe:0 -ar 16000 -y "$out" 2>/dev/null; then
+        ffmpeg -nostdin -loglevel error $dec -ac 1 -i pipe:0 -af "highpass=f=200,lowpass=f=3500,volume=3.0" -ar 16000 -y "$out" 2>/dev/null; then
         chmod 666 "$out" 2>/dev/null || true
         return 0
     fi

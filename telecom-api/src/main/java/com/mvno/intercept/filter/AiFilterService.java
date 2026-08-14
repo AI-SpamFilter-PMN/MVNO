@@ -83,6 +83,12 @@ public class AiFilterService {
                 meterRegistry.counter("mvno.vosk.scamflag", "word", scamWord).increment();
                 return new InterceptResponse(true, "scam-keyword-review: " + scamWord);
             }
+            final String smishThreat = scanSmishingUrls(req.content());
+            if (smishThreat != null) {
+                meterRegistry.counter("mvno.smishing.url.blocked", "threat", smishThreat).increment();
+                logger.warn("SMISHING PHISHING URL INTERCEPTED: sender={} threat='{}'", req.sender(), smishThreat);
+                return new InterceptResponse(false, "SMISHING_URL_BLOCKED: " + smishThreat);
+            }
         }
 
         try {
@@ -369,6 +375,35 @@ public class AiFilterService {
             // without relying on \b adjacent to a quoted literal.
             if (Pattern.compile("(?i)(?<![a-z])" + Pattern.quote(w) + "(?![a-z])").matcher(t).find()) {
                 return w;
+            }
+        }
+        return null;
+    }
+
+    private static final Pattern URL_PATTERN = Pattern.compile(
+        "(?i)\\b(https?://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]|(bit\\.ly|t\\.co|tinyurl\\.com|is\\.gd)/[a-zA-Z0-9_-]+)"
+    );
+
+    private static final Set<String> PHISHING_INDICATORS = Set.of(
+        "claim-prize", "account-update", "bank-secure", "verify-account",
+        "login-bank", "free-reward", "gift-card", "free-crypto", "claim-now"
+    );
+
+    /**
+     * AI Smishing URL Sandbox & Heuristic Analyzer.
+     * Extracts shortened URLs or suspicious phishing domains embedded in SMS bodies.
+     */
+    public String scanSmishingUrls(final String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        final var matcher = URL_PATTERN.matcher(text);
+        while (matcher.find()) {
+            final String url = matcher.group().toLowerCase(Locale.ROOT);
+            for (final String indicator : PHISHING_INDICATORS) {
+                if (url.contains(indicator)) {
+                    return indicator;
+                }
             }
         }
         return null;
