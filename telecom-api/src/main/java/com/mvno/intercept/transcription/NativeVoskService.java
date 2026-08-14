@@ -178,9 +178,9 @@ public class NativeVoskService {
     }
 
     /**
-     * Periodically polls media spool directory on Virtual Threads every 3000ms to process new audio captures.
+     * Periodically polls media spool directory on Virtual Threads every 1000ms for ultra-low latency real-time transcription.
      */
-    @Scheduled(fixedDelay = 3000)
+    @Scheduled(fixedDelay = 1000)
     public void pollSpoolDirectory() {
         if (voskModel == null) {
             // Fail-open: calls proceed; transcription is best-effort post-call analytics.
@@ -215,10 +215,10 @@ public class NativeVoskService {
                     Files.createDirectories(archiveDir);
                 }
                 
-                // Process each .wav file that has finished writing (file age > 3000ms)
+                // Process each .wav file that has finished writing (file age > 800ms for low latency)
                 for (final Path path : stream) {
                     final File file = path.toFile();
-                    if (!file.isDirectory() && System.currentTimeMillis() - file.lastModified() > 3000) {
+                    if (!file.isDirectory() && System.currentTimeMillis() - file.lastModified() > 800) {
                         // Transcribe WAV audio to text
                         final String text = transcribeWav(file);
                         logger.info("Native Java 21 Vosk ASR Transcribed [{}]: {}", file.getName(), text);

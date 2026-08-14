@@ -433,7 +433,7 @@ cockpit:
 
 # Launches detached Wireshark GUI pre-filtered for MVNO/AI-Filter SIP, SMPP, RTP, and REST traffic
 wireshark:
-	@bash scripts/demo/demo_live.sh --wireshark
+	@bash scripts/demo/launch_wireshark.sh
 
 # Interactive incoming call listener with desktop GUI modal popup & terminal controls
 listen-call:

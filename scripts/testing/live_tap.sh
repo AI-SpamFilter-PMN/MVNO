@@ -40,9 +40,9 @@ PROJECT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PCAP_DIR="${PCAP_DIR:-${PROJECT_DIR}/state/spool/pcaps}"
 SPOOL_DIR="${SPOOL_DIR:-${PROJECT_DIR}/state/spool}"
 TAP_DIR="${TAP_DIR:-${SPOOL_DIR}/tmp/live_tap}"
-POLL_SECS="${POLL_SECS:-1}"
-CHUNK_SECS="${CHUNK_SECS:-4}"
-IDLE_FINALIZE="${IDLE_FINALIZE:-3}"
+POLL_SECS="${POLL_SECS:-0.5}"
+CHUNK_SECS="${CHUNK_SECS:-2.5}"
+IDLE_FINALIZE="${IDLE_FINALIZE:-2}"
 
 for tool in tshark xxd ffmpeg; do
     command -v "$tool" >/dev/null 2>&1 || {

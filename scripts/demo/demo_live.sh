@@ -152,7 +152,7 @@ fi
 # 5G user plane: auto-recovering probe (demo path only; make gate is untouched).
 say "running preflight_5g.sh --auto-recover (5.8/5.9/7.x UE-drop ladder)..."
 bash scripts/testing/preflight_5g.sh --auto-recover \
-    || die "5G user plane not UP after auto-recovery — fix before the call"
+    || echo -e "\033[0;33m[demo-live] ⚠ 5G UE plane not attached — starting in softphone / SIP mode\033[0m"
 
 # Bridge 2G-AoR assert (Issue 8.38 class): the 5G->2G SMS relay depends on the
 # bridge's registrations (15554443322/15557778888) being live in usrloc. Fail
