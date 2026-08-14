@@ -133,6 +133,10 @@ public class NativeVoskService {
                 recognizer.acceptWaveForm(buffer, bytesRead);
             }
             transcriptions.increment(); // Increment Micrometer transcription metric
+            final String finalResult = recognizer.getFinalResult();
+            if (finalResult != null && !finalResult.isBlank() && !finalResult.equals("{\n  \"text\" : \"\"\n}")) {
+                return finalResult;
+            }
             return recognizer.getResult(); // Return JSON string containing transcribed text
         } catch (final Exception e) {
             decodeErrors.increment();
