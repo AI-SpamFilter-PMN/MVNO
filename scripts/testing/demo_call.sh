@@ -23,7 +23,7 @@ source "${REPO_ROOT}/scripts/lib/common.sh"   # play_go_beep (go-cue) + side_ton
 CALLER=15553332211
 CALLEE=15559998888
 SIP_HOST=10.89.0.23
-IMAGE="${BARESIP_IMAGE:-mvno-baresip:1.0.0}"
+IMAGE="${BARESIP_IMAGE:-mvno-baresip:1.1.0}"
 NET=("--network" "mvno_mvno_net")
 # Realistic scam phrase, Vosk-small-model vetted (2026-08-08: transcribes as
 # "your bank account has been blocked please confirm your detail now" — the
@@ -63,17 +63,30 @@ module g722.so
 module opus.so
 module ausine.so
 module aufile.so
+module pulse.so
 module uuid.so
 module_app account.so
 module_app menu.so
 module_app ctrl_tcp.so
 audio_source aufile,/media/speech8k.wav
 EOF
+  if [ "$PULSE_OK" -eq 1 ]; then
+    # Issue 8.47 proven recipe: play the remote leg (phone mic) on the laptop
+    # speakers via baresip's pulse module — full-duplex live audio both ends.
+    cat >> state/baresip/rx/config <<EOF
+audio_player pulse,alsa_output.pci-0000_05_00.6.analog-stereo
+EOF
+  fi
   cat > state/baresip/rx/accounts <<EOF
 <sip:${CALLEE}@${SIP_HOST}:5060>;auth_user=${CALLEE};auth_pass=testpass;answermode=auto
 EOF
   # Caller leg: use the live host mic when a Pulse socket exists, else a
   # container-side speech tone (portable fallback — still a real call).
+  # Caller leg audio path (Issue 8.47, FIXED 2026-08-13): baresip's pulse.so
+  # DOES capture the real laptop HW mic in this rootless rig when the container
+  # runs as root (uid 0) with --security-opt label=disable, the host pulse
+  # socket + cookie mounted, and PULSE_SERVER/XDG_RUNTIME_DIR set. The aufile
+  # streaming workaround is no longer needed for live laptop-mic capture.
   local tx_src="ausine"
   if [ "$PULSE_OK" -eq 1 ]; then
     tx_src="pulse"
@@ -94,10 +107,8 @@ module_app ctrl_tcp.so
 ctrl_tcp_listen 0.0.0.0:4444
 EOF
   if [ "$PULSE_OK" -eq 1 ]; then
-    # Live host mic via PulseAudio/PipeWire socket (proven recipe, Issue 8.47):
-    # mount the pulse socket + cookie, set PULSE_SERVER + XDG_RUNTIME_DIR, and
-    # disable SELinux labeling so the root container can reach the host socket.
-    # The specific ALSA device pins the laptop's real hardware mic.
+    # Live laptop mic + speakers via baresip's pulse module (Issue 8.47
+    # proven recipe): real-time full-duplex capture, no file, no feeder.
     cat >> state/baresip/tx/config <<EOF
 audio_source pulse,alsa_input.pci-0000_05_00.6.analog-stereo
 audio_player pulse,alsa_output.pci-0000_05_00.6.analog-stereo
@@ -113,17 +124,25 @@ EOF
 
   podman rm -f baresip-rx baresip-tx 2>/dev/null
   if [ "$PULSE_OK" -eq 1 ]; then
+    # Issue 8.47 proven recipe: root (uid 0), label=disable, host pulse socket
+    # + cookie mounted, PULSE_SERVER/XDG_RUNTIME_DIR set. baresip's pulse.so
+    # then captures the real laptop HW mic and plays to the laptop speakers.
+    PULSE_SOCK="${PULSE_DIR}/pulse/native"
+    PULSE_COOKIE="${HOME}/.config/pulse/cookie"
     podman run -d --name baresip-rx "${NET[@]}" --ip 10.89.0.60 \
+      --security-opt label=disable \
+      -e PULSE_SERVER="unix:${PULSE_SOCK}" -e XDG_RUNTIME_DIR="${PULSE_DIR}" \
+      -v "${PULSE_SOCK}:${PULSE_SOCK}:ro" \
+      -v "${PULSE_COOKIE}:${PULSE_DIR}/pulse/cookie:ro" \
       -v $PWD/state/baresip/rx:/cfg:z \
       -v $PWD/state/baresip/speech8k.wav:/media/speech8k.wav:ro \
       "${IMAGE}" >/dev/null
     podman run -d --name baresip-tx "${NET[@]}" --ip 10.89.0.61 \
       --security-opt label=disable \
+      -e PULSE_SERVER="unix:${PULSE_SOCK}" -e XDG_RUNTIME_DIR="${PULSE_DIR}" \
+      -v "${PULSE_SOCK}:${PULSE_SOCK}:ro" \
+      -v "${PULSE_COOKIE}:${PULSE_DIR}/pulse/cookie:ro" \
       -v $PWD/state/baresip/tx:/cfg:z \
-      -v "${PULSE_DIR}/pulse/native:${PULSE_DIR}/pulse/native" \
-      -v "${HOME}/.config/pulse/cookie:${HOME}/.config/pulse/cookie" \
-      -e "PULSE_SERVER=unix:${PULSE_DIR}/pulse/native" \
-      -e "XDG_RUNTIME_DIR=${PULSE_DIR}" \
       "${IMAGE}" >/dev/null
   else
     podman run -d --name baresip-rx "${NET[@]}" --ip 10.89.0.60 \
@@ -137,7 +156,7 @@ EOF
   sleep 3
   echo "  rx registrations (expect >= 2): $(podman logs baresip-rx | grep -c '200 OK')"
   echo "  tx registrations (expect >= 2): $(podman logs baresip-tx 2>&1 | grep -c '200 OK')"
-  echo "  caller audio source: ${tx_src}"
+  echo "  caller audio source: ${tx_src} (PULSE_OK=${PULSE_OK})"
   echo "  ✓ rig ready — paste: bash scripts/testing/demo_call.sh dial"
 }
 
