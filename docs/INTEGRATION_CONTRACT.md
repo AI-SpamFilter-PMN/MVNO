@@ -29,7 +29,7 @@ repositories are treated as **read-only external consumers**.
 
 | Interface | Endpoint / Port | Protocol | Consumed by | Status |
 |---|---|---|---|---|
-| **SIP registrar/proxy** | `127.0.0.1:5066` (host) → Kamailio `:5060` (container) | UDP/TCP SIP, RFC 3261 + digest auth | `SipClient` | ✅ stable |
+| **SIP registrar/proxy** | `127.0.0.1:5060` (host) → Kamailio `:5060` (container) | UDP/TCP SIP, RFC 3261 + digest auth | `SipClient` | ✅ stable |
 | **SMPP SMSC** | `127.0.0.1:2775` → OsmoSMSC | SMPP 3.4 (ESME bind/submit) | (see §5: refactored `sms-client` uses its own SMPP `:2076` + Neon today; `2775` is present but not currently consumed) | ✅ stable (present) |
 | **SMS intercept REST** | `POST /api/v1/intercept/sms` (`mvno-api:8080`, host `8080`) | HTTP JSON + `X-API-Key` | `sms-client` (optional), Kamailio `route[INTERCEPT_SMS]` | ✅ stable |
 | **Call intercept REST** | `POST|GET /api/v1/intercept/call` (`mvno-api:8080`) | HTTP JSON + `X-API-Key` | `SipClient` via Kamailio `route[INTERCEPT]` | ✅ stable |
@@ -195,31 +195,38 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 > `github.com/AI-SpamFilter-PMN/sms-client` and `.../SipClient`); findings below
 > marked ✅-verified or ⚠-mismatch. MVNO still never edits external repositories.
 
-### SipClient (`com.sipclient.sip.config.SipConfig`) — ✅ verified
-- `SipConfig` hardcodes `SERVER_PORT = 5060`, `LOCAL_PORT = 5070` (confirmed in
-  source). Ships targeting `SERVER_PORT = 5060`, local `127.0.0.1:5070`.
-- **MVNO Kamailio host port is `5066`** (canonical). Host `5060` is occupied by a host-level
-  Asterisk (see `docs/ENVIRONMENT_MATRIX.md` Section 3) — the optional `MVNO_PUBLISH_5060` extra
-  publish is **default-off and blocked on this host**.
-- **Recommendation to the consuming client (not an MVNO edit):** set the SIP server port to `5066`
-  (or make it configurable) so the unmodified client reaches Kamailio.
+### SipClient (`com.sipclient.sip.config.SipConfig`) — ⚠ re-verified 2026-08-14 (hardcoded, NOT sip.properties)
+> **Correction (verified against `origin/main` and `feature/kamailio-integration`,
+> 2026-08-14):** the earlier "✅ loads from `src/main/resources/sip.properties`"
+> claim is **FALSE**. `SipConfig.java` is **hardcoded constants** — `LOCAL_IP=127.0.0.1`,
+> `LOCAL_PORT=5070`, `SERVER_PORT=5060`, `TRANSPORT=udp`; **no `sip.properties` file exists**
+> in the repo. Pointing SipClient at a different MVNO host requires **editing
+> `SipConfig.java` and recompiling** — there is no config-file path today.
+- **Connecting SipClient to an MVNO host**: edit `SipConfig.java` (the
+  `SERVER_HOST`/`SERVER_PORT`/`LOCAL_IP`/`LOCAL_PORT` constants), rebuild with
+  Maven, run. MVNO does not edit external repos; if properties loading is
+  wanted, file a PR in the SipClient repo (recommended: add a
+  `src/main/resources/sip.properties` with `sip.server.host`/`sip.server.port`
+  keys and `@Value`-inject them — MVNO will not do this for you).
+- **MVNO Kamailio host port is `5060`** (canonical, `5060:5060/udp`). A host-level
+  Asterisk formerly held `0.0.0.0:5060`; it is removed, so 5060 is free.
 - **SIP INVITE Authentication (407 Digest):** Kamailio challenges unauthenticated `INVITE` with
   `407 Proxy Authentication Required`. Clients MUST handle the `Proxy-Authenticate: Digest`
   challenge and retry with an `Authorization: Digest` header using their subscriber-table
   credentials (`username: MSISDN`, realm `localhost`, password `testpass`). Applies to REGISTER and
   INVITE alike.
-- **RTP Media Relay:** RTPEngine ports `30000-30100/udp` (G.711u PCMU codec supported).
+- **RTP Media Relay:** RTPEngine ports `10000-20000/udp` (G.711u PCMU codec supported).
 - **Codec:** configure the client for **PCMU (G.711u, payload type 0) only** — the relay does not
   transcode; PCMA/opus negotiations fail media.
 - **Blocked calls:** zero-balance / EIR-fraud / AI-blocked calls are rejected with
   `SIP/2.0 403 Forbidden` — treat 403 as a terminal call failure (no retry loop).
-- **Firewall:** open UDP `30000-30100` (RTP relay range) and UDP `5066` (SIP) between client host
+- **Firewall:** open UDP `10000-20000` (RTP relay range) and UDP `5060` (SIP) between client host
   and MVNO host; the client's own RTP socket must be reachable (see `fix_nated_contact()` in
   `configs/kamailio/kamailio.cfg`).
-- **Any RFC-3261 softphone works (mobile/desktop)**: MVNO publishes `5066/udp` and RTP
-  `30000-30100/udp` on **all host interfaces** (`*`, verified live), so a phone on the same LAN can
+- **Any RFC-3261 softphone works (mobile/desktop)**: MVNO publishes `5060/udp` and RTP
+  `10000-20000/udp` on **all host interfaces** (`*`, verified live), so a phone on the same LAN can
   REGISTER directly with `username=<MSISDN>`, `password=testpass`, realm `localhost`, server
-  `<host-ip>:5066`, codec **PCMU only**. See `docs/LIVE_DEMO.md` S15 and
+  `<host-ip>:5060`, codec **PCMU only**. See `docs/LIVE_DEMO.md` S15 and
   `docs/partner/SipClient-INTEGRATION.md` (drop-in for the repo's README).
 
 ### sms-client (`src/main/resources/application.properties`) — ⚠ re-verified 2026-08-09 against `origin/main @ 1a388af`
@@ -231,17 +238,17 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 > client does not talk to `osmo-smsc` unless re-pointed. Plan against this shape.
 >
 > **Planned org flow (when the Filteration-System decider is wired —
-> `docs/filteration-system-handoff.md`)**: `sms-client` re-points to **`:2776`**
+> `docs/filteration-system-handoff.md`)**: `sms-client` re-points to **`:2076`**
 > (the decider's SMPP listener); the decider forwards clean SMS to MVNO
 > `osmo-smsc:2775`. MVNO stays in-band **transport**; `2775` remains the SMSC
-> seam but the client's target becomes `2776`.
+> seam but the client's target becomes `2076`.
 >
 > **Legacy/classic shape** (pre-refactor `ddb3df8`, rollback/reference only):
 - `smpp.host=127.0.0.1`, `smpp.port=2775` — ✅ still matches MVNO's `osmo-smsc` publish
   (`docker-compose.yml` `2775:2775`; `osmo-smsc.cfg` `esme smsclient` route), but this exact
   wiring is **rollback/reference only** — the refactored `origin/main @ 1a388af` client does not
   target `2775` today. When Filteration-System is wired (see handoff
-  `docs/filteration-system-handoff.md`), this port becomes **`2776`** (the org filter's SMPP
+  `docs/filteration-system-handoff.md`), this port becomes **`2076`** (the org filter's SMPP
   listener) — MVNO is bypassed until then.
 - `smpp.systemId=smsclient`, `smpp.password=password` → matches the `esme smsclient` route ✅
   (MVNO SMSC System-ID `MVNO_SMSC`; primary ESME `mvno-api-route`/`changeme`).
@@ -292,37 +299,62 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
 - **TRANSCRIPT events are post-call analytics only**: verdicts never retro-block an in-flight call;
     they increment `mvno_vosk_blocked_total` and appear in the mvno-api log.
 
-### Filteration-System (SMPP in-band filter — the org's decider) — verified via source audit, NOT cloned locally
-> The intended live decider per the org's separation of concerns. It is **SMPP-based, not REST**:
-> it sits **in-band between the ESME and the MSC**, so SMS traffic must be re-routed through it
+### Filteration-System (SMPP in-band filter + voice decider — the org's decider) — verified via source audit 2026-08-14
+> The intended live decider per the org's separation of concerns. It is **SMPP-based, not REST**
+> for SMS, and now also exposes a **voice adjudication REST endpoint** (see below). It sits
+> **in-band between the ESME and the MSC**, so SMS traffic must be re-routed through it
 > (see `docs/filteration-system-handoff.md` for the full teammate-facing contract).
-- **Topology (from source):** `ESME → SMPP :2776 → Filteration-System [decides] → SMPP → MSC :2775 → MT`.
-  - `SmppServerManager`: SMPP server listener on **`2776`** (binds as `SpamFilter`), attaches
+- **Topology (from source):** `ESME → SMPP :2076 → Filteration-System [decides] → SMPP → MSC :2775 → MT`.
+  - `SmppServerManager`: SMPP server listener on **`2076`** (binds as `SpamFilter`), attaches
     `SpamFilterMessageReceiver` per session.
   - `SpamFilterMessageReceiver`: on each `SUBMIT_SM`/`DELIVER_SM` calls
     `filterService.isSpam(sender, receiver, body)`; spam → reject (`STAT_ESME_RSUBMITFAIL`,
     never forwarded); clean → `OsmoMscClient` forwards to the MSC.
   - `SpamFilterService.isSpam`: **whitelist → blocklist → AI LLM** (HTTP to agentrouter.org);
     an AI "spam" hit writes a new `Blocklist` row (self-learning).
+- **Voice adjudication hook (NEW — verified 2026-08-14):** `VoiceFilterController` exposes
+  `POST /api/v1/voice/filter` `{callerId, receiverId, transcript}` →
+  `{malicious, DROP_CALL | ALLOW_CALL}`. This **matches MVNO's `FILTERATION_VOICE_URL`
+  wiring** in `docker-compose.yml` (`telecom-api` posts post-call transcripts there).
+  Earlier "no call (non-SMPP) adjudication hook today" is **stale** — the hook exists now.
+- **Real repo vs. compose mock:** MVNO's compose `filteration-system` service is a
+  **deterministic Python mock** (`python:3.11-alpine` inline `http.server` on `8000`)
+  — the real Spring Boot repo runs `server.port=8081` with SMPP on `2076`. The real
+  repo is **not deployed in the MVNO stack**; only the mock is. To wire the real repo:
+  re-point `FILTERATION_VOICE_URL` to the real service (or remap its port to the compose
+  expectation).
 - **Wiring notes for MVNO co-deployment:**
   - `OsmoMscClient` targets `localhost:2775` — i.e. Filteration-System must run in a network
     where `localhost:2775` reaches MVNO's `osmo-smsc` (same container network / same host).
   - **Port collision**: `2775` is MVNO's published SMPP port — Filteration-System must NOT also
     publish `2775` on the same host (use container networking instead of host publish).
-  - `sms-client` re-points to `:2776` to enter the filter (deferred per org decision — MVNO demo
+  - `sms-client` re-points to `:2076` to enter the filter (deferred per org decision — MVNO demo
     stays standalone until the wiring phase).
-- **Call path gap**: Filteration-System has **no call (non-SMPP) adjudication hook** today — the
-  SipClient→MVNO→decider flow needs a call endpoint (recommendation in the handoff doc). Until
-  then, call verdicts stay with MVNO's `telecom-api` → `ai-filter` proxy (fail-open SLA).
+- **Call path gap**: the voice hook exists, but the end-to-end SipClient→MVNO→decider call flow
+  is not wired in the standalone demo — call verdicts stay with MVNO's `telecom-api` →
+  `ai-filter` proxy (fail-open SLA) until the real Filteration-System is co-deployed.
+
+### admin-client (Neon Postgres UI — NOT an MVNO REST client)
+> **New section (verified 2026-08-14).** The admin-client repo runs `server.port=8082`
+> and is a **DB UI over the shared Neon Postgres schema** (`db.url` env; tables
+> `messages`, `calls`, `subscribers`, `logs`, `blocklist`, `whitelisted_senders`),
+> with role-gated login (`ROLE_ADMIN` / `ROLE_ESCALATION`).
+- **Integration surface:** it does **not** talk to MVNO REST at all — it reads/writes
+  the **same Neon Postgres** MVNO writes to via `NEON_DB_URL` (rows only, schema shared).
+  Schema coordination (not DDL) is the only seam.
+- **Contract implication:** nothing to wire in MVNO compose; verify the shared table
+  names/columns match the Neon schema MVNO's `NEON_DB_URL` targets.
 
 ---
 
-## 6. Optional `MVNO_PUBLISH_5060` (default-off, env-gated)
+## 6. (superceded) `MVNO_PUBLISH_5060` / `docker-compose.5060.yml`
 
-- A `SipClient` instance that hardcodes `5060` can be accommodated **only on hosts where UDP 5060
-  is free** by publishing an extra `5060:5060`. This is **default-off** and **blocked on this host**
-  (Asterisk owns `0.0.0.0:5060`). Enable via compose env when the host is clean.
-- `scripts/preflight.sh` checks `ss -lun | grep :5060` and warns loudly if occupied.
+- Kamailio is now published directly on the **canonical host port `5060`** (`5060:5060/udp`),
+  so the earlier opt-in `5060` extra-publish override (`docker-compose.5060.yml`) is **removed**.
+  There is no longer any need to publish 5060 additionally — it is the default.
+- On a host where another SIP daemon (e.g. a local Asterisk) holds `0.0.0.0:5060`, that listener
+  must be stopped for Kamailio to bind. `scripts/preflight.sh` checks `ss -lun | grep :5060`
+  and warns loudly if 5060 is occupied.
 
 ---
 
@@ -332,7 +364,7 @@ MVNO keeps these seams stable across changes so external clients keep working wi
 - `POST /api/v1/intercept/sms`, `POST|GET /api/v1/intercept/call` request/response schemas.
 - `POST /api/v1/classify` with the three event types (SMS, VOICE_CALL, TRANSCRIPT) + `{allow, reason}`.
 - SMPP `2775` + the `esme smsclient`/`esme mvno-api-route` routes.
-- SIP `5066` host port + digest `subscriber` table credentials (`testpass`).
+- SIP `5060` host port + digest `subscriber` table credentials (`testpass`).
 - `POST /api/v1/transcriptions` inbound schema (transcript + biometrics + DTMF).
 
 Any breaking change to these is a **coordinated, versioned contract change** communicated to the consuming repositories.
@@ -344,11 +376,11 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 ### Filteration-System (org decider — SMPP in-band filter)
 | Artifact | Why |
 |---|---|
-| `docs/filteration-system-handoff.md` | **the handoff contract**: SMPP `:2776` bind, `isSpam(sender, receiver, body)` signature, RSUBMITFAIL semantics, whitelist/blocklist/AI-LLM order, self-learning blocklist, `OsmoMscClient` → `localhost:2775` wiring + port-collision note, sms-client `:2775→:2776` re-point, call-adjudication hook request |
+| `docs/filteration-system-handoff.md` | **the handoff contract**: SMPP `:2076` bind, `isSpam(sender, receiver, body)` signature, RSUBMITFAIL semantics, whitelist/blocklist/AI-LLM order, self-learning blocklist, `OsmoMscClient` → `localhost:2775` wiring + port-collision note, sms-client `:2775→:2076` re-point, call-adjudication hook request |
 | `docs/INTEGRATION_CONTRACT.md` Section 5 (Filteration-System) | verified topology summary |
 | `configs/osmocom/osmo-smsc.cfg` | the `esme smsclient`/`esme mvno-api-route` routes the filter's MSC client must authenticate to |
 
-**Prove your integration with**: re-point `sms-client` `smpp.port` to `2776`, run
+**Prove your integration with**: re-point `sms-client` `smpp.port` to `2076`, run
 `./scripts/testing/sms_matrix.sh` (all 5 cells must stay green) and
 `./scripts/testing/live_demo.sh` check 10/10b (SUBMIT_SM path).
 
@@ -377,7 +409,7 @@ Any breaking change to these is a **coordinated, versioned contract change** com
 ### sms-client (SMPP ESME)
 | Artifact | Why |
 |---|---|
-| `docs/INTEGRATION_CONTRACT.md` Section 1, Section 5 (sms-client) | SMPP `2775` today (→ `2776` when Filteration-System is wired), `MVNO_SMSC`, ESME accounts, dead `ai.classify.url` + `sms.blockSpam=false` caveats, intercept REST |
+| `docs/INTEGRATION_CONTRACT.md` Section 1, Section 5 (sms-client) | SMPP `2775` today (→ `2076` when Filteration-System is wired), `MVNO_SMSC`, ESME accounts, dead `ai.classify.url` + `sms.blockSpam=false` caveats, intercept REST |
 | `configs/osmocom/osmo-smsc.cfg` | the `esme smsclient` / `esme mvno-api-route` routes |
 | `docs/TESTING_REFERENCE.md` SMS flows | 2G/5G + IP-SM-GW delivery verification; raw-shell variants in `docs/LIVE_DEMO.md` S6–S8 |
 | `scripts/testing/sms_matrix.sh` | 5-cell SMS matrix (2G→2G, 2G→5G, 5G→2G, 5G→5G, AI-block) |

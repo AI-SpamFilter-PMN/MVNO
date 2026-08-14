@@ -51,7 +51,7 @@ declare -A SAVE_IMAGES=(
     ["mvno-open5gs-2.8.0"]="mvno-open5gs:2.8.0"
     ["mvno-open5gs-webui-2.8.0"]="mvno-open5gs-webui:2.8.0"
     ["mvno-ueransim-3.2.6"]="mvno-ueransim:3.2.6"
-    ["mvno-baresip-1.0.0"]="mvno-baresip:1.0.0"
+    ["mvno-baresip-1.1.0"]="mvno-baresip:1.1.0"
 )
 
 # Resolve a short image ref to a local store entry, trying the prefixes podman

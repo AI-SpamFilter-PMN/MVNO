@@ -193,7 +193,7 @@ MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "5"))
 def fetch_pending_2g_to_5g(con):
     cur = con.execute(
         """
-        SELECT id, src_addr, dest_addr, text, user_data
+        SELECT id, src_addr, dest_addr, text, user_data, data_coding_scheme
           FROM SMS
          WHERE sent IS NULL
            AND deliver_attempts < ?
@@ -240,20 +240,101 @@ _GSM7_EXT = {
 }
 
 
-def gsm7_decode(packed):
-    """Unpack a GSM 7-bit encoded octet string into Unicode text."""
+# Reverse (char -> septet) maps, built lazily so module import stays free of
+# side effects.
+def _char_to_septet():
+    return {c: i for i, c in enumerate(_GSM7_ALPHABET)}
+
+
+def _ext_to_septet():
+    return {c: i for i, c in _GSM7_EXT.items()}
+
+
+def gsm7_encode(text):
+    """Encode Unicode text into a GSM 03.38 7-bit packed octet string.
+
+    Each character is mapped to its default-alphabet septet; extended-table
+    characters (``[ ] { } \\ | ~ ^ €``) are encoded as the 0x1B escape
+    followed by the extension-table septet. Characters outside GSM 03.38 are
+    replaced with ``?``. The septets are packed LSB-first with no gap,
+    zero-padded to the final octet — the exact inverse of :func:`gsm7_decode`.
+    """
+    char_to_septet = _char_to_septet()
+    ext_to_septet = _ext_to_septet()
     septets = []
+    for ch in text:
+        if ch in char_to_septet:
+            septets.append(char_to_septet[ch])
+        elif ch in ext_to_septet:
+            septets.append(0x1B)
+            septets.append(ext_to_septet[ch])
+        else:
+            septets.append(char_to_septet["?"])
+    out = bytearray()
     val = 0
     bits = 0
-    for octet in packed:
-        val |= octet << bits
-        bits += 8
-        if bits >= 7:
-            septets.append(val & 0x7F)
-            val >>= 7
-            bits -= 7
-    if bits >= 7:
-        septets.append(val & 0x7F)
+    for s in septets:
+        val |= s << bits
+        bits += 7
+        while bits >= 8:
+            out.append(val & 0xFF)
+            val >>= 8
+            bits -= 8
+    if bits > 0:
+        out.append(val & 0xFF)  # zero-pad the final partial octet
+    return bytes(out)
+
+
+def gsm7_decode(packed, n_septets=None):
+    """Unpack a GSM 7-bit encoded octet string into Unicode text.
+
+    GSM 03.38 7-bit LSB-first packing: consecutive septets are packed into
+    octets with no gap, so a septet may span two octets. We extract septets
+    from the octet stream in 7-bit steps (bit-offset method).
+
+    Two defects in the ORIGINAL implementation are fixed here (both regression
+    -tested in scripts/test_ip_sm_gw.py):
+
+    1. Truncation: the old ``if bits >= 7`` flush after a *single* emit per
+       octet dropped the trailing septet whenever the accumulator climbed past
+       7 bits, corrupting every message longer than ~15 chars ("you have won a
+       prize" lost its final "e"; a 160-char message lost its last char).
+    2. Spurious trailing septet: without the true septet count (UDL) the last
+       octet's zero-padding is indistinguishable from a real septet, and a
+       naive decode emitted a bogus trailing ``@`` for messages whose length
+       was ≡ 7 (mod 8).
+
+    The zero-padding in the final partial octet is only decodable from a real
+    trailing ``@`` (septet 0x00) when the true septet count is known, so the
+    buffer alone cannot disambiguate them. Callers that know the exact septet
+    count — e.g. from an SMPP SM_length / GSM 03.38 UDL — MUST pass
+    ``n_septets`` to decode exactly that many septets and drop the padding
+    (see gsm7_decode(bytes, n_septets) at the SMPP submit path). Without it we
+    emit every fully-contained septet and never guess, preferring to preserve
+    content over a silent drop.
+    """
+    septets = []
+    total_septets = (8 * len(packed) + 6) // 7  # ceil(8m/7) = max septets held
+    bit = 0
+    for _ in range(total_septets):
+        if bit + 7 > 8 * len(packed):
+            break
+        byte_i, shift = divmod(bit, 8)
+        take = 8 - shift
+        if take >= 7:
+            septet = (packed[byte_i] >> shift) & 0x7F
+        else:
+            lo = (packed[byte_i] >> shift) & ((1 << take) - 1)
+            hi = packed[byte_i + 1] & ((1 << (7 - take)) - 1)
+            septet = lo | (hi << take)
+        septets.append(septet)
+        bit += 7
+    # Exact septet count supplied (e.g. from an SMPP SM_length / UDL): honour it
+    # (unambiguous — no padding heuristics). Callers without a known count get
+    # every fully-contained septet; a trailing zero-padding septet can only be
+    # disambiguated from a literal final '@' via the UDL, so we never guess.
+    if n_septets is not None:
+        septets = septets[:n_septets]
     out = []
     i = 0
     while i < len(septets):
@@ -271,6 +352,28 @@ def gsm7_decode(packed):
 # -----------------------------------------------------------------------------
 # SMPP 3.4 BIND_TRANSCEIVER + SUBMIT_SM helpers (no external libs)
 # -----------------------------------------------------------------------------
+def _recv_exact(sock, n):
+    """Read exactly ``n`` bytes from a blocking stream socket.
+
+    ``sock.recv`` on a TCP socket may return fewer bytes than requested (the
+    stream can be fragmented arbitrarily). The old single ``s.recv(1024)``
+    call let a partial read (header split across two IP segments) fall straight
+    into ``struct.unpack(">II", resp[4:12])`` and raise a ``struct.error`` —
+    a live SMPP framing crash. Loop until the full 16-byte SMPP PDU header
+    (command_length/command_id/command_status/sequence_number) is assembled;
+    the status checks below read only ``resp[4:12]`` (command_id + status), so
+    16 bytes of header is sufficient. Regression-tested in
+    scripts/test_ip_sm_gw.py::SmppSubmitSmTest.test_fragmented_recv_reassembles.
+    """
+    buf = bytearray()
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            break  # peer closed
+        buf += chunk
+    return bytes(buf)
+
+
 def smpp_submit_sm(host, port, sender, recipient, message):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(5)
@@ -286,7 +389,7 @@ def smpp_submit_sm(host, port, sender, recipient, message):
     )
     bind_hdr = struct.pack(">IIII", 16 + len(bind_body), 0x00000009, 0, 1)
     s.sendall(bind_hdr + bind_body)
-    resp = s.recv(1024)
+    resp = _recv_exact(s, 16)
     cmd_id, status = struct.unpack(">II", resp[4:12])
     if status != 0 or cmd_id != 0x80000009:
         s.close()
@@ -295,7 +398,12 @@ def smpp_submit_sm(host, port, sender, recipient, message):
 
     sender_b = sender.encode() + b"\x00"
     recipient_b = recipient.encode() + b"\x00"
-    msg_b = message.encode("utf-8")
+    # SMS default alphabet (data_coding=0x00) requires the GSM-7 packed septets
+    # in short_message, NOT raw UTF-8. The previous `message.encode("utf-8")`
+    # sent UTF-8 bytes labelled GSM-7, which OsmoSMSC mis-decodes into garbage
+    # on the 2G MS. gsm7_encode() produces the spec-correct packed payload and
+    # sm_length becomes the packed octet count (ceil(7*len/8)).
+    msg_b = gsm7_encode(message)
     submit_body = (
         b"\x00"
         + b"\x01\x01"
@@ -311,7 +419,7 @@ def smpp_submit_sm(host, port, sender, recipient, message):
     )
     submit_hdr = struct.pack(">IIII", 16 + len(submit_body), 0x00000004, 0, 2)
     s.sendall(submit_hdr + submit_body)
-    resp = s.recv(1024)
+    resp = _recv_exact(s, 16)
     s.close()
     resp_cmd, resp_status = struct.unpack(">II", resp[4:12])
     if resp_status != 0:
@@ -329,6 +437,8 @@ def digest_response(username, realm, password, method, uri, nonce):
 
 
 def parse_nonce(resp_text, header):
+    if not isinstance(resp_text, str) or not resp_text.strip():
+        return None
     for line in resp_text.split("\r\n"):
         if line.lower().startswith(header.lower() + ":"):
             m = re.search(r'nonce="([^"]+)"', line)
@@ -359,6 +469,8 @@ def reply_ok(req_text, sock, host, port):
 
 
 def parse_sip_message(req_text):
+    if not isinstance(req_text, str) or not req_text.strip():
+        return None, None, ""
     from_m = re.search(r'From:\s*<sip:(\d+)@', req_text)
     to_m = re.search(r'To:\s*<sip:(\d+)@', req_text)
     body_m = re.search(r"\r\n\r\n(.*)", req_text, re.S)
@@ -615,7 +727,17 @@ class Gateway:
                 dest = row["dest_addr"]
                 body = row["text"] or ""
                 if not body and row["user_data"]:
-                    body = gsm7_decode(bytes(row["user_data"]))
+                    # user_data is GSM 03.38 7-bit packed septets (default
+                    # alphabet, data_coding_scheme 0x00). The SMSC row carries
+                    # no explicit UDL column, so the true septet count is
+                    # derived from the packed octet length: ceil(7*S/8) fields
+                    # S into O octets, hence S == (8*O - 1)//7 where the final
+                    # partial octet's zero-padding is dropped. Without
+                    # n_septets the ≡7 (mod 8) boundary case emitted a
+                    # spurious trailing '@' (zero-padding read as a real
+                    # septet) — fixed by threading the exact UDL.
+                    udl = (8 * len(row["user_data"]) - 1) // 7
+                    body = gsm7_decode(bytes(row["user_data"]), n_septets=udl)
                 log("POLL", f"row_id={row['id']} {src}->{dest} body='{body[:80]}'")
                 incr("mvno_bridge_sms_attempts_total")
                 if self.sip.send_message(src, dest, body):

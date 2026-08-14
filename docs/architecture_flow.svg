@@ -171,7 +171,7 @@
     <!-- IP-SM-GW Bridge -->
     <g transform="translate(15, 525)">
       <rect width="220" height="75" class="box" />
-      <text x="12" y="22" class="text-title">IP-SM-GW Bridge (Go)</text>
+      <text x="12" y="22" class="text-title">IP-SM-GW Bridge (Python)</text>
       <text x="12" y="42" class="text-body">• Polls smsc.db → SIP MESSAGE</text>
       <text x="12" y="60" class="text-body">• :5090 SMPP backhaul → SMSC</text>
     </g>
@@ -179,7 +179,7 @@
 
   <!-- ==================== 4. AI SPAM PLATFORM (X: 1040, W: 240) ==================== -->
   <g transform="translate(1040, 95)">
-    <rect width="240" height="260" class="ai-box" />
+    <rect width="240" height="400" class="ai-box" />
     <text x="15" y="30" class="text-header">4. AI Spam Platform</text>
 
     <g transform="translate(15, 55)">
@@ -191,7 +191,16 @@
       <text x="12" y="106" class="text-body">• E2E-BLOCK marker → allow:false</text>
       <text x="12" y="126" class="text-body">• POST /api/v1/classify</text>
       <text x="12" y="146" class="text-body">• Carrier SLA Response &lt; 5s</text>
-      <text x="12" y="166" class="text-link">HTTP Port 8000</text>
+      <text x="12" y="166" class="text-link">HTTP Port 8000 (host mapped 8008)</text>
+    </g>
+
+    <g transform="translate(15, 255)">
+      <rect width="210" height="130" class="box" stroke="#ffb74d" />
+      <text x="12" y="24" class="text-title" fill="#ffb74d">Filteration-System Voice Decider</text>
+      <text x="12" y="46" class="text-body">• POST /api/v1/voice/filter</text>
+      <text x="12" y="66" class="text-body">• {callerId,receiverId,transcript}</text>
+      <text x="12" y="86" class="text-body">• → {isMalicious,action}</text>
+      <text x="12" y="106" class="text-body">• DROP_CALL / ALLOW_CALL</text>
     </g>
   </g>
 
@@ -258,6 +267,10 @@
   <!-- 7. Outbound AI Classification: telecom-api -> AI Spam Platform -->
   <path d="M 945,210 L 1040,210" class="ai-arrow" marker-end="url(#arrow-head-orange)" />
   <text x="955" y="200" class="text-label" fill="#ff5722">7. AI Classify</text>
+
+  <!-- 7a. Voice decider: telecom-api -> Filteration-System (/api/v1/voice/filter) -->
+  <path d="M 945,300 L 1040,350" class="ai-arrow" marker-end="url(#arrow-head-orange)" />
+  <text x="950" y="330" class="text-label" fill="#ffb74d">7a. Voice Filter (DROP/ALLOW)</text>
 
   <!-- 8. Observability Scraping: vmagent -> telecom-api -->
   <path d="M 1040,510 L 980,510 L 980,240 L 945,240" class="obs-arrow" marker-end="url(#arrow-head-blue)" />

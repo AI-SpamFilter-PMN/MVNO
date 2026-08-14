@@ -2,7 +2,7 @@
 # ==============================================================================
 # check-bootstrap.sh — post-up functional health gate (the cold-start oracle)
 # ==============================================================================
-# "32 containers Up" is not functional health. After a cold start this asserts
+# "36 services Up" is not functional health. After a cold start this asserts
 # the things that make the stack WORK, polling each until ready (bounded), so
 # the FIRST red marker points at the EXACT missing step:
 #   1. Kamailio subscriber table + seeded rows (sqlite)     [make init-db]

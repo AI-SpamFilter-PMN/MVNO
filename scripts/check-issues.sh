@@ -214,6 +214,12 @@ fi
 # ---------------------------------------------------------------------------
 # 3. Title-token dedup (>=2 shared significant tokens = candidate duplicate).
 # ---------------------------------------------------------------------------
+# A NEW issue that shares >=2 tokens with any anchor is a candidate re-file and
+# FAILs — UNLESS the new block carries an explicit, auditable
+#   * Distinct-from: Issue X.Y — <one-line RCA difference>
+# line naming that anchor. The annotation is a conscious disambiguation (a
+# planted re-file would have to falsely claim distinctness in review), so
+# same-domain-but-different-RCA issues can pass while silent re-files cannot.
 STOPWORDS="the a an of in on for to with vs after before during from into via over under and or not no up down out its it this that new fixed fix docs setup issue issues sh py md yaml port range"
 
 sig_tokens() { # $1 = title string → significant lowercase tokens, one per line
@@ -230,6 +236,12 @@ for ((i=0; i<N; i++)); do
   sig_tokens "${TITLES[$i]}" | sort -u > "$TMPD/t$i"
 done
 
+disambiguated() { # $1=issue idx $2=anchor ID (MAJ.MIN) → 0 if * Distinct-from: names it
+  local bf="${BLOCKFILES[$1]}"
+  [ -f "$bf" ] || return 1
+  grep -qE "^\* (\*\*)?Distinct-from(\*\*)?:.*${2//./\\.}" "$bf"
+}
+
 CLUSTER_NOTE=""
 for ((i=0; i<N; i++)); do
   for ((j=i+1; j<N; j++)); do
@@ -239,7 +251,15 @@ for ((i=0; i<N; i++)); do
     gt_frontier "${MAJORS[$i]}" "${MINS[$i]}" && ia_new=1
     gt_frontier "${MAJORS[$j]}" "${MINS[$j]}" && ib_new=1
     if [ "$ia_new" -eq 1 ] || [ "$ib_new" -eq 1 ]; then
-      fail "candidate duplicate: Issue ${IDS[$i]} and ${IDS[$j]} share $shared significant title tokens — extend the existing issue instead of re-filing"
+      # Audited escape: the NEW side must explicitly name the anchor it
+      # overlaps with; otherwise it is a candidate re-file (FAIL).
+      if [ "$ia_new" -eq 1 ] && disambiguated "$i" "${IDS[$j]}"; then
+        CLUSTER_NOTE+=" ${IDS[$i]}↔${IDS[$j]}($shared,distinct-from)"
+      elif [ "$ib_new" -eq 1 ] && disambiguated "$j" "${IDS[$i]}"; then
+        CLUSTER_NOTE+=" ${IDS[$i]}↔${IDS[$j]}($shared,distinct-from)"
+      else
+        fail "candidate duplicate: Issue ${IDS[$i]} and ${IDS[$j]} share $shared significant title tokens — extend the existing issue instead of re-filing (or add an audited * Distinct-from: Issue ${IDS[$j]}/${IDS[$i]} line if the RCA is genuinely different)"
+      fi
     else
       CLUSTER_NOTE+=" ${IDS[$i]}↔${IDS[$j]}($shared)"
     fi

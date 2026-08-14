@@ -48,7 +48,7 @@ groups:
           severity: warning
         annotations:
           summary: "Media ports almost exhausted"
-          description: "Only {{ $values.A }} RTP media ports free (port-min=30000, ~25 sessions max)"
+          description: "Only {{ $values.A }} RTP media ports free (port-min=10000, port-max=20000, UFW-allowed ~10000 sessions max)"
       - uid: mvno-eir-simswap-blocks
         title: MVNO EIR SIM-Swap Blocks
         condition: A

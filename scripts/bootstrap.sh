@@ -287,9 +287,10 @@ for build_target in \
     try_log_quiet "$label" "$DOCKER_CMD build -t '${tag}:latest' -f '$dockerfile' '$ctx'"
 done
 
-# Version-tag the baresip rig image (rig is not a compose service, so no
-# compose build: stanza produces its pinned tag — do it here for the bundle).
-try_log_quiet "tag:mvno-baresip" "$DOCKER_CMD tag 'mvno-baresip:latest' 'mvno-baresip:1.0.0'"
+# Version-tag the baresip rig image to the tag the compose services pin
+# (docker-compose.yml baresip-rx/baresip-tx use mvno-baresip:1.1.0) so a
+# bootstrap-built image satisfies the exact-tag gate.
+try_log_quiet "tag:mvno-baresip" "$DOCKER_CMD tag 'mvno-baresip:latest' 'mvno-baresip:1.1.0'"
 
 # ─── Step 7: Save all images as tarballs ────────────────
 # Tag compose-built images with stable names
@@ -323,7 +324,7 @@ declare -A SAVE_IMAGES=(
     ["mvno-open5gs-2.8.0"]="mvno-open5gs:2.8.0"
     ["mvno-open5gs-webui-2.8.0"]="mvno-open5gs-webui:2.8.0"
     ["mvno-ueransim-3.2.6"]="mvno-ueransim:3.2.6"
-    ["mvno-baresip-1.0.0"]="mvno-baresip:1.0.0"
+    ["mvno-baresip-1.1.0"]="mvno-baresip:1.1.0"
 )
 
 for name in "${!SAVE_IMAGES[@]}"; do

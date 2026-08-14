@@ -76,23 +76,27 @@ if [ "$INSTALL" -eq 1 ]; then
   else
     ok "container runtime: $RT"
   fi
-  for tool in sqlite3 curl espeak-ng ffmpeg baresip tshark nc; do
+  for tool in sqlite3 curl espeak-ng ffmpeg jq socat tshark nc lksctp-tools; do
     if command -v "$tool" >/dev/null 2>&1; then ok "$tool present"
     else
       # tool name != package name for some tools; map per distro
       case "$tool:$(command -v apt-get >/dev/null 2>&1 && echo apt || { command -v dnf >/dev/null 2>&1 && echo dnf || echo pacman; })" in
-        baresip:*)        pkg=baresip ;;
         tshark:apt*)      pkg=tshark ;;
         tshark:*)         pkg=wireshark-cli ;;
         nc:apt*)          pkg=netcat-openbsd ;;
         nc:dnf*)          pkg=nmap-ncat ;;
         nc:*)             pkg=openbsd-netcat ;;
+        lksctp-tools:*)   pkg=lksctp-tools ;;
         *)                pkg=$tool ;;
       esac
       echo "» installing $tool ($pkg)"
       if command -v apt-get >/dev/null 2>&1; then sudo apt-get install -y "$pkg"
       elif command -v dnf >/dev/null 2>&1; then sudo dnf install -y "$pkg"
       elif command -v pacman >/dev/null 2>&1; then sudo pacman -Sy --noconfirm "$pkg"; fi
+      ret=$?
+      if [ $ret -ne 0 ] && [ "$tool" = "lksctp-tools" ]; then
+        warn "lksctp-tools install failed — SCTP userspace tooling missing (5G NGAP needs it). Install manually or ensure /proc/net/sctp."
+      fi
     fi
   done
 else
@@ -102,7 +106,8 @@ fi
 # ---- 3. Kernel prerequisites --------------------------------------------------
 step "Kernel prerequisites"
 if [ -z "$RT" ]; then RT="podman"; fi   # compose refs below use RT
-if sudo -n modprobe sctp >/dev/null 2>&1 || modprobe sctp >/dev/null 2>&1; then ok "sctp module available"; else warn "sctp missing (5G NGAP gNB<->AMF won't connect)"; fi
+# Interactive sudo (no -n) so a fresh teammate with password-sudo can load SCTP.
+if sudo modprobe sctp >/dev/null 2>&1 || modprobe sctp >/dev/null 2>&1; then ok "sctp module available"; else warn "sctp missing (5G NGAP gNB<->AMF won't connect)"; fi
 [ -c /dev/net/tun ] && ok "/dev/net/tun present" || warn "/dev/net/tun missing (5G user plane)"
 [ -d /proc/net/sctp ] && ok "/proc/net/sctp up" || warn "/proc/net/sctp absent (verify sctp loaded)"
 
@@ -124,7 +129,7 @@ step "Initialise subscriber databases"
 if make init-db >/dev/null 2>&1; then ok "init-db"; else fail "make init-db"; fi
 
 # ---- 6. Launch ---------------------------------------------------------------------------
-step "Launching 31-service stack"
+step "Launching 36-service stack"
 if [ "$BUILD" -eq 1 ]; then
   "$SCRIPT_DIR/up.sh" --build && ok "up.sh --build" || fail "up.sh --build"
 else
@@ -161,6 +166,20 @@ step "Health snapshot"
 curl -s -m 3 http://localhost:8080/actuator/health | head -c 200; echo ""
 echo "compose ps lines: $($COMPOSE_CMD ps 2>/dev/null | wc -l)"
 
+echo ""
+echo "=== Connect a softphone/UA ==="
+# Portable LAN-IP detection: try `hostname -I` (Ubuntu/Fedora), fall back to
+# `ip -4 addr` (Arch), else a placeholder. Works on a fresh teammate box too.
+HOST_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+[ -z "$HOST_IP" ] && HOST_IP="$(ip -4 addr show scope global 2>/dev/null | grep -oP 'inet \K[0-9.]+' | head -1)"
+REG_USER="${MVNO_MSISDN_FUNDED:-15551234567}"
+echo "  SIP server :  ${HOST_IP:-<this-host-LAN-IP>}:5060  (UDP)"
+echo "  Username    :  ${REG_USER}   (funded subscriber)"
+echo "  Password    :  testpass"
+echo "  Realm       :  localhost  (or the host LAN IP)"
+echo "  Call a rig  :  15559998888 (baresip-rx auto-answer) / 15553332211"
+echo "  Linphone    :  username=${REG_USER} pass=testpass proxy=sip:${HOST_IP:-<IP>}:5060 transport=UDP"
+echo "  SipClient   :  src/main/resources/sip.properties -> sip.server.host=${HOST_IP:-<IP>}, sip.server.port=5060"
 echo ""
 echo "=== DEPLOY SUMMARY ==="
 for s in "${SUCCESSES[@]:-}"; do ok "$s"; done

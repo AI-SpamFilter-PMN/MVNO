@@ -126,7 +126,7 @@ main() {
     # -u: unbuffered — timeout kills the UAS while it is still listening, and
     # buffered stdout would otherwise be lost before the SIGTERM lands.
     REG_OUT="$(timeout 20 python3 -u scripts/testing/sip_traffic_sim.py \
-        --uas "${THROWAWAY}" --host 127.0.0.1 --port 5066 --listen-port 5071 2>&1 || true)"
+        --uas "${THROWAWAY}" --host 127.0.0.1 --port 5060 --listen-port 5071 2>&1 || true)"
     # Risk-3 fix (format-drift fragility): accept the looser
     # "REGISTER…200 OK" shape instead of the exact full-string; scope it to
     # THIS throwaway so a stale 200 OK for another subscriber cannot pass.

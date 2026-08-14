@@ -1,0 +1,203 @@
+diff --git a/modules/aufile/aufile_src.c b/modules/aufile/aufile_src.c
+--- a/modules/aufile/aufile_src.c
++++ b/modules/aufile/aufile_src.c
+@@ -34,6 +34,8 @@
+ 	RE_ATOMIC bool run;
+ 	bool started;
+ 	thrd_t thread;
++	thrd_t fthr;                 /**< live stream file-reader thread */
++	bool live;                   /**< MVNO: true = growing/live WAV stream */
+ 	ausrc_read_h *rh;
+ 	ausrc_error_h *errh;
+ 	void *arg;
+@@ -47,6 +49,7 @@
+ 	if (st->started) {
+ 		re_atomic_rlx_set(&st->run, false);
+ 		thrd_join(st->thread, NULL);
++		thrd_join(st->fthr, NULL);
+ 	}
+ 
+ 	tmr_cancel(&st->tmr);
+@@ -84,7 +87,11 @@
+ 
+ 		ts += st->ptime;
+ 
+-		if (aubuf_cur_size(st->aubuf) == 0)
++		/* MVNO patch: do NOT break on an empty buffer while the source is
++		   still running — the live file-reader thread tops the buffer up
++		   asynchronously, so an empty buffer at startup (or during a live
++		   stream) is normal. Only stop when the source is torn down. */
++		if (aubuf_cur_size(st->aubuf) == 0 && !re_atomic_rlx(&st->run))
+ 			break;
+ 	}
+ 
+@@ -95,6 +102,88 @@
+ }
+ 
+ 
++static int read_file(struct ausrc_st *st);   /* MVNO patch: fwd decl for file_thread */
++
++/* Live-stream file reader thread (MVNO patch): keeps topping up the aubuf
++   from the growing WAV file. read_file() returns only on error or teardown,
++   so this loop is exited via the run flag. */
++static int file_thread(void *arg)
++{
++	struct ausrc_st *st = arg;
++
++	while (re_atomic_rlx(&st->run))
++		read_file(st);
++
++	return 0;
++}
++
++
++
++/* MVNO patch: detect a "live" (growing) WAV stream. The host live-mic feeder
++   writes a WAV header with an UNKNOWN data chunk size (0xFFFFFFFF) so that
++   aufile keeps reading the ever-growing file. A finite file (callee leg) has
++   a real data size and must stop at EOF. Returns true if the data chunk size
++   is 0xFFFFFFFF (live stream). */
++/* MVNO patch: read a little-endian uint32 from a WAV chunk header (portable —
++   WAV sizes are LE; do not assume host endianness). */
++static uint32_t aufile_read_le32(FILE *f)
++{
++	uint8_t b[4];
++
++	if (1 != fread(b, sizeof(b), 1, f))
++		return 0;
++
++	return (uint32_t)b[0] | ((uint32_t)b[1] << 8) |
++	       ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
++}
++
++/* MVNO patch: detect a "live" (growing) WAV stream. The host live-mic feeder
++   writes a WAV header with an UNKNOWN data chunk size (0xFFFFFFFF) so that
++   aufile keeps reading the ever-growing file. A finite file (callee leg) has
++   a real data size and must stop at EOF. Returns true if the data chunk size
++   is 0xFFFFFFFF (live stream). */
++static bool aufile_is_live(const char *dev)
++{
++	FILE *f;
++	uint8_t id[4];
++	uint32_t sz;
++	bool live = false;
++
++	f = fopen(dev, "rb");
++	if (!f)
++		return false;
++
++	/* skip RIFF header + WAVE + fmt chunk (fixed 12 + 8 + 16 bytes) */
++	if (fseek(f, 12, SEEK_SET))
++		goto out;
++	if (1 != fread(id, sizeof(id), 1, f))
++		goto out;
++	if (memcmp(id, "fmt ", 4))
++		goto out;
++	sz = aufile_read_le32(f);
++	/* skip fmt payload + any extra */
++	if (fseek(f, sz, SEEK_CUR))
++		goto out;
++
++	/* scan chunks for "data" */
++	for (;;) {
++		if (1 != fread(id, sizeof(id), 1, f))
++			goto out;
++		sz = aufile_read_le32(f);
++		if (0 == memcmp(id, "data", 4)) {
++			live = (sz == 0xFFFFFFFFu);
++			break;
++		}
++		if (fseek(f, sz, SEEK_CUR))
++			goto out;
++	}
++
++ out:
++	fclose(f);
++	return live;
++}
++
++
+ static void timeout(void *arg)
+ {
+ 	struct ausrc_st *st = arg;
+@@ -140,8 +229,23 @@
+ 			break;
+ 
+ 		if (mb->end == 0) {
+-			info("aufile: read end of file\n");
+-			break;
++			if (!re_atomic_rlx(&st->run))
++				break;
++			if (!st->live) {
++				/* finite file (callee leg): end of file, stop */
++				info("aufile: read end of file\n");
++				break;
++			}
++			/* LIVE STREAM (MVNO patch): the file may still be growing
++			   (host live-mic feeder appends PCM). Wait for more data;
++			   while waiting, feed ptime of silence at real-time rate
++			   so the pipeline never drains (a silent mic is silence).
++			   Exit only when the source is being torn down. */
++			memset(mb->buf, 0, st->sampc * sizeof(int16_t));
++			mb->end = st->sampc * sizeof(int16_t);
++			aubuf_append_auframe(st->aubuf, mb, &af);
++			sys_msleep(st->ptime);
++			continue;
+ 		}
+ 
+ 		/* convert from Little-Endian to Native-Endian */
+@@ -223,6 +327,28 @@
+ 		goto out;
+ 	}
+ 
++	st->live = aufile_is_live(dev);
++	info("aufile: %s mode (%s)\n", dev, st->live ? "LIVE" : "finite");
++
++	if (st->live) {
++		/* MVNO patch: drain pre-existing audio so the caller leg carries
++		   ONLY audio captured after call establishment (no ringing-period
++		   pre-roll, no stale audio). aufile_read advances af->nread; with
++		   datasize=0xFFFFFFFF it reads until fread returns 0 (momentary
++		   EOF). New appends after this point are read live by file_thread. */
++		uint8_t dbuf[4096];
++		size_t dn;
++
++		do {
++			dn = sizeof(dbuf);
++			err = aufile_read(st->aufile, dbuf, &dn);
++			if (err)
++				break;
++		} while (dn > 0);
++
++		info("aufile: drained pre-existing audio (live start)\n");
++	}
++
+ 	info("aufile: %s: %u Hz, %d channels, %s\n",
+ 	     dev, fprm.srate, fprm.channels, aufmt_name(fprm.fmt));
+ 
+@@ -245,10 +371,8 @@
+ 	if (err)
+ 		goto out;
+ 
+-	err = read_file(st);
+-	if (err)
+-		goto out;
+-
++	/* MVNO patch: the file is read by the live-stream file_thread (the old
++	   synchronous preload would block forever on a growing file). */
+ 	tmr_start(&st->tmr, st->ptime, timeout, st);
+ 
+ 	re_atomic_rlx_set(&st->run, true);
+@@ -257,6 +381,12 @@
+ 	if (err) {
+ 		st->started = false;
+ 		re_atomic_rlx_set(&st->run, false);
++		goto out;
++	}
++	err = thread_create_name(&st->fthr, "aufile_fread", file_thread, st);
++	if (err) {
++		st->started = false;
++		re_atomic_rlx_set(&st->run, false);
+ 		goto out;
+ 	}
+ 

@@ -5,22 +5,20 @@
 > this document is the contract its maintainers implement so the org decider can be
 > wired into the live flows. MVNO stays a standalone demo until then.
 >
-> **Status**: ⚠ **RE-VERIFY REQUIRED** — the source audit below is from
-> 2026-08-03 (then: 2 commits, skeletal: `SmppServerManager`,
-> `SpamFilterMessageReceiver`, `SpamFilterService`, `OsmoMscClient`, domain
-> entities `Message`/`Call`/`Subscriber`/`Blocklist`/`WhitelistedSender`/
-> `SenderPolicy`/`SenderStatus`). The repo is **private** and has advanced
-> since (updates 2026-08-08+); confirm the class names, the SMPP bind `:2776`,
-> and the `OsmoMscClient` → `:2775` wiring still hold before relying on §2.
+> **Status**: ⚠ **RE-VERIFY UPDATED 2026-08-14** — the source audit was refreshed
+> 2026-08-14 against the live repo: **SMPP bind confirmed `:2076`** (not 2776),
+> **voice hook `VoiceFilterController` EXISTS** (`POST /api/v1/voice/filter`),
+> real repo runs `server.port=8081`. Still to confirm when wiring: the
+> `OsmoMscClient` → `:2775` credentials and the AI-LLM error path (fail-open).
 
 ---
 
 ## 1. Role in the architecture (agreed)
 
 ```
-SMS : sms-client (ESME) ──SMPP 2776──▶ Filteration-System [DECIDES] ──SMPP 2775──▶ osmo-smsc ──▶ MT
+SMS : sms-client (ESME) ──SMPP 2076──▶ Filteration-System [DECIDES] ──SMPP 2775──▶ osmo-smsc ──▶ MT
 CALL: SipClient ──▶ MVNO (Kamailio/telecom-api: capture + Vosk ASR) ──sync HTTP──▶ Filteration-System [DECIDES]
-                                                                                      (hook to be added — §4)
+                                                                                      (voice hook EXISTS — §3)
 ```
 
 - **Filteration-System = the decider** (blocklist / sender policy / AI LLM scoring).
@@ -34,7 +32,7 @@ CALL: SipClient ──▶ MVNO (Kamailio/telecom-api: capture + Vosk ASR) ──
 
 | Item | Spec | Status in repo |
 |---|---|---|
-| SMPP listener | Bind **`:2776`**, system-id `SpamFilter`; accept `BIND_TRANSCEIVER` from `sms-client` (`smsclient`/`password`) | `SmppServerManager` ✅ exists |
+| SMPP listener | Bind **`:2076`**, system-id `SpamFilter`; accept `BIND_TRANSCEIVER` from `sms-client` (`smsclient`/`password`) | `SmppServerManager` ✅ exists |
 | Decision hook | `isSpam(sender, receiver, body)` → `boolean` | `SpamFilterMessageReceiver` ✅ exists |
 | Decision order | whitelist → blocklist → AI LLM (agentrouter) | `SpamFilterService` ✅ exists |
 | Self-learning | AI "spam" hit writes a `Blocklist` row | ✅ exists |
@@ -43,10 +41,16 @@ CALL: SipClient ──▶ MVNO (Kamailio/telecom-api: capture + Vosk ASR) ──
 | **Port collision** | Do NOT publish `2775` on the host — MVNO already publishes `2775:2775`. Use container networking (`mvno_net` bridge) instead | ⚠ ops note |
 | Fail-open | If the AI LLM call errors/timeouts, decision must be **allow** (carrier SLA), never a hard drop of legitimate traffic | ⚠ verify |
 
-**sms-client wiring (when the owner confirms readiness):** `smpp.port=2775` → `2776`.
+**sms-client wiring (when the owner confirms readiness):** `smpp.port=2775` → `2076`.
 Optionally enable client-side enforcement with `sms.blockSpam=true`.
 
-## 3. Call contract (NOT in repo — must be added)
+## 3. Call contract (voice hook EXISTS — verified 2026-08-14)
+
+> **Update 2026-08-14:** the real Filteration-System repo now has a **voice
+> adjudication hook** — `VoiceFilterController` exposes
+> `POST /api/v1/voice/filter` `{callerId, receiverId, transcript}` →
+> `{malicious, DROP_CALL | ALLOW_CALL}`, matching MVNO's `FILTERATION_VOICE_URL`
+> wiring in `docker-compose.yml`. The earlier "hook to be added" status is stale.
 
 MVNO's call path needs a synchronous adjudication point. `telecom-api`'s
 `AiFilterService` already proxies to `POST /api/v1/classify` with **three event
@@ -70,6 +74,12 @@ Also accept `SMS` (sender/recipient/content_text) and `TRANSCRIPT` (call_id +
 transcript) events; post-call transcript verdicts are telemetry (increment
 `mvno_vosk_blocked_total`), never retro-blocking.
 
+> **Real-repo port note (verified 2026-08-14):** the real Spring Boot repo runs
+> `server.port=8081` (SMPP on `2076`). MVNO's compose `filteration-system`
+> service is a **Python mock** on `8000` — the real repo is not deployed in the
+> stack. Wiring the real repo requires re-pointing `FILTERATION_VOICE_URL` to
+> the real service (or remapping its port to the compose expectation).
+
 **Shape mismatch warning**: `sms-client`'s `AiClassifierClient` expects
 `{"label": "spam|ham", "score": 0.x}`; MVNO expects `{"allow": bool, "reason": "str"}`.
 Pick **one** canonical shape (recommended: `{allow, reason}` for both, and adapt
@@ -87,7 +97,7 @@ model blocks these exact inputs, otherwise the gates break:
 
 ## 5. Acceptance criteria (definition of done for the wiring)
 
-1. `smpp.port=2776` in sms-client; `sms_matrix.sh` **5/5 cells green** (2G→2G, 2G→5G,
+1. `smpp.port=2076` in sms-client; `sms_matrix.sh` **5/5 cells green** (2G→2G, 2G→5G,
    5G→2G, 5G→5G, AI-block 403).
 2. `live_demo.sh` check 9b: scam speech → `allow:false` + `mvno_vosk_blocked_total`
    increments; check 9d: clean call → `allow:true`.

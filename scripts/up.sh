@@ -75,6 +75,16 @@ case "${1:-}" in
     ;;
 esac
 
+# ─── Validate compose file parses BEFORE touching the stack ──────────────────
+# Fail fast (no silent partial up) if docker-compose.yml is malformed or the
+# editor left an error. `config -q` returns non-zero on invalid YAML/merge.
+if ! $COMPOSE_CMD -f docker-compose.yml config -q >/dev/null 2>&1; then
+  echo "❌ docker-compose.yml failed validation. Run:" >&2
+  echo "   $COMPOSE_CMD -f docker-compose.yml config" >&2
+  echo "   and fix the reported error before bringing the stack up." >&2
+  exit 1
+fi
+
 # ─── Pre-flight: check if local custom images are pre-loaded ───────────────────
 MISSING=()
 for img in "${CUSTOM_IMAGES[@]}"; do

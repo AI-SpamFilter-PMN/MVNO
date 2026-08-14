@@ -11,21 +11,27 @@
 
 | Item | Value |
 |---|---|
-| SIP server | `<mvno-host-IP>:5066/udp` (maps to Kamailio `:5060/udp`) |
+| SIP server | `<mvno-host-IP>:5060/udp` (canonical Kamailio host port) |
 | Auth | Digest — **REGISTER and INVITE both challenged** (407 → retry with `Authorization: Digest`) |
 | Realm | `localhost` |
 | Credentials | `username = <MSISDN>` (e.g. `15553332211`), `password = testpass` |
 | Codec | **PCMU (G.711u, PT 0) ONLY** — the relay does not transcode; PCMA/OPUS fail media |
-| RTP relay | UDP `30000-30100` (RTPEngine) — open these + `5066/udp` in the firewall |
+| RTP relay | UDP `10000-20000` (RTPEngine) — open these + `5060/udp` in the firewall |
 | 403 semantics | Zero-balance / EIR-fraud / AI-blocked calls → `SIP 403 Forbidden` — treat as **terminal** (no retry loop) |
 
-> Your repo currently hardcodes `SERVER_PORT = 5060` / `LOCAL_PORT = 5070` —
-> make the server port **configurable** and point it at `5066` (or enable MVNO's
-> optional `MVNO_PUBLISH_5060` compose extra **only** on a host where `5060` is free).
+> **IMPORTANT (verified 2026-08-14):** SipClient does **NOT** load
+> `src/main/resources/sip.properties` — **no such file exists** in the repo.
+> `com.sipclient.sip.config.SipConfig` is **hardcoded constants**
+> (`LOCAL_IP=127.0.0.1`, `LOCAL_PORT=5070`, `SERVER_PORT=5060`, `TRANSPORT=udp`).
+> To point SipClient at a different MVNO host you must **edit `SipConfig.java`
+> and recompile** (Maven). Recommended: file a PR in the SipClient repo to add
+> properties loading (`sip.server.host` / `sip.server.port` via `@Value` or
+> `System.getProperty`) so future hosts are config-only — MVNO never edits
+> external repos, so this is a SipClient-side change.
 
 ## Minimal registration trace (any Unicast/SIPDebugger/client)
 
-1. `REGISTER sip:<server>:5066` with `Authorization: Digest username=<MSISDN>,
+1. `REGISTER sip:<server>:5060` with `Authorization: Digest username=<MSISDN>,
    realm=localhost` — expect `200 OK` when the number exists in the Kamailio
    subscriber table (seed via MVNO `scripts/add-subscriber.sh <MSISDN>`).
 2. `INVITE sip:15559998888@<server>` — expect `407`, then digest retry → `200 OK`.

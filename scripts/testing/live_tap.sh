@@ -11,8 +11,12 @@
 # baseline): tshark fields (ip.src, udp.dstport, data.data) -> awk keeps only
 # RTP (even UDP dstport; RTCP odd ports dropped; PCMU payload type 0 via the
 # RTP header byte; 12-byte RTP header stripped) -> xxd -r -p -> ffmpeg mulaw.
-# Audio is grouped into one stream per source IP (per-leg), so Vosk transcribes
-# each leg separately — no leg classification heuristic required.
+# Audio is grouped into one stream per rtpengine PROXY PORT (udp.dstport; one
+# per call leg). rtpengine rewrites BOTH directions to the same source IP
+# (its eth0 / the proxy source), so source-IP grouping would merge caller and
+# callee into one mangled stream. Port-based grouping keeps each side separate
+# so Vosk transcribes them independently and they can be labeled caller/callee
+# (e.g. live-<stem>-30000-N.wav = one side, live-<stem>-30020-M.wav = the other).
 #
 # Modes:
 #   daemon  Poll PCAP_DIR every POLL_SECS (default 1s). Reads only NEW packets
@@ -75,19 +79,27 @@ extract_new() {
                 h = substr($4, 1, 24)          # CLI/rtp 12-byte header as hex
                 pt = substr(h, 3, 2)           # RTP payload type byte (hex)
                 # Store the payload type as decimal for the codec-aware decoder.
-                # PT 0=G.711u (PCMU), 8=G.711a (PCMA), 9=G.722, 111=Opus.
+                # PT 0=G.711u (PCMU), 8=G.711a (PCMA), 9=G.722, 96/111=Opus.
                 ptdec = strtonum("0x" pt)
                 # Only keep audio payload types we can decode (below); store the
                 # first-seen PT per leg so mux_leg picks the right decoder.
                 if (ptdec + 0 != ptdec + 0 || ptdec < 0) next
-                if (ptdec != 0 && ptdec != 8 && ptdec != 9 && ptdec != 111) next
-                if (! (($2) in seentype)) seentype[$2] = ptdec
-                print substr($4, 25) >> (d "/" $2 ".hex")
+                if (ptdec != 0 && ptdec != 8 && ptdec != 9 && ptdec != 96 && ptdec != 111) next
+                # LEG GROUPING: rtpengine (recording-method=pcap) rewrites BOTH
+                # directions to the same source IP (its own eth0 / the proxy
+                # source 10.89.0.1), so grouping by ip.src collapses caller and
+                # callee into ONE mangled stream (Vosk -> empty/single-word).
+                # udp.dstport is the rtpengine per-leg PROXY port (one per call
+                # side), so it uniquely separates the two directions for
+                # per-side transcription + caller/callee labeling. RTCP even
+                # (>base) pairs are excluded by the modulo-2 RTP-only gate.
+                if (! (($3) in seentype)) seentype[$3] = ptdec
+                print substr($4, 25) >> (d "/" $3 ".hex")
                 if ($1 > max) max = $1
             }
             END {
                 if (max > 0) print max > (d "/.maxframe")
-                for (ip in seentype) print seentype[ip] > (d "/" ip ".pt")
+                for (port in seentype) print seentype[port] > (d "/" port ".pt")
             }'
     cat "$dir/.maxframe" 2>/dev/null || echo 0
 }
@@ -100,7 +112,7 @@ extract_new() {
 mux_leg() {
     local hex="$1" off="$2" out="$3"
     # Payload type for the decoder: 0=G.711u (PCMU), 8=G.711a (PCMA), 9=G.722,
-    # 111=Opus. Falls back to PCMU/mulaw when the leg has no recorded PT (legacy).
+    # 96/111=Opus. Falls back to PCMU/mulaw when the leg has no recorded PT (legacy).
     local ptfile="${hex%.hex}.pt"
     local pt=0
     [ -f "$ptfile" ] && pt="$(cat "$ptfile" 2>/dev/null || echo 0)"
@@ -114,7 +126,7 @@ mux_leg() {
     case "$pt" in
         8)  dec="-f alaw -ar 8000" ;;              # G.711a (PCMA)
         9)  dec="-f g722" ;;                       # G.722 wideband (16 kHz native)
-        111) dec="-f opus" ;;                      # Opus (48 kHz native -> resample)
+        96|111) dec="-f opus" ;;                   # Opus (48 kHz native -> resample; 96=Linphone, 111=baresip)
         *)  dec="-f mulaw -ar 8000" ;;             # G.711u (PCMU) / default fallback
     esac
 

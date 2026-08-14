@@ -230,7 +230,7 @@ main() {
         # of a packet" trailing-partial-packet warning — the frames are still
         # decoded. `|| true` keeps that warning from aborting the proof under
         # set -e + pipefail (the bug that leaked the session on the first run).
-        RTP_N="$(tshark -r "$PCAP" -d "udp.port==30000-30100,rtp" -Y rtp 2>/dev/null | wc -l || true)"
+        RTP_N="$(tshark -r "$PCAP" -d "udp.port==10000-20000,rtp" -Y rtp 2>/dev/null | wc -l || true)"
         [ "${RTP_N:-0}" -gt 0 ] && ok "tshark decoded ${RTP_N} RTP frames (30000 range)" \
             || fail "no RTP frames decoded from fresh pcap"
     fi

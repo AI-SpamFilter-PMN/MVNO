@@ -454,16 +454,20 @@ Choose your distro:
 
 ```bash
 # ─── Debian / Ubuntu (apt) ──────────────────────────────
-sudo apt update && sudo apt install -y podman docker-compose python3 python3-pip sqlite3
+sudo apt update && sudo apt install -y podman docker-compose-v2 sqlite3 lksctp-tools espeak-ng ffmpeg
 # (Optional) sipp: sudo apt install -y sipp
+# (Optional) tshark capture: sudo apt install -y tshark  # set dumpcap setuid for non-root
 
 # ─── Arch / CachyOS (pacman) ────────────────────────────
-sudo pacman -S --needed podman docker-compose python python-pip sqlite3
+sudo pacman -S --needed podman docker-compose sqlite3 lksctp-tools espeak-ng ffmpeg
 # (Optional) sipp — available in AUR: yay -S sipp
 
 # ─── Fedora / RHEL (dnf / yum) ──────────────────────────
-sudo dnf install -y podman docker-compose python3 python3-pip sqlite3
+sudo dnf install -y podman docker-compose-plugin sqlite3 lksctp-tools espeak-ng ffmpeg
 # (Optional) sipp: sudo dnf install -y sipp
+# Note: on Ubuntu/Fedora/Arch use `docker-compose-v2` / `docker-compose-plugin`
+# (the v2 CLI plugin). The legacy `docker-compose` package is deprecated v1 and
+# is NOT what `podman compose` / `docker compose` consume.
 
 # ─── Common (all distros) ────────────────────────────────
 # Verify rootless mode
@@ -639,7 +643,7 @@ services:
     command: ["rtpengine", "--config-file=/etc/rtpengine/rtpengine.conf", "--foreground"]
     ports:
       - "22222:22222/udp"
-      - "30000-30100:30000-30100/udp"
+      - "10000-20000:10000-20000/udp"
       - "9900:9900/tcp"
     volumes:
       - ./configs/rtpengine:/etc/rtpengine:z

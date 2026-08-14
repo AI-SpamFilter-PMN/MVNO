@@ -26,7 +26,14 @@ ps:
 # Completely resets runtime container volumes and state directory
 clean:
 	./scripts/up.sh down -v
-	rm -rf state/kamailio/* state/spool/* state/hlr/* state/vm-data/* state/grafana/*
+	# Grafana writes its plugins/db as container uid 100471 (rootless podman
+	# user-namespace), so host `rm -rf` hits "Permission denied" on cold start.
+	# `podman unshare` maps us into that namespace to remove them; fall back to
+	# sudo if unshare is unavailable. Other state dirs are host-owned.
+	rm -rf state/kamailio/* state/spool/* state/hlr/* state/vm-data/*
+	@if [ -d state/grafana ] && [ -n "$$(ls -A state/grafana 2>/dev/null)" ]; then \
+		podman unshare rm -rf state/grafana/* 2>/dev/null || sudo rm -rf state/grafana/*; \
+	fi
 
 # Rebuilds all custom images from source, initializes databases, and starts the stack
 rebuild: clean init-db
@@ -91,6 +98,13 @@ init-db:
 			ON CONFLICT(msisdn) DO UPDATE SET username=excluded.username, domain=excluded.domain, password=excluded.password, ha1=excluded.ha1, ha1b=excluded.ha1b, balance=excluded.balance;" \
 		"PRAGMA journal_mode=WAL;" \
 		"PRAGMA synchronous=NORMAL;"
+	@# Wire number-normalization dialplan into the cold-start path. Historically the
+	@# dialplan (dpid=4, 5 rules) was ONLY seeded manually via seed-dialplan.sh; a
+	@# fresh `make clean && make bootstrap` produced a DB with stale/wrong rules or
+	@# none, silently breaking E.164/national normalization (calls 404'd). Running
+	@# the idempotent seeder here guarantees every cold start has the correct 5-rule
+	@# set. Kamailio caches dialplan in RAM, so `make up`/restart reloads it.
+	@bash scripts/seed-dialplan.sh
 	@# osmo-hlr 1.9.3 (--db-upgrade) reads PRAGMA user_version (NOT a meta table)
 	@# and expects the FULL v7 schema: subscriber with msc_number (hlr_number was
 	@# renamed in v3), NOT NULL DEFAULT nam_cs/nam_ps/ms_purged_*, plus

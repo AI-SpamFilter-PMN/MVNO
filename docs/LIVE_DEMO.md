@@ -69,10 +69,11 @@ with internet can pre-pull instead: `./scripts/pull-images.sh && make up`.
 at the image/state level). Full details: `docs/deployment_guide.md` §2 / §2B.
 
 **EXPECT** — `Started`/`Up` lines; `podman compose ps | grep -c Up` eventually
-returns **32** (the core stack; `baresip-rx`/`baresip-tx` are demo-only and are
-added by S4). Health can take ~30 s — poll:
+returns **36** (34 core + `baresip-rx`/`baresip-tx` — the rig is now
+**compose-managed**, so `make up` includes it; no separate demo-only bring-up).
+Health can take ~30 s — poll:
 ```bash
-until [ "$(podman compose ps 2>/dev/null | grep -c Up)" -ge 32 ]; do
+until [ "$(podman compose ps 2>/dev/null | grep -c Up)" -ge 36 ]; do
   sleep 3; printf '.'
 done; echo " UP"
 ```
@@ -96,7 +97,7 @@ registrations in Kamailio's usrloc (Issue 8.37) that mask the bounded-retry and
 404 flows. Reset first (idempotent — safe to run already-clean):
 
 ```bash
-podman rm -f baresip-rx baresip-tx 2>/dev/null
+podman compose rm -sf baresip-rx baresip-tx 2>/dev/null
 for u in 15559998888 15557654321 15554443322 15557778888; do
   python3 scripts/testing/sip_traffic_sim.py --callee "$u" --deregister
 done
@@ -178,28 +179,35 @@ SMPP variant: S7.
 ## S4 — Real Call: baresip → RTPEngine → Vosk  ·  ~4 min
 
 **PURPOSE** — the heart of the demo: a **real `baresip` voice call** (containerized
-`mvno-baresip:1.0.0` rig), auto-answered, media anchored by RTPEngine which
-records a pcap per call; then the `live_tap.sh` zero-Python extraction and the
-Vosk transcript.
+`mvno-baresip:1.1.0` rig, **compose-managed**), auto-answered, media anchored by
+RTPEngine which records a pcap per call; then the `live_tap.sh` zero-Python
+extraction and the Vosk transcript.
 
 > **FLOW (this is the call path, live)**:
 > ```
 > CALLER (baresip-tx @10.89.0.61 — YOUR MIC when Pulse is up)
 >   │ SIP INVITE 407→digest→100→180→200  [Kamailio mvno-kamailio @10.89.0.23:5060]
 >   │  ├─ INTERCEPT REST callout → mvno-api:8080 (allow)
->   │  └─ rtpengine_manage → RTPEngine @10.89.0.48 (UDP 30000-30100)
+>   │  └─ rtpengine_manage → RTPEngine @10.89.0.48 (UDP 10000-20000)
 >   ▼
-> CALLEE (baresip-rx @10.89.0.60 — streams the scam phrase via aufile)
+> CALLEE (baresip-rx @10.89.0.60 — YOUR MIC too when Pulse is up; aufile scam
+>         phrase only as the headless fallback)   [Issue 8.47: full-duplex live]
 >   └─ every RTP packet → RTPEngine pcap → state/spool/pcaps/ → live_tap → Vosk
 > ```
 
-> **The rig**: `demo_call.sh` builds the `mvno-baresip:1.0.0` container (libre
-> v4.9.0 + baresip v4.10.0, stdio + aufile + pulse + g711 modules) and runs two
-> UAs: `baresip-tx` (caller `15553332211`) and `baresip-rx` (callee
-> `15559998888`). The **callee streams the scam phrase**; the **caller leg is
-> YOUR LIVE MIC** when the host Pulse socket exists and the terminal is a TTY —
-> `demo_call.sh` then prompts **"SPEAK NOW"** for ~12 s and Vosk transcribes
-> *your* voice. No mic → canned tone caller (deterministic guard).
+> **The rig**: `demo_call.sh` does NOT build/run containers anymore — `baresip-tx`
+> and `baresip-rx` are **compose services** in `docker-compose.yml` (image
+> `mvno-baresip:1.1.0`, libre v4.9.0 + baresip v4.10.0, stdio + aufile + pulse +
+> g711 modules; `make up` brings them up, `make clean` removes them). The script
+> only writes their `/cfg` configs into `state/baresip/{tx,rx}` and calls
+> `podman compose up -d baresip-rx baresip-tx` to apply them. Caller
+> `15553332211` (tx), callee `15559998888` (rx, auto-answer). **Both legs are
+> YOUR LIVE MIC** when the host Pulse socket exists — full-duplex (Issue 8.47
+> recipe): the caller leg is live mic → phone/rig, the callee leg is live mic →
+> the other direction, with the remote leg played on your laptop speakers.
+> `demo_call.sh dial` then prompts **"SPEAK NOW"** for ~10 s and Vosk transcribes
+> your voice on both legs. No Pulse socket → the callee falls back to the aufile
+> scam phrase and the caller to a canned tone (deterministic guard).
 >
 > **Audible go-cue**: the moment the speaking window opens (and the instant
 > `mic_record.sh` starts capturing), a short two-tone **pep sound** plays over
@@ -236,9 +244,15 @@ Vosk transcript.
 **COMMANDS** (T-B)
 
 ```bash
-bash scripts/testing/demo_call.sh setup   # speech file + both UAs register (~15 s)
+bash scripts/testing/demo_call.sh setup   # writes /cfg configs + both UAs register (~15 s)
 bash scripts/testing/demo_call.sh dial    # real call; callee streams the phrase; SPEAK NOW for ~12 s
 ```
+> **Preflight for S4** (skip if S1 preflight passed): verify UFW allows the RTP
+> media range (`sudo ufw allow 5060/udp && sudo ufw allow 10000:20000/udp` on
+> Ubuntu — else the phone leg rings with no audio) and that the Pulse socket
+> exists (`test -S "$XDG_RUNTIME_DIR/pulse/native"` — needed for the live-mic
+> legs; `demo_call.sh setup` exports `PULSE_SOCK`/`PULSE_DIR`/`PULSE_COOKIE`
+> from your runtime dir automatically).
 **EXPECT** — `setup` prints `rx registrations (expect >= 2)`/`tx registrations (expect >= 2)`
 and the phrase; `dial` prints
 `CALL_OUTGOING → CALL_RINGING → CALL_ANSWERED → CALL_ESTABLISHED →
@@ -260,14 +274,14 @@ The cockpit's `--wireshark` flag opens it live (P8); post-hoc, open the fresh
 pcap above directly:
 
 ```bash
-wireshark -r "$NEW" -d udp.port==30000-30100,rtp   # GUI decode of the RTP relay
+wireshark -r "$NEW" -d udp.port==10000-20000,rtp   # GUI decode of the RTP relay
 ```
 **EXPECT** — `200 Answering` = 1; Kamailio shows the INVITE/ACK/BYE dialog plus
 the `INTERCEPT QUERY: caller=15553332211 callee=15559998888` callout; `NEW` is a
 pcap newer than S4 started; the RTPEngine counter is present.
 
 > **Why the pcap "has no RTP" with `tshark -Y rtp`** — RTPEngine records pcaps on
-> its **relay ports UDP 30000-30100**, which Wireshark does not auto-decode as
+> its **relay ports UDP 10000-20000**, which Wireshark does not auto-decode as
 > RTP, so `-Y rtp` matches 0 and frames show as raw `data` (172-byte G.711).
 > Force-decode to see the ~700+ RTP packets:
 > ```bash
@@ -425,10 +439,10 @@ unpolluted:
 sqlite3 state/hlr/smsc.db "DELETE FROM SMS WHERE sent IS NULL;"
 ```
 
-**S6c — 5G→2G** (digest-auth SIP MESSAGE via Kamailio 5066)
+**S6c — 5G→2G** (digest-auth SIP MESSAGE via Kamailio 5060)
 
 > **FLOW**: `MO 15553332211 (baresip-tx @10.89.0.61 — or any digest UA) → SIP
-> MESSAGE → KAMAILIO 5066 (digest auth `testpass`; INTERCEPT_SMS → ai-filter) →
+> MESSAGE → KAMAILIO 5060 (digest auth `testpass`; INTERCEPT_SMS → ai-filter) →
 > IP-SM-GW bridge (mvno-ip-sm-gw [RELAY] 5G→2G) → SMPP SUBMIT_SM → OSMO-SMSC
 > @2775 → 2G radio → MT 15554443322 (2G-MS1 → T-A sms.txt)`.
 
@@ -445,7 +459,7 @@ receipted — the 2G container serves only MS1; always use `15554443322`.)
 **S6d — 5G→5G** (digest-auth SIP MESSAGE to the registered IMS number)
 
 > **FLOW**: `MO 15553332211 (baresip-tx @10.89.0.61) → SIP MESSAGE → KAMAILIO
-> 5066 (digest auth; INTERCEPT_SMS → ai-filter) → lookup("location") → MT
+> 5060 (digest auth; INTERCEPT_SMS → ai-filter) → lookup("location") → MT
 > 15559998888 (baresip-rx @10.89.0.60)`. Pure IMS-to-IMS — no bridge/SMPP
 > (those counters stay flat).
 
@@ -627,7 +641,7 @@ once**; switch with `Ctrl-b n` / `Ctrl-b p`, or
 |---|---|---|
 | **P0** (top-left) | `demo_call.sh setup && dial` — **SPEAK NOW = your mic** (+ side-tone) | S4 |
 | **P1** (top-right) | `live_tap.sh daemon` — pcap → 16 kHz WAV → Vosk chunks mid-call | S4/S5 |
-| **P2** (bottom-left) | live capture — RTP `30000-30100` + SIP `5066` on host loopback | S4 |
+| **P2** (bottom-left) | live capture — RTP `10000-20000` + SIP `5060` on host loopback | S4 |
 | **P4** (bottom-right) | **Vosk LIVE readout** — verdict logs **+ the raw recognized text** (`live-*.txt` tail) | S4/S5 |
 
 **Window `monitors`** — network + health:
@@ -679,7 +693,7 @@ once**; switch with `Ctrl-b n` / `Ctrl-b p`, or
 loopback, so capture targets `lo` (Issue 8.20 — host has no route to the bridge
 IPs) with a forced RTP decode. The plan's `udp.portrange` decode field is
 **not** valid in tshark 4.x; the working form (verified on this host) is
-`-d udp.port==30000-30100,rtp` (range as value). Two live views exist:
+`-d udp.port==10000-20000,rtp` (range as value). Two live views exist:
 
 - **P2 — CLI (default, headless-safe)**: live `tshark` tail of the loopback
   capture; if live capture lacks dumpcap permissions it falls back to tailing
@@ -697,7 +711,7 @@ IPs) with a forced RTP decode. The plan's `udp.portrange` decode field is
 ```bash
 # open the newest saved relay pcap in the Wireshark GUI (post-hoc, any time):
 wireshark -r "$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')" \
-  -d udp.port==30000-30100,rtp
+  -d udp.port==10000-20000,rtp
 ```
 
 **Teardown** keeps the evidence (pcaps, `live-*.wav`, archived transcripts),
@@ -847,9 +861,9 @@ softphone** (phone app / Zoiper / MicroSIP / Linphone / Blink, or the teammate
 through RTPEngine. This doubles as the integration test for the `SipClient`
 teammate repo (drop-in: `docs/partner/SipClient-INTEGRATION.md`).
 
-> Ports bind on `*` (verified live): `5066/udp` (SIP) and `30000-30100/udp`
+> Ports bind on `*` (verified live): `5060/udp` (SIP) and `10000-20000/udp`
 > (RTP) are reachable from any host on the same LAN. Keep firewall UDP
-> `5066` + `30000-30100` open.
+> `5060` + `10000-20000` open.
 
 **SETUP** (one provisioned number is enough — e.g. `15553332211`):
 
@@ -859,7 +873,7 @@ hostname -I | awk '{print $1}'               # LAN IP the phone should reach
 ```
 
 On the softphone, add an account:
-- **Server / Proxy**: `<this-host-IP>:5066` (UDP)
+- **Server / Proxy**: `<this-host-IP>:5060` (UDP)
 - **Username**: the MSISDN (`15553332211`) · **Password**: `testpass` · **Auth**: digest
 - **Realm**: `localhost` · **Codec**: **PCMU only** (G.711u) — disable G.722/OPUS (no transcode, S4)
 - REGISTER. **EXPECT**: `SIP 200 OK` (Kamailio `auth_db`; bad password → 401/403).
@@ -897,7 +911,7 @@ Issue 8.19); host ports are published for rootless Podman/Docker on
 
 | Host endpoint | Container → port | Service | Demo step |
 |---|---|---|---|
-| `127.0.0.1:5066/udp` | kamailio `:5060` | SIP registrar/proxy (digest auth) | S6c/6d (external clients: INTEGRATION_CONTRACT §1) |
+| `127.0.0.1:5060/udp` | kamailio `:5060` | SIP registrar/proxy (digest auth) | S6c/6d (external clients: INTEGRATION_CONTRACT §1) |
 | `127.0.0.1:2775` | osmo-smsc `:2775` | SMPP 3.4 SMSC (ESME bind/submit) | S3, S6a, S7 |
 | `127.0.0.1:8080` | telecom-api `:8080` | REST intercept API + actuator | S2, S8 |
 | `127.0.0.1:8008` | ai-filter `:8000` | AI classifier (mock, deterministic rules) | S2, S5 |
@@ -907,12 +921,14 @@ Issue 8.19); host ports are published for rootless Podman/Docker on
 | `127.0.0.1:9999` | open5gs-webui `:3000` | 5G subscriber UI | — |
 | `127.0.0.1:27017` | mongodb `:27017` | 5G core subscriber DB | — |
 | `127.0.0.1:9900` | rtpengine `:9900` | RTPEngine Prometheus metrics | S9 (T8) |
-| `127.0.0.1:30000-30100/udp` | rtpengine `:30000-30100` | RTP media relay range (G.711 PCMU) | S4, S5 |
+| `127.0.0.1:10000-20000/udp` | rtpengine `:10000-20000` | RTP media relay range (G.711 PCMU) | S4, S5 |
 | `127.0.0.1:9100` | ip-sm-gw `:9100` | bridge /metrics | — |
 
-> Host UDP `5060` is **not** used: a host Asterisk owns `0.0.0.0:5060`
-> (`ENVIRONMENT_MATRIX.md` §3). The optional `MVNO_PUBLISH_5060` compose extra
-> is default-off and blocked on this host.
+> Host UDP `5060` is the canonical Kamailio published port (`5060:5060/udp`).
+> A host-level Asterisk previously held `0.0.0.0:5060` (hence an earlier
+> `5066` + `MVNO_PUBLISH_5060` gating); that Asterisk is removed, so Kamailio
+> now binds 5060 directly. On a fresh host with no competing SIP daemon, UDP
+> 5060 is used as-is. See `ENVIRONMENT_MATRIX.md` §3.
 
 ### A.2 — Static container IPs on `mvno_net` (10.89.0.0/24, pinned in compose)
 
@@ -969,7 +985,7 @@ podman exec mvno-2g-ms sh -c "sleep 6; grep \"$BODY\" /root/.osmocom/bb/sms.txt"
 curl -s localhost:9100/metrics | grep -E 'sms_(2g5g|5g2g)'
 # 4) Open the newest relay pcap in the Wireshark GUI:
 wireshark -r "$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')" \
-  -d udp.port==30000-30100,rtp -Y 'sip || tcp || smpp || rtp'
+  -d udp.port==10000-20000,rtp -Y 'sip || tcp || smpp || rtp'
 ```
 
 **Call flow (same idea, voice):** start the cockpit (`bash scripts/demo/demo_live.sh
@@ -982,3 +998,35 @@ the SIP/RTP live while the Wireshark GUI captures it — the call equivalent of 
 > `watch_send.sh` wrapper remains a **possible** convenience, but is not
 > required to demonstrate the path — this section *is* the single-command demo
 > using the pieces already shipped.
+
+---
+
+## S12 — USER-driven live flow (`make user-demo`) · the human drives
+
+The AUTO/`make graduation`/`gate` path is canned and deterministic. The
+**user-driven** companion takes LIVE, dynamic input from the operator — your
+own SMS body and your own voice — reusing the same tested primitives.
+
+```bash
+make user-demo          # interactive menu (order: up -> mic probe -> SMS -> call)
+make user-sms  BODY="<your text>" FLOW=2g-2g    # any flow: 2g2g|2g5g|5g2g|5g5g|ai
+make user-call  CALLEE=15559998888              # speak ~10 s, see your words live
+```
+
+| Entry | Auto (canned) | User (live/dynamic) |
+|---|---|---|
+| SMS | `sms_matrix.sh` / `demo_call.sh` (fixed bodies) | `user_sms.sh` — **you type** the body |
+| Call | `demo_call.sh` / `graduation` (canned phrase) | `user_call.sh` — **you speak**, live Vosk |
+| Voice | baresip UAs + `--codec g722` sim | your phone/softphone or the mic |
+
+The user-driven family lives in `scripts/demo/` (`user_demo.sh` menu,
+`user_sms.sh` MO-write, `user_call.sh`); the AUTO test harness stays in
+`scripts/testing/` (`*matrix*`, `gate.sh`) — never mixed. Full details:
+`docs/USER_DEMO.md`.
+
+> **Exact phone / softphone values** (Linphone, MizuDroid, SipClient, baresip-UAs):
+> proxy `sip:<HOST-LAN-IP>:5060` (discover `hostname -I | awk '{print $1}'`),
+> username `15551234567`, password `testpass`,
+> realm `localhost`, transport UDP/TCP. Dial `15559998888` (baresip-rx auto-answer).
+> Negotiate **G.722/16000** (`rtpmap:9`) with **PCMU/8000** fallback — see
+> `server-port` config in the client build.
