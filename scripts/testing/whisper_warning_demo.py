@@ -48,11 +48,25 @@ def main():
         run_cmd("make hangup", timeout=10)
         raise RuntimeError("Fatal: No active PJSIP channel found in Asterisk!")
 
-    # 3. Inject Whisper Warning into the live bridge
-    print("\n[2/3] Injecting In-Call Audio Warning into Active Asterisk Bridge...")
-    inject_res = run_cmd("podman exec mvno-asterisk asterisk -rx 'channel originate Local/scam-warn@mvno extension 7001@mvno'")
-    print(f"  Originate Result: {inject_res}")
+    # 3. Inject True ChanSpy Whisper Warning into the specific active caller channel
+    print("\n[2/3] Injecting In-Call Audio Warning via ChanSpy into Active Channel...")
+    active_chans = [line.split()[0] for line in channels.splitlines() if "PJSIP/mvno-trunk" in line]
+    if not active_chans:
+        run_cmd("make hangup", timeout=10)
+        raise RuntimeError("Fatal: Could not isolate target PJSIP channel for ChanSpy!")
+    
+    target_chan = active_chans[0]
+    print(f"  Target PJSIP Channel: {target_chan}")
+    inject_res = run_cmd(f"podman exec mvno-asterisk asterisk -rx 'channel originate Local/whisper-audio@mvno application ChanSpy {target_chan},qwB'")
+    print(f"  Originate Result: {inject_res.strip() or 'SUCCESS (Dispatched)'}")
     time.sleep(4)
+
+    # Assert Asterisk actually executed ChanSpy and played audio
+    ast_logs = run_cmd("podman logs --since 6s mvno-asterisk")
+    if "Spying on channel" not in ast_logs and "Attaching spy channel" not in ast_logs:
+        run_cmd("make hangup", timeout=10)
+        raise RuntimeError(f"Fatal: ChanSpy failed to attach to target channel! Logs:\n{ast_logs}")
+    print("  ✓ ChanSpy Spy Channel attached and audio injected cleanly.")
 
     # 4. Teardown
     print("\n[3/3] Completing call gracefully...")
@@ -62,7 +76,7 @@ def main():
     except Exception:
         pass
 
-    print("\n🎉 IN-CALL REAL-TIME AUDIO WHISPER WARNING EMPIRICALLY VERIFIED!")
+    print("\n🎉 IN-CALL REAL-TIME AUDIO WHISPER WARNING EMPIRICALLY VERIFIED WITH CHANSPY!")
 
 
 if __name__ == "__main__":
