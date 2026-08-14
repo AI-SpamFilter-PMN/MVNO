@@ -2,9 +2,11 @@
 
 > Abbreviations: **docs/GLOSSARY.md** — single source of truth
 This document is the **single source of truth** for every public interface the MVNO core exposes
-to the three external repositories (`AI-Filteration-System`, `SipClient`, `sms-client`), so their
-clients can plug in **without modifying this repo**. The MVNO is the central repo; those
-repositories are treated as **read-only external consumers**.
+to the external repositories (`Filteration-System` [Spring Boot decider], `SipClient`,
+`sms-client`, `admin-client` [Neon DB UI]), so their clients can plug in **without modifying
+this repo**. The MVNO is the central repo; those repositories are treated as **read-only
+external consumers**. (`AI-Filteration-System` — the archived Python reference scorer — is
+reference-only per the handoff doc and is not an active external consumer.)
 
 > Principle: MVNO exposes stable interfaces; external clients align to them.
 > MVNO never edits external repositories. Gaps are surfaced as *recommendations*, never as edits.
