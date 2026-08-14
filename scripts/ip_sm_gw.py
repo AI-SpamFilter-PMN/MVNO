@@ -395,15 +395,23 @@ def smpp_submit_sm(host, port, sender, recipient, message):
         s.close()
         raise RuntimeError(f"SMPP BIND failed: status=0x{status:08X}")
     log("SMPP", "BIND_TRANSCEIVER OK")
+    # Drain the bind_response body (OsmoSMSC appends a 1-byte empty system_id,
+    # making the PDU 17 bytes). If left in the socket, that stray octet shifts
+    # the SUBMIT_SM response parse one byte right and yields a bogus non-zero
+    # status (0x04000000) even though the SMS is stored and delivered.
+    bind_clen = struct.unpack(">I", resp[:4])[0]
+    if bind_clen > 16:
+        _recv_exact(s, bind_clen - 16)
 
     sender_b = sender.encode() + b"\x00"
     recipient_b = recipient.encode() + b"\x00"
-    # SMS default alphabet (data_coding=0x00) requires the GSM-7 packed septets
-    # in short_message, NOT raw UTF-8. The previous `message.encode("utf-8")`
-    # sent UTF-8 bytes labelled GSM-7, which OsmoSMSC mis-decodes into garbage
-    # on the 2G MS. gsm7_encode() produces the spec-correct packed payload and
-    # sm_length becomes the packed octet count (ceil(7*len/8)).
-    msg_b = gsm7_encode(message)
+    # SMS default alphabet (data_coding=0x00): OsmoSMSC expects UNPACKED 7-bit
+    # characters in short_message (one octet per septet), with sm_length = the
+    # character count. It packs to GSM-7 septets itself for the 2G radio path.
+    # Sending pre-packed bytes (gsm7_encode) double-encodes: OsmoSMSC treats the
+    # packed octets as literal text and the 2G MS displays raw packed garbage.
+    # Verified empirically via smpp_ab_test.py: packed -> garbled, ascii -> clean.
+    msg_b = message.encode("ascii", errors="replace")
     submit_body = (
         b"\x00"
         + b"\x01\x01"
@@ -448,7 +456,14 @@ def parse_nonce(resp_text, header):
 
 
 def reply_ok(req_text, sock, host, port):
-    lines = req_text.split("\r\n")
+    # Normalize line endings FIRST: some embedded/Mizudroid-style clients emit
+    # bare-LF SIP. Splitting on CRLF only would collapse the whole request into
+    # ONE line, so the 200 OK would carry NO Via/From/Call-ID headers — Kamailio
+    # cannot match the transaction and retransmits the MESSAGE forever (the SMS
+    # still gets delivered; the sender just never sees the final 200).
+    # Observed live 2026-08-14 with a bare-LF MizuDroid-style MESSAGE.
+    text = req_text.replace("\r\n", "\n")
+    lines = text.split("\n")
     vias = [ln.strip().split(":", 1)[1].strip() for ln in lines if ln.lower().startswith("via:")]
     headers = {}
     for ln in lines[1:]:
@@ -468,16 +483,67 @@ def reply_ok(req_text, sock, host, port):
     sock.sendto(reply.encode(), (host, port))
 
 
+def _extract_msisdn(header_value):
+    """Pull the numeric MSISDN out of a From/To header VALUE.
+
+    Real SIP stacks vary widely (all RFC 3261-legal):
+      - bracket forms: `From: <sip:1555..@..>` vs bare `From: sip:1555..@..`
+      - display names: `From: "Jane Doe" <sip:+1555..@..>`
+      - schemes: `sip:`, `tel:`, and `sip:+` international prefixes
+      - header case: `from:` / `From:` / `FROM:` (some embedded/Mizudroid-style
+        stacks emit lowercase header names)
+    Prefer an explicit sip:/tel: URI number (so a display name containing
+    digits, e.g. "Agent 007", never wins over the real address), then fall
+    back to any 8+ digit run for bare-number headers.
+    """
+    if not header_value:
+        return None
+    m = re.search(r'(?:sip:|tel:)\+?(\d+)', header_value, re.I)
+    if m:
+        return m.group(1)
+    m = re.search(r'\+?(\d{8,})', header_value)
+    return m.group(1) if m else None
+
+
 def parse_sip_message(req_text):
     if not isinstance(req_text, str) or not req_text.strip():
         return None, None, ""
-    from_m = re.search(r'From:\s*<sip:(\d+)@', req_text)
-    to_m = re.search(r'To:\s*<sip:(\d+)@', req_text)
-    body_m = re.search(r"\r\n\r\n(.*)", req_text, re.S)
-    sender = from_m.group(1) if from_m else None
-    recipient = to_m.group(1) if to_m else None
+    # `<` is OPTIONAL: RFC 3261 allows both `From: <sip:..>` and the bare
+    # `From: sip:..` form. Android Linphone sends `To: sip:15554443322@localhost`
+    # WITHOUT angle brackets — a strict `<sip:` regex silently dropped every
+    # phone-originated message (recipient=None -> not in MSISDN_2G -> no 200,
+    # Kamailio timed out and sent 408). Observed live 2026-08-14.
+    #
+    # Normalize line endings first: some clients (embedded/Mizudroid-style)
+    # emit bare-LF SIP without CRLF. Searching on a normalized copy keeps the
+    # body split reliable for both conventions.
+    text = req_text.replace("\r\n", "\n")
+    body_m = re.search(r"\n\n(.*)", text, re.S)
     body = body_m.group(1).strip() if body_m else ""
-    return sender, recipient, body
+    from_h = to_h = None
+    for line in text.split("\n"):
+        low = line.lower()
+        if low.startswith("from:") and from_h is None:
+            from_h = line[5:].strip()
+        elif low.startswith("to:") and to_h is None:
+            to_h = line[3:].strip()
+    return _extract_msisdn(from_h), _extract_msisdn(to_h), body
+
+
+def is_typing_indicator(req_text):
+    """True if this is an RFC 3994 is-composing (typing) notification, not an
+    actual SMS. Android Linphone sends these as SIP MESSAGEs with
+    `Content-Type: application/im-iscomposing+xml` whenever the user types.
+    Without this gate they are relayed to the 2G MS as literal SMS bodies
+    (observed live 2026-08-14: the raw XML landed in sms.txt)."""
+    if not isinstance(req_text, str):
+        return False
+    # Match either CRLF or bare-LF line endings (Mizudroid/embedded clients
+    # may emit bare-LF SIP).
+    for line in req_text.replace("\r\n", "\n").split("\n"):
+        if line.lower().startswith("content-type:") and "iscomposing" in line.lower():
+            return True
+    return False
 
 
 class BridgeSip:
@@ -680,6 +746,12 @@ class Gateway:
             return
         sender, recipient, body = parse_sip_message(data)
         if recipient in MSISDN_2G:
+            if is_typing_indicator(data):
+                # RFC 3994 typing indicator — not an SMS; ack Kamailio (so the
+                # sender's delivery state stays clean) but do NOT relay to 2G.
+                log("SKIP", f"5G->2G typing indicator {sender}->{recipient} (is-composing)")
+                reply_ok(data, self.sip.sock, KAMAILIO_HOST, KAMAILIO_PORT)
+                return
             log("RELAY", f"5G->2G {sender}->{recipient} body='{body[:80]}'")
             reply_ok(data, self.sip.sock, KAMAILIO_HOST, KAMAILIO_PORT)
             incr("mvno_bridge_sms_attempts_total")

@@ -256,7 +256,12 @@ class SmppSubmitSmTest(unittest.TestCase):
         self.assertEqual(sub_status, 0)
         self.assertEqual(sub_seq, 2)  # sequence number increments
 
-    def test_submit_sm_payload_matches_reference_gsm7_packer(self):
+    def test_submit_sm_payload_is_unpacked_ascii(self):
+        # Verified 2026-08-14 (smpp_ab_test.py + live e2e): OsmoSMSC expects
+        # UNPACKED 7-bit chars with data_coding=0 (one octet per septet,
+        # sm_length = char count). Pre-packed GSM-7 bytes were double-encoded
+        # and the 2G MS displayed raw packed garbage. The wire short_message
+        # is therefore `message.encode("ascii")`, NOT gsm7_encode(message).
         sender = "15554443322"
         recipient = "15551234567"
         message = "you have won a prize"
@@ -284,12 +289,12 @@ class SmppSubmitSmTest(unittest.TestCase):
 
         self.assertEqual(src, sender)
         self.assertEqual(dst, recipient)
-        # sm_length == packed octet count of the GSM-7 septets.
-        expected = RefPacker.encode(message)
+        # sm_length == unpacked char count (ASCII octets, data_coding=0).
+        expected = message.encode("ascii")
         self.assertEqual(sm_length, len(expected))
         self.assertEqual(user_data, expected)
-        # Round-trips back to the exact message.
-        self.assertEqual(gw.gsm7_decode(user_data), message)
+        # The payload is NOT the pre-packed GSM-7 octets.
+        self.assertNotEqual(user_data, RefPacker.encode(message))
 
     def test_fragmented_recv_reassembles(self):
         # The fragile framing risk: if recv() returns a PDU header in 3-byte
@@ -455,6 +460,190 @@ class ParseSipMessageTest(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.assertEqual(gw.parse_sip_message(bad),
                                  (None, None, ""))
+
+    def test_linphone_bracketless_to_and_from(self):
+        # Android Linphone sends `To: sip:15554443322@localhost` WITHOUT the
+        # angle brackets (RFC 3261 permits both forms). Regression for the
+        # silent-drop: the old `To:\s*<sip:` regex returned recipient=None and
+        # the 5G->2G relay never fired (observed live 2026-08-14, e2e Cell 3).
+        linphone_msg = (
+            "MESSAGE sip:15554443322@localhost SIP/2.0\r\n"
+            "Via: SIP/2.0/UDP 192.168.100.33:37322;branch=z9hG4bK.1;rport\r\n"
+            "From: <sip:15551234567@192.168.100.93>;tag=TisjRObY9\r\n"
+            "To: sip:15554443322@localhost\r\n"
+            "CSeq: 21 MESSAGE\r\n"
+            "Call-ID: yOPA0YONrX\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: 11\r\n"
+            "\r\n"
+            "PHONE2UE0710"
+        )
+        sender, recipient, body = gw.parse_sip_message(linphone_msg)
+        self.assertEqual(sender, "15551234567")
+        self.assertEqual(recipient, "15554443322")
+        self.assertEqual(body, "PHONE2UE0710")
+
+    def test_is_typing_indicator_detects_linphone_iscomposing(self):
+        # Linphone's RFC 3994 typing notification (XML body, iscomposing
+        # content type) must be recognized so it is NOT relayed as an SMS.
+        composing = (
+            "MESSAGE sip:15554443322@localhost SIP/2.0\r\n"
+            "Via: SIP/2.0/UDP 192.168.100.33:37322;branch=z9hG4bK.3\r\n"
+            "From: <sip:15551234567@192.168.100.93>;tag=z\r\n"
+            "To: sip:15554443322@localhost\r\n"
+            "CSeq: 21 MESSAGE\r\n"
+            "Content-Type: application/im-iscomposing+xml\r\n"
+            "Content-Length: 207\r\n"
+            "\r\n"
+            '<?xml version="1.0"?><isComposing><state>active</state></isComposing>'
+        )
+        self.assertTrue(gw.is_typing_indicator(composing))
+
+    def test_is_typing_indicator_false_for_plain_sms(self):
+        self.assertFalse(gw.is_typing_indicator(MESSAGE_REQ))
+        self.assertFalse(gw.is_typing_indicator(INVITE_REQ))
+        self.assertFalse(gw.is_typing_indicator(None))
+        self.assertFalse(gw.is_typing_indicator(b"bytes"))
+        self.assertFalse(gw.is_typing_indicator(""))
+
+    def test_linphone_bracketless_from_too(self):
+        # Both headers bare (no <>): must still parse.
+        msg = (
+            "MESSAGE sip:15554443322@localhost SIP/2.0\r\n"
+            "Via: SIP/2.0/UDP 192.168.100.33:37322;branch=z9hG4bK.2\r\n"
+            "From: sip:15551234567@192.168.100.93;tag=x\r\n"
+            "To: sip:15554443322@localhost\r\n"
+            "CSeq: 1 MESSAGE\r\n"
+            "Content-Length: 4\r\n"
+            "\r\n"
+            "TEST"
+        )
+        sender, recipient, body = gw.parse_sip_message(msg)
+        self.assertEqual(sender, "15551234567")
+        self.assertEqual(recipient, "15554443322")
+        self.assertEqual(body, "TEST")
+
+    def test_mizudroid_lowercase_headers_and_bare_lf(self):
+        # Mizudroid / embedded stacks emit lowercase header names and bare-LF
+        # line endings (no CRLF). Both must still parse; the body split must
+        # survive the normalized line endings.
+        msg = (
+            "MESSAGE sip:15554443322@localhost SIP/2.0\n"
+            "via: SIP/2.0/UDP 192.168.100.55:40000;branch=z9hG4bK.m1\n"
+            "from: <sip:15551234567@192.168.100.93>;tag=mt\n"
+            "to: <sip:15554443322@localhost>\n"
+            "cseq: 7 MESSAGE\n"
+            "content-type: text/plain\n"
+            "content-length: 9\n"
+            "\n"
+            "MIZU0710"
+        )
+        sender, recipient, body = gw.parse_sip_message(msg)
+        self.assertEqual(sender, "15551234567")
+        self.assertEqual(recipient, "15554443322")
+        self.assertEqual(body, "MIZU0710")
+
+    def test_display_name_plus_prefix_and_tel_uri(self):
+        # Java SIP client (SipClient) style: display name with digits, a
+        # +-prefixed international number, and a tel: URI. The display-name
+        # digits must never be mistaken for the MSISDN.
+        msg = (
+            "MESSAGE sip:15554443322@localhost SIP/2.0\r\n"
+            "Via: SIP/2.0/UDP 192.168.100.99:55555;branch=z9hG4bK.j1\r\n"
+            'From: "Agent 007" <sip:+15551234567@192.168.100.93>;tag=jt\r\n'
+            "To: <tel:+15554443322>\r\n"
+            "CSeq: 3 MESSAGE\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: 10\r\n"
+            "\r\n"
+            "JAVACLIENT"
+        )
+        sender, recipient, body = gw.parse_sip_message(msg)
+        self.assertEqual(sender, "15551234567")
+        self.assertEqual(recipient, "15554443322")
+        self.assertEqual(body, "JAVACLIENT")
+
+    def test_display_name_without_angle_brackets(self):
+        # SipClient-style display name, bare URI (no <>), + prefix.
+        msg = (
+            "MESSAGE sip:15554443322@localhost SIP/2.0\r\n"
+            "Via: SIP/2.0/UDP 192.168.100.99:55556;branch=z9hG4bK.j2\r\n"
+            'From: "Team Member" <sip:+15551234567@10.89.0.23>;tag=jt2\r\n'
+            "To: sip:15554443322@10.89.0.23\r\n"
+            "CSeq: 4 MESSAGE\r\n"
+            "Content-Length: 5\r\n"
+            "\r\n"
+            "TEAM1"
+        )
+        sender, recipient, body = gw.parse_sip_message(msg)
+        self.assertEqual(sender, "15551234567")
+        self.assertEqual(recipient, "15554443322")
+        self.assertEqual(body, "TEAM1")
+
+    def test_typing_indicator_case_insensitive_content_type(self):
+        # Some clients lowercase the Content-Type header name too.
+        composing = (
+            "MESSAGE sip:15554443322@localhost SIP/2.0\n"
+            "from: <sip:15551234567@192.168.100.93>;tag=z\n"
+            "to: <sip:15554443322@localhost>\n"
+            "content-type: application/im-iscomposing+xml\n"
+            "content-length: 200\n"
+            "\n"
+            '<?xml version="1.0"?><isComposing><state>active</state></isComposing>'
+        )
+        self.assertTrue(gw.is_typing_indicator(composing))
+
+    def test_reply_ok_carries_headers_for_bare_lf_request(self):
+        # Regression (2026-08-14, cross-client): reply_ok() used to split on
+        # "\r\n" ONLY — a bare-LF (MizuDroid/embedded) request collapsed into
+        # ONE line, so the 200 OK had NO Via/From/Call-ID headers. Kamailio's
+        # tm could not match the transaction and retransmitted the MESSAGE
+        # forever; the SMS WAS delivered but the sender never saw the final
+        # 200. The reply must now carry the transaction headers regardless of
+        # the request's line endings.
+        bare_lf = (
+            "MESSAGE sip:15554443322@localhost SIP/2.0\n"
+            "via: SIP/2.0/UDP 127.0.0.1:5090;branch=z9hG4bK-mz1\n"
+            "from: sip:15551234567@localhost;tag=mztag1\n"
+            "to: sip:15554443322@localhost\n"
+            "call-id: mizu-0814-1@127.0.0.1\n"
+            "cseq: 1 MESSAGE\n"
+            "max-forwards: 70\n"
+            "content-type: text/plain\n"
+            "content-length: 12\n"
+            "\n"
+            "XC-MIZU-0814"
+        )
+        sent = {}
+
+        class FakeSock:
+            def sendto(self, data, addr):
+                sent["data"] = data.decode(errors="ignore")
+
+        gw.reply_ok(bare_lf, FakeSock(), "127.0.0.1", 5060)
+        reply = sent.get("data", "")
+        self.assertIn("SIP/2.0 200 OK", reply)
+        self.assertIn("Via: SIP/2.0/UDP 127.0.0.1:5090;branch=z9hG4bK-mz1", reply)
+        self.assertIn("From: sip:15551234567@localhost;tag=mztag1", reply)
+        self.assertIn("To: sip:15554443322@localhost", reply)
+        self.assertIn("Call-ID: mizu-0814-1@127.0.0.1", reply)
+        self.assertIn("CSeq: 1 MESSAGE", reply)
+
+    def test_reply_ok_carries_headers_for_crlf_request(self):
+        # CRLF requests must still produce a well-formed 200 OK (no regression).
+        sent = {}
+
+        class FakeSock:
+            def sendto(self, data, addr):
+                sent["data"] = data.decode(errors="ignore")
+
+        gw.reply_ok(MESSAGE_REQ, FakeSock(), "127.0.0.1", 5060)
+        reply = sent.get("data", "")
+        self.assertIn("SIP/2.0 200 OK", reply)
+        self.assertIn("Via: SIP/2.0/UDP 10.89.0.23:5060;branch=z9hG4bK2", reply)
+        self.assertIn("From: <sip:15554443322@10.89.0.23>;tag=b", reply)
+        self.assertIn("To: <sip:15551234567@10.89.0.23>", reply)
+        self.assertIn("CSeq: 2 MESSAGE", reply)
 
 
 if __name__ == "__main__":
