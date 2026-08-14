@@ -44,7 +44,7 @@
  🔐 TEST 3: STIR/SHAKEN ES256 PASSporT (RFC 8224 / 8588) VALIDATION
 ==========================================================================
 [*] Generated SIP Identity Header:
-eyJhbGciOiJFUzI1NiIsInBwdCI6InNoYWtlbiIsInR5cCI6InBhc3Nwb3J0IiwieDV1IjoiaHR0cHM6Ly9jZXJ0Lm12bm8ubmV0L3Jvb3QucGVtIn0.eyJhdHRlc3QiOiJBIiwiZGVzdCI6eyJ0biI6WyIxNTU1OTk5ODg4OCJdfSwiaWF0IjoxNzg2NzM2ODA2LCJvcmlnIjp7InRuIjoiMTU1NTMzMzIyMTEifSwib3JpZ2lkIjoidXJuOnV1aWQ6ODk3YTdmZjUtYzFmMC00NjQxLTk2YzgtOTc5NWJhZjI4ZDM4In0.9gM51pXvm2j5AAzjvqyIvzDt3-dxy9IEWQlbz9bqO1txHysI8j_OXpRoaOdQy1_Om2yZuuQSoynIrIS8xR664w;info=<https://cert.mvno.net/root.pem>;alg=ES256;ppt=shaken
+eyJhbGciOiJFUzI1NiIsInBwdCI6InNoYWtlbiIsInR5cCI6InBhc3Nwb3J0IiwieDV1IjoiaHR0cHM6Ly9jZXJ0Lm12bm8ubmV0L3Jvb3QucGVtIn0.eyJhdHRlc3QiOiJBIiwiZGVzdCI6eyJ0biI6WyIxNTU1OTk5ODg4OCJdfSwiaWF0IjoxNzg2NzM3NDEzLCJvcmlnIjp7InRuIjoiMTU1NTMzMzIyMTEifSwib3JpZ2lkIjoidXJuOnV1aWQ6Y2JiOWM2OWUtOTEwYS00MmVkLTgzMzMtZDRmNjljMGFiMGM1In0.6zSZ-DCyG-34ivE09A0vF5GloTIECKILbylMsUgTKFo49-Gp1LnI8PcGRXgMDl3MRLdUZxviN3gKxQB4b0NEJA;info=<https://cert.mvno.net/root.pem>;alg=ES256;ppt=shaken
 
 [*] Decoded JOSE Header: {
   "alg": "ES256",
@@ -59,11 +59,11 @@ eyJhbGciOiJFUzI1NiIsInBwdCI6InNoYWtlbiIsInR5cCI6InBhc3Nwb3J0IiwieDV1IjoiaHR0cHM6
       "15559998888"
     ]
   },
-  "iat": 1786736806,
+  "iat": 1786737413,
   "orig": {
     "tn": "15553332211"
   },
-  "origid": "urn:uuid:897a7ff5-c1f0-4641-96c8-9795baf28d38"
+  "origid": "urn:uuid:cbb9c69e-910a-42ed-8333-d4f69c0ab0c5"
 }
 [+] RFC 8588 Claims & Structure Verified.
 [*] Verification Result: {
@@ -103,75 +103,48 @@ Voucher redeemed successfully! Added 50 Credits ($50.00) to your balance.
 
 🎉 ALL STATEFUL USSD GATEWAY TESTS PASSED (5/5)!
 ==========================================================================
- 🚨 TEST 5: EMERGENCY 911/112 LAYER 0 PRIORITY PREEMPTION VALIDATION
+ 🚨 TEST 5: REAL KAMAILIO SIP LAYER 0 EMERGENCY 911/112 PREEMPTION
 ==========================================================================
-[*] Initiating Emergency Call to dialed number '911'...
-[*] Originate output: 
+[*] Dialing sip:911@10.89.0.23:5060 from Laptop UE (15553332211) -> Kamailio SIP Core...
+  SIP Handshake Response:
+0.60s "type":"CALL_OUTGOING"
+  0.60s "type":"CALL_LOCAL_SDP"
+  0.60s "type":"CALL_ANSWERED"
+  0.60s "type":"CALL_REMOTE_SDP"
+  0.61s "type":"CALL_ESTABLISHED"
 
-[*] Asterisk Live Logs:
-[1;30m    -- [0mExecuting [911@mvno:1] [1;36mNoOp[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35mMVNO-EMERGENCY-911: Emergency call from [0m") in new stack
-[1;30m    -- [0mExecuting [911@mvno:2] [1;36mAnswer[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35m[0m") in new stack
-[1;30m    -- [0mLocal/911@mvno-00000006;1 answered
-[1;30m       > [0mLaunching Wait(2) on Local/911@mvno-00000006;1
-[1;30m    -- [0mExecuting [911@mvno:3] [1;36mSet[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35mVOLUME(TX)=3[0m") in new stack
-[1;30m    -- [0mExecuting [911@mvno:4] [1;36mPlayback[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35mbeep[0m") in new stack
-[1;30m    -- [0m<Local/911@mvno-00000006;2> Playing 'beep.gsm' (language 'en')
-[1;30m    -- [0mExecuting [911@mvno:5] [1;36mPlayback[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35mvm-intro[0m") in new stack
-[1;30m    -- [0m<Local/911@mvno-00000006;2> Playing 'vm-intro.gsm' (language 'en')
-[1;30m  == [0mSpawn extension (mvno, 911, 5) exited non-zero on 'Local/911@mvno-00000006;2'
-[1;30m    -- [0mRemote UNIX connection
-[1;30m    -- [0mRemote UNIX connection disconnected
-[1;30m    -- [0mRemote UNIX connection
-[1;30m    -- [0mRemote UNIX connection disconnected
-[1;30m    -- [0mCalled 911@mvno
-[1;30m    -- [0mExecuting [911@mvno:1] [1;36mNoOp[0m("[1;35mLocal/911@mvno-00000007;2[0m", "[1;35mMVNO-EMERGENCY-911: Emergency call from [0m") in new stack
-[1;30m    -- [0mExecuting [911@mvno:2] [1;36mAnswer[0m("[1;35mLocal/911@mvno-00000007;2[0m", "[1;35m[0m") in new stack
-[1;30m    -- [0mLocal/911@mvno-00000007;1 answered
-[1;30m       > [0mLaunching Wait(2) on Local/911@mvno-00000007;1
-[1;30m    -- [0mExecuting [911@mvno:3] [1;36mSet[0m("[1;35mLocal/911@mvno-00000007;2[0m", "[1;35mVOLUME(TX)=3[0m") in new stack
-[1;30m    -- [0mExecuting [911@mvno:4] [1;36mPlayback[0m("[1;35mLocal/911@mvno-00000007;2[0m", "[1;35mbeep[0m") in new stack
-[1;30m    -- [0m<Local/911@mvno-00000007;2> Playing 'beep.gsm' (language 'en')
-[1;30m    -- [0mExecuting [911@mvno:5] [1;36mPlayback[0m("[1;35mLocal/911@mvno-00000007;2[0m", "[1;35mvm-intro[0m") in new stack
-[1;30m    -- [0m<Local/911@mvno-00000007;2> Playing 'vm-intro.gsm' (language 'en')
-[1;30m  == [0mSpawn extension (mvno, 911, 5) exited non-zero on 'Local/911@mvno-00000007;2'
+[*] Kamailio Core Layer 0 Routing Log:
+  ✓ 4(5) WARNING: <script>: EMERGENCY 911/112 PRIORITY CALL: 15553332211 -> 911 (Routing to PSAP Trunk)
+  ✓ 3(4) WARNING: <script>: EMERGENCY 911/112 PRIORITY CALL: 15553332211 -> 911 (Routing to PSAP Trunk)
+  ✓ 2(3) WARNING: <script>: EMERGENCY 911/112 PRIORITY CALL: 15553332211 -> 911 (Routing to PSAP Trunk)
+  ✓ 4(5) WARNING: <script>: EMERGENCY 911/112 PRIORITY CALL: 15553332211 -> 911 (Routing to PSAP Trunk)
+  ✓ 2(3) WARNING: <script>: EMERGENCY 911/112 PRIORITY CALL: 15553332211 -> 911 (Routing to PSAP Trunk)
 
-[+] Asterisk PSAP Emergency Gateway Answer & Audio Execution Confirmed!
-🎉 ALL EMERGENCY 911/112 PRIORITY PREEMPTION TESTS PASSED!
+[*] Asterisk PSAP Gateway Inbound Trunk Execution Log:
+  ✓ [1;30m    -- [0mExecuting [911@mvno:1] [1;36mNoOp[0m("[1;35mPJSIP/mvno-trunk-00000009[0m", "[1;35mMVNO-EMERGENCY-911: Emergency call from 15553332211[0m") in new stack
+  ✓ [1;30m    -- [0mExecuting [911@mvno:1] [1;36mNoOp[0m("[1;35mPJSIP/mvno-trunk-0000000a[0m", "[1;35mMVNO-EMERGENCY-911: Emergency call from 15553332211[0m") in new stack
+
+🎉 REAL KAMAILIO LAYER 0 EMERGENCY 911/112 PRIORITY PREEMPTION PASSED EMPIRICALLY!
 ==========================================================================
- 📡 TEST 6: REAL SOCKET 5G CORE L7 DEEP PACKET INSPECTION (DPI) VALIDATION
+ 📡 TEST 6: REAL 5G CORE GTP-U & OGSTUN L7 DPI PACKET INSPECTION
 ==========================================================================
-[*] Spawning live DPI sniffer engine on ports 5353 (DNS), 15000 (RTP), 9092 (Metrics)...
-[*] Transmitting REAL DNS packet (35 bytes) over wire to 127.0.0.1:5353...
-[*] Transmitting REAL RTP Voice packet (172 bytes) over wire to 127.0.0.1:15000...
-[*] Fetching live metrics from DPI Exporter (http://localhost:9092/metrics)...
+  ✓ Compose-managed 5G DPI Probe running in Open5GS UPF netns.
+[*] Triggering 5G UE (mvno-ueransim-ue-1, 10.45.0.5) transmission over 5G PDU session (uesimtun0)...
+✓ Sent 5G DNS query (35 bytes) from UE 10.45.0.5 -> UPF ogstun 10.45.0.1:5353
+[*] Fetching ingested metrics from VictoriaMetrics (http://localhost:8428)...
+[*] VictoriaMetrics TSDB Telemetry:
+  - Captured 5G DNS Bytes:        140.0 (Expected: >= 35)
+  - Intercepted 5G Phishing Threat: 4.0 (Expected: >= 1)
+  - Active 5G DNS Flows:          4.0 (Expected: >= 1)
 
-[*] Live Exported DPI Telemetry:
-# HELP mvno_dpi_bytes_total Total Layer 7 payload bytes inspected by 5G UPF DPI engine.
-# TYPE mvno_dpi_bytes_total counter
-mvno_dpi_bytes_total{protocol="dns",slice="embb"} 35
-mvno_dpi_bytes_total{protocol="tls",slice="embb"} 0
-mvno_dpi_bytes_total{protocol="http",slice="embb"} 0
-mvno_dpi_bytes_total{protocol="rtp",slice="embb"} 172
-mvno_dpi_bytes_total{protocol="other",slice="embb"} 0
+[*] DPI Sniffer Interception Log from UPF ogstun interface:
+  ⚠️ [DPI-ALERT] 5G USER-PLANE PHISHING BLOCKED: phishing-bank.com from UE 10.45.0.5
+[DPI-5G-DNS] 5G UE (10.45.0.5:56511) -> Intercepted DNS Query: phishing-bank.com
+⚠️ [DPI-ALERT] 5G USER-PLANE PHISHING BLOCKED: phishing-bank.com from UE 10.45.0.5
+[DPI-5G-DNS] 5G UE (10.45.0.5:55160) -> Intercepted DNS Query: phishing-bank.com
+⚠️ [DPI-ALERT] 5G USER-PLANE PHISHING BLOCKED: phishing-bank.com from UE 10.45.0.5
 
-# HELP mvno_dpi_flows_active Number of active application flows tracked by DPI.
-# TYPE mvno_dpi_flows_active gauge
-mvno_dpi_flows_active{protocol="dns"} 1
-mvno_dpi_flows_active{protocol="tls"} 0
-mvno_dpi_flows_active{protocol="http"} 0
-mvno_dpi_flows_active{protocol="rtp"} 1
-
-# HELP mvno_dpi_threats_intercepted_total Malicious L7 hostnames and phishing flows intercepted.
-# TYPE mvno_dpi_threats_intercepted_total counter
-mvno_dpi_threats_intercepted_total{threat_type="phishing",protocol="dns"} 1
-
-[*] Empirical Metrics Check:
-  - Captured DNS Bytes: 35.0 (Expected: 35)
-  - Captured RTP Bytes: 172.0 (Expected: 172)
-  - Intercepted Phishing Threats: 1.0 (Expected: >= 1)
-  - Active DNS Flows: 1.0 (Expected: >= 1)
-
-🎉 ALL REAL-SOCKET 5G CORE L7 DPI PROBE TESTS PASSED EMPIRICALLY!
+🎉 100% REAL 5G CORE GTP-U & OGSTUN L7 DPI PACKET INSPECTION PASSED EMPIRICALLY!
 ==========================================================================
  🚀 MVNO SOTA ADVANCED CARRIER INNOVATIONS & ANTI-FRAUD TEST SUITE
 ==========================================================================

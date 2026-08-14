@@ -33,10 +33,10 @@ dc76f546	device
   SIP Call Handshake:
 0.60s "type":"CALL_OUTGOING"
   0.60s "type":"CALL_LOCAL_SDP"
-  0.61s "type":"CALL_RINGING"
-  0.61s "type":"CALL_ANSWERED"
-  0.61s "type":"CALL_REMOTE_SDP"
-  0.61s "type":"CALL_ESTABLISHED"
+  0.62s "type":"CALL_RINGING"
+  0.62s "type":"CALL_ANSWERED"
+  0.62s "type":"CALL_REMOTE_SDP"
+  0.62s "type":"CALL_ESTABLISHED"
   ✓ Live SIP Call Established & Media Anchored across RTPEngine.
   • Streaming live audio across RTP pipeline for 8.0s...
 
@@ -81,8 +81,8 @@ Participants:
 --------------------------------------------------
 Channel                        Flags  User Profile     Bridge Profile   Menu             CallerID
 ============================== ====== ================ ================ ================ ================
-PJSIP/mvno-trunk-00000003      E      default_user     default_bridge   default_menu     15553332211
-PJSIP/mvno-trunk-00000004      E      default_user     default_bridge   default_menu     15559998888
+PJSIP/mvno-trunk-0000000b      E      default_user     default_bridge   default_menu     15553332211
+PJSIP/mvno-trunk-0000000c      E      default_user     default_bridge   default_menu     15559998888
 --------------------------------------------------
   • Holding 3-way conference bridge active for 8.5s...
 
@@ -93,10 +93,10 @@ PJSIP/mvno-trunk-00000004      E      default_user     default_bridge   default_
  🚀 STAGE 7: LIVE CARRIER OBSERVABILITY & STRICT TSDB METRIC ASSERTIONS
 ════════════════════════════════════════════════════════════════════════
 • VictoriaMetrics Real-Time PromQL Metrics:
-  - Total Call Requests: 4.0 (Target: >= 1)
-  - Total SMS Requests:  10.0 (Target: >= 1)
+  - Total Call Requests: 8.0 (Target: >= 1)
+  - Total SMS Requests:  35.0 (Target: >= 1)
   - 5G SA UPF Sessions:  3.0 (Target: == 3)
-  - RTPEngine Uptime:    16514.0s (Target: > 0)
+  - RTPEngine Uptime:    17364.0s (Target: > 0)
   - Grafana NOC URL:     http://192.168.100.93:3000/d/mvno-unified-noc
 
 ════════════════════════════════════════════════════════════════════════

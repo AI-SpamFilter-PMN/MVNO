@@ -175,6 +175,19 @@ services:
         ipv4_address: 10.89.0.14
     restart: unless-stopped
 
+  # ─── 5G Core User-Plane L7 Deep Packet Inspection (DPI) Probe ───
+  dpi-probe:
+    image: docker.io/library/python:3.11-slim
+    container_name: mvno-5g-dpi
+    network_mode: "service:upf"
+    volumes:
+      - ./scripts/dpi/dpi_probe.py:/dpi_probe.py:ro,z
+    command: ["python3", "-u", "/dpi_probe.py"]
+    restart: unless-stopped
+    depends_on:
+      upf:
+        condition: service_started
+
   # ─── Open5GS AUSF (Authentication Server Function) ───
   ausf:
     image: mvno-open5gs:2.8.0

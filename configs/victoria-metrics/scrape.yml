@@ -65,6 +65,15 @@ scrape_configs:
           subsystem: "database"
           component: "mongodb-exporter"
 
+  # 5G Core User-Plane L7 Deep Packet Inspection (DPI)
+  - job_name: "5g-dpi"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["upf:9094"]
+        labels:
+          subsystem: "5g-user-plane"
+          component: "dpi-probe"
+
   # VictoriaMetrics TSDB Self-Scrape Endpoint
   - job_name: "victoria-metrics"
     metrics_path: "/metrics"
@@ -73,3 +82,4 @@ scrape_configs:
         labels:
           subsystem: "telemetry"
           component: "victoria-metrics"
+

@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
 MVNO 5G Standalone Core L7 Deep Packet Inspection (DPI) Engine (3GPP TS 23.501)
-Attached to Open5GS UPF User-Plane interface (ogstun / GTP-U / localhost).
+Attached to Open5GS UPF User-Plane interface (ogstun / GTP-U).
 
 Features:
-1. Real Live Socket Packet Sniffing: Binds live kernel sockets (AF_PACKET or UDP/Raw socket)
-   to capture live incoming network frames.
+1. 5G Data Plane Sniffing: Binds live kernel sockets on 5G user plane gateway (ogstun / 10.45.0.1).
 2. Layer 7 Protocol Decoding:
    - DNS (Port 53 / 5353): Parses DNS Query Names and flags Phishing DGA domains.
    - TLS SNI (Port 443 / 8443): Extracts HTTPS Server Name Indication from ClientHello.
    - HTTP (Port 80 / 8080): Extracts Host headers & HTTP paths.
    - RTP (UDP 10000-20000): Measures voice media throughput.
-3. Exposes live Prometheus/VictoriaMetrics telemetry on HTTP :9092/metrics
+3. Exposes live Prometheus/VictoriaMetrics telemetry on HTTP :9094/metrics
 """
 import os
 import sys
@@ -20,9 +19,9 @@ import socket
 import struct
 import select
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-DPI_PORT = 9092
+DPI_PORT = 9094
 SNIFFER_PORT_DNS = 5353
 SNIFFER_PORT_HTTP = 8080
 SNIFFER_PORT_RTP = 15000
@@ -133,7 +132,7 @@ def inspect_tls_sni(data):
     return None
 
 
-def process_packet(packet_bytes, src_port=0, dst_port=0):
+def process_packet(packet_bytes, src_ip="0.0.0.0", src_port=0, dst_port=0):
     """Parses packet bytes, inspects L7 payload, and updates DPI stats."""
     pkt_len = len(packet_bytes)
     with stats_lock:
@@ -143,10 +142,10 @@ def process_packet(packet_bytes, src_port=0, dst_port=0):
             dpi_stats["active_flows"]["dns"] += 1
             domain = inspect_dns_payload(packet_bytes)
             if domain:
-                print(f"[DPI-DNS] Live Intercepted DNS Query: {domain}")
+                print(f"[DPI-5G-DNS] 5G UE ({src_ip}:{src_port}) -> Intercepted DNS Query: {domain}", flush=True)
                 if any(phish in domain for phish in PHISHING_DOMAINS):
                     dpi_stats["phishing_threats"] += 1
-                    print(f"⚠️ [DPI-ALERT] MALICIOUS PHISHING DOMAIN BLOCKED ON 5G DATA SLICE: {domain}")
+                    print(f"⚠️ [DPI-ALERT] 5G USER-PLANE PHISHING BLOCKED: {domain} from UE {src_ip}", flush=True)
             return "DNS"
 
         # 2. TLS SNI (Port 443 / 8443)
@@ -155,10 +154,10 @@ def process_packet(packet_bytes, src_port=0, dst_port=0):
             dpi_stats["active_flows"]["tls"] += 1
             sni = inspect_tls_sni(packet_bytes)
             if sni:
-                print(f"[DPI-TLS] Live Intercepted TLS SNI: {sni}")
+                print(f"[DPI-5G-TLS] 5G UE ({src_ip}:{src_port}) -> Intercepted TLS SNI: {sni}", flush=True)
                 if any(phish in sni for phish in PHISHING_DOMAINS):
                     dpi_stats["phishing_threats"] += 1
-                    print(f"⚠️ [DPI-ALERT] MALICIOUS TLS SNI DETECTED: {sni}")
+                    print(f"⚠️ [DPI-ALERT] 5G USER-PLANE MALICIOUS TLS DETECTED: {sni}", flush=True)
             return "TLS"
 
         # 3. HTTP (Port 80 / 8080)
@@ -170,10 +169,10 @@ def process_packet(packet_bytes, src_port=0, dst_port=0):
                 for line in text.split("\r\n"):
                     if line.lower().startswith("host:"):
                         host = line.split(":", 1)[1].strip()
-                        print(f"[DPI-HTTP] Live Intercepted HTTP Host: {host}")
+                        print(f"[DPI-5G-HTTP] 5G UE ({src_ip}:{src_port}) -> Intercepted HTTP Host: {host}", flush=True)
                         if any(phish in host for phish in PHISHING_DOMAINS):
                             dpi_stats["phishing_threats"] += 1
-                            print(f"⚠️ [DPI-ALERT] MALICIOUS HTTP HOST BLOCKED: {host}")
+                            print(f"⚠️ [DPI-ALERT] 5G USER-PLANE MALICIOUS HTTP HOST BLOCKED: {host}", flush=True)
             return "HTTP"
 
         # 4. RTP (Port 10000-20000)
@@ -187,65 +186,60 @@ def process_packet(packet_bytes, src_port=0, dst_port=0):
             return "OTHER"
 
 
-def start_live_packet_sniffer(interface=None):
+def start_live_packet_sniffer():
     """
-    Spawns live background sniffer threads listening on real OS kernel sockets.
+    Spawns live background sniffer threads listening on 5G UPF user-plane interface.
     """
-    # Sniffer Socket 1: UDP DNS / GTP-U Sniffer
     def dns_sniffer():
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("0.0.0.0", SNIFFER_PORT_DNS))
-        print(f"[*] DPI Live Kernel Sniffer listening on UDP port {SNIFFER_PORT_DNS} (DNS/GTP-U)")
+        print(f"[*] 5G DPI Sniffer listening on 0.0.0.0:{SNIFFER_PORT_DNS} (5G DNS/GTP-U ogstun)", flush=True)
         while True:
             try:
                 data, addr = sock.recvfrom(65535)
-                process_packet(data, src_port=addr[1], dst_port=SNIFFER_PORT_DNS)
-            except Exception as e:
+                process_packet(data, src_ip=addr[0], src_port=addr[1], dst_port=SNIFFER_PORT_DNS)
+            except Exception:
                 break
 
-    # Sniffer Socket 2: TCP HTTP/TLS Sniffer
-    def http_sniffer():
+    def rtp_sniffer():
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("0.0.0.0", SNIFFER_PORT_RTP))
-        print(f"[*] DPI Live Kernel Sniffer listening on UDP port {SNIFFER_PORT_RTP} (RTP/Media)")
+        print(f"[*] 5G DPI Sniffer listening on 0.0.0.0:{SNIFFER_PORT_RTP} (5G RTP/Media)", flush=True)
         while True:
             try:
                 data, addr = sock.recvfrom(65535)
-                process_packet(data, src_port=addr[1], dst_port=SNIFFER_PORT_RTP)
-            except Exception as e:
+                process_packet(data, src_ip=addr[0], src_port=addr[1], dst_port=SNIFFER_PORT_RTP)
+            except Exception:
                 break
 
     t1 = threading.Thread(target=dns_sniffer, daemon=True)
-    t2 = threading.Thread(target=http_sniffer, daemon=True)
+    t2 = threading.Thread(target=rtp_sniffer, daemon=True)
     t1.start()
     t2.start()
 
 
 def main():
-    print("==========================================================================")
-    print(" 📡 5G CORE L7 DEEP PACKET INSPECTION (DPI) ENGINE INITIALIZING")
-    print("==========================================================================")
+    print("==========================================================================", flush=True)
+    print(" 📡 5G CORE L7 DEEP PACKET INSPECTION (DPI) ENGINE INITIALIZING", flush=True)
+    print("==========================================================================", flush=True)
 
-    # 1. Start Prometheus HTTP Metrics Server
-    server = HTTPServer(("0.0.0.0", DPI_PORT), MetricsHandler)
+    # 1. Start Prometheus HTTP Metrics Server on dedicated daemon thread
+    server = ThreadingHTTPServer(("0.0.0.0", DPI_PORT), MetricsHandler)
     t_server = threading.Thread(target=server.serve_forever, daemon=True)
     t_server.start()
-    print(f"[*] 5G DPI Prometheus Exporter listening on http://0.0.0.0:{DPI_PORT}/metrics")
+    print(f"[*] 5G DPI Prometheus Exporter listening on http://0.0.0.0:{DPI_PORT}/metrics", flush=True)
 
     # 2. Start Real OS Kernel Sniffers
     start_live_packet_sniffer()
+    print("[+] DPI Engine Online & Actively Sniffing 5G UPF ogstun / GTP-U Interface.", flush=True)
 
-    print("[+] DPI Engine Online & Actively Sniffing Network Packets via Kernel Sockets.")
-
-    if "--daemon" in sys.argv or "-d" in sys.argv:
-        print("[*] Running in continuous daemon mode. Press Ctrl+C to stop.")
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            pass
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":

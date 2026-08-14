@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Master Verification Suite: SOTA Carrier Telephony & Anti-Fraud Mesh (0 MOCKS)
-Executes and validates all 6 advanced features end-to-end:
+Master Verification Suite: SOTA Carrier Telephony & Anti-Fraud Mesh
+Executes and validates all 6 advanced carrier features end-to-end:
 1. Deep Smishing Redirect Sandbox & SSRF Guard (AiFilterService.java)
-2. AI Voice Clone & Synthetic Audio DSP Spectral Detector (VoiceCloneDetector.java)
+2. AI Voice Clone & Synthetic Audio DSP Spectral Detector (VoiceCloneDetector.java & genuine acoustic WAVs)
 3. STIR/SHAKEN ES256 PASSporT Cryptographic Attestation (RFC 8224 / RFC 8588)
 4. Stateful Interactive USSD Gateway (*100# / 3GPP TS 24.090)
-5. Emergency 911 / 112 Layer 0 Priority Preemption (RFC 6881 / 3GPP TS 23.167)
-6. 5G Core L7 Deep Packet Inspection (DPI) Probe (ogstun / GTP-U)
+5. Emergency 911 / 112 Layer 0 Priority Preemption (Kamailio Core & Asterisk PSAP)
+6. 5G Core L7 Deep Packet Inspection (DPI) Probe (Open5GS UPF ogstun & GTP-U)
 """
 import sys
 import subprocess
