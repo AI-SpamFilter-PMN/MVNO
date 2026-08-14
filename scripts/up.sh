@@ -47,19 +47,25 @@ CUSTOM_IMAGES=(
   # mvno-vosk-worker — removed: ASR runs in-process via NativeVoskService.java
 )
 
-# ─── Cold-start fail-fast (guided error, not silent breakage) ─────────────────
-# A plain launch (or --build) with no subscriber DBs means a silently broken
-# stack: no Kamailio subscriber table (SIP digest auth fails), no hlr.db IMSI
-# map (2G paths), no balances (403 contract). `make init-db` (or the one-command
-# `make bootstrap`) creates them. Passthrough commands work without the DBs.
+# ─── Cold-start auto-provision (one-command `make up` / `podman compose up`) ──
+# A plain launch with no subscriber DBs means a silently broken stack: no
+# Kamailio subscriber table (SIP digest auth fails), no hlr.db IMSI map (2G
+# paths), no balances (403 contract). `make init-db` creates them idempotently
+# (CREATE TABLE IF NOT EXISTS + seed rows), so instead of a guided error we
+# AUTO-PROVISION them here — `make up` / `podman compose up` now work from a
+# truly cold tree (git clone → make up). Passthrough commands need no DBs.
 case "${1:-}" in
   down|logs|ps|stop|restart|config|create) : ;;  # passthrough: no DB needed
   *)
     if [ ! -f state/kamailio/kamailio.db ] || [ ! -f state/hlr/hlr.db ]; then
-      echo "❌ cold start: subscriber DBs missing (state/kamailio/kamailio.db, state/hlr/hlr.db)." >&2
-      echo "   Run 'make init-db' first — or the one-command 'make bootstrap'" >&2
-      echo "   (≡ init-db -> up -> seed-mongo -> bootstrap-check)." >&2
-      exit 1
+      echo "ℹ️  cold start: subscriber DBs missing — auto-provisioning via 'make init-db'..."
+      if ! make init-db >/dev/null 2>&1; then
+        echo "❌ cold start: 'make init-db' failed (see above)." >&2
+        echo "   Manual fallback: run 'make init-db' and retry." >&2
+        exit 1
+      fi
+      [ -f state/kamailio/kamailio.db ] && [ -f state/hlr/hlr.db ] \
+        && echo "  ✓ subscriber DBs provisioned (kamailio.db + hlr.db)" || exit 1
     fi
     ;;
 esac
@@ -120,4 +126,15 @@ if [ ${#DRIFT[@]} -gt 0 ]; then
 fi
 
 echo "All required images present. Launching offline container stack..."
-exec $COMPOSE_CMD -f docker-compose.yml up -d "$@"
+if $COMPOSE_CMD -f docker-compose.yml up -d "$@"; then
+  # ─── Auto-seed Open5GS Mongo (idempotent upsert) ────────────────────────────
+  # seed-mongo.sh waits for mongodb readiness (up to 60 s) and upserts the 3
+  # UERANSIM 5G SA subscribers. Without it, `make up` alone leaves the 5G UEs
+  # unprovisioned (AMF attach fails). Safe to re-run on a live stack.
+  echo "ℹ️  stack up — seeding Open5GS Mongo (5G SA subscribers)..."
+  if ./scripts/seed-mongo.sh >/dev/null 2>&1; then
+    echo "  ✓ Open5GS Mongo seeded (3× UERANSIM subscribers)"
+  else
+    echo "  ⚠ seed-mongo skipped/failed (check mvno-mongodb health later)" >&2
+  fi
+fi

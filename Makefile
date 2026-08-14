@@ -198,6 +198,20 @@ test-call:
 gate:
 	./scripts/testing/gate.sh
 
+# Live NOC center: tmux multiterminal with streaming logs + call control + evidence.
+#   make noc        -> create/attach the control room
+#   make noc-kill   -> destroy the tmux session
+noc:
+	./scripts/noc.sh
+
+noc-kill:
+	./scripts/noc.sh kill
+
+# Fully headless end-to-end verify: cold start -> phone -> rig call (RTP assert)
+# -> SMS matrix. Use --skip-cold-start to re-verify a live stack only.
+demo-verify:
+	./scripts/testing/demo-verify.sh
+
 # Static IP pin uniqueness guard (F1-class: duplicate pins surface only as
 # runtime IPAM errors at container start). Run before committing compose changes.
 check-pins:
