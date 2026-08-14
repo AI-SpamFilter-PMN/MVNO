@@ -272,7 +272,7 @@ One of the most common failure patterns in multi-component telecom stacks (confi
 ```yaml
 services:
   mongodb:
-    image: mongo:8.0
+    image: mongo:7.0
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.runCommand({ping:1})", "--quiet"]
       interval: 5s

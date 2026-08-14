@@ -261,11 +261,11 @@ launch_wireshark() {
         echo "  (wireshark not installed — post-hoc: see the S11 one-liner below)"; return 0; }
     [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] || {
         echo "  (no DISPLAY/WAYLAND_DISPLAY — post-hoc: wireshark -r \"\$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')\" -d udp.port==10000-20000,rtp)"; return 0; }
-    if ! timeout 2 dumpcap -i lo -a duration:1 -w "${TMPDIR}/mvno-ws-perm.pcap" >/dev/null 2>&1; then
+    if ! timeout 2 dumpcap -i lo -a duration:1 -w "${TMPDIR:-/tmp}/mvno-ws-perm.pcap" >/dev/null 2>&1; then
         echo "  ⚠ no lo capture permission — GUI opens but capture would be empty."
         echo "    fix: sudo setcap cap_net_raw,cap_net_admin+eip \$(command -v dumpcap)"
     fi
-    rm -f "${TMPDIR}/mvno-ws-perm.pcap"
+    rm -f "${TMPDIR:-/tmp}/mvno-ws-perm.pcap"
     local plat="xcb"
     [ -n "${WAYLAND_DISPLAY:-}" ] && plat="wayland"
     local xa=":"

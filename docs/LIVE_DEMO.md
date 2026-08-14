@@ -299,7 +299,8 @@ curl -s 'http://localhost:8428/api/v1/query?query=rtpengine_packets_total' \
 ```
 
 Want to **inspect the capture in the Wireshark GUI** (not just the CLI tail)?
-The cockpit's `--wireshark` flag opens it live (P8); post-hoc, open the fresh
+The cockpit's `--wireshark` flag launches it live as a **detached** capture
+(spans `lo` + LAN via `-i any`; it is *not* a tmux pane); post-hoc, open the fresh
 pcap above directly:
 
 ```bash
@@ -728,7 +729,8 @@ IPs) with a forced RTP decode. The plan's `udp.portrange` decode field is
   capture; if live capture lacks dumpcap permissions it falls back to tailing
   the newest relay pcap with the same decode.
 - **Wireshark GUI — DETACHED, not a pane**: `demo_live.sh --wireshark` launches
-  `wireshark -k -i lo` (RTP decode) as a **background process** — a GUI cannot
+  `wireshark -k -i any` (multi-interface: loopback + LAN for the mobile phone;
+  RTP decode on UDP 10000-20000) as a **background process** — a GUI cannot
   live reliably inside a tmux pane. The launcher handles the classic
   no-window causes explicitly: the Qt platform plugin under Wayland
   (`QT_QPA_PLATFORM=wayland`, xcb fallback for XWayland), an empty
