@@ -87,6 +87,12 @@ it (see `2026-08-09-g722-sip-rtp-path.md`).
    for ~5 seconds so the rig's Vosk ASR can transcribe it.
 6. Send **one SMS** from the phone (if an SMS path for the phone is configured;
    otherwise use `scripts/testing/send_smpp_sms.py`).
+   - Both Linphone and MizuDroid are supported for SMS (Issues 8.51/8.56): the
+     bridge accepts bracketless `To: sip:..@..` headers and Kamailio normalizes
+     `+`/`00`/`0`-prefixed `From:` before the OCS lookup — use the bare MSISDN
+     `15551234567` or the international `+2015551234567` form, either works.
+   - Typing indicators while composing are consumed silently (Issue 8.52) —
+     only the actual sent message is delivered to the 2G MS.
 7. Report back: the time you called, the phrase you spoke, and the SMS body.
 
 > ⚠ I do **not** fabricate the phone event. The device registration and spoken

@@ -96,6 +96,15 @@ it is referenced from the `loadmodule "dialplan.so"` comment in
 (bare-INVITE/LOCATION and the MESSAGE path) and is skipped for
 OPTIONS/CANCEL/ACK (all handled earlier in `request_route`).
 
+**Sender (`From:`) normalization for SMS interception (Issue 8.56, 2026-08-14):**
+`route[INTERCEPT_SMS]` ALSO normalizes `$fU` (the sender) to a bare MSISDN
+before building the intercept payload — clients that emit `+`/`00`/`0`-prefixed
+`From:` (Java SipClient, mizuDroid, Linphone intl mode) would otherwise look up
+`+1555…` against the bare-MSN subscriber DB, read balance 0, and be wrongly
+BLOCKED as "Prepaid balance exhausted". The same prefix table applies
+(`+20…`→strip 3, `+1555…`→strip 1, `00[20]…`→strip 2, `0…`→strip 1). The
+recipient (`$rU`) was already handled by the dialplan above.
+
 ## 4. Vector log-shipper socket (runtime-agnostic)
 
 - The `mvno-vector` container mounts the container engine socket to read container logs.
@@ -115,7 +124,7 @@ OPTIONS/CANCEL/ACK (all handled earlier in `request_route`).
 ```bash
 ./scripts/preflight.sh        # verify host (must be ✓ ALL CLEAR or ! WARN)
 make init-db                  # SQLite subscriber DBs (Kamailio auth + balance, HLR)
-make up                       # 34 containers (compose), offline-first
+make up                       # 37 containers (compose), offline-first
 make seed-mongo               # Open5GS 5G subscribers — AFTER up (execs into mongodb)
 bash scripts/testing/live_demo.sh   # 13-step end-to-end gate
 ```

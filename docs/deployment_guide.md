@@ -100,8 +100,9 @@ pull from their own public Docker Hub namespaces as usual.
 
 **Compose file layout (why 3 files — do NOT merge them):** the stack uses standard Compose
 *override layering*, so each file has one distinct purpose:
-- `docker-compose.yml` — the canonical, offline-first base (36 services: 34 core + the
-  `baresip-rx`/`baresip-tx` live-demo rig, statically pinned IPs).
+- `docker-compose.yml` — the canonical, offline-first base (37 services: 35 core +
+  the `baresip-rx`/`baresip-tx` live-demo rig + the `asterisk` media sidecar,
+  statically pinned IPs).
 - `docker-compose.build.yml` — opt-in **source-build** override for online rebuilds
   (`podman compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`); keeps the
   base file free of `build:` stanzas.

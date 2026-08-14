@@ -48,7 +48,8 @@ All commands below were **empirically verified** against the running stack
 12. [Flow M — Call Recording → ASR Transcription (RTPEngine pcap → WAV → Vosk)](#flow-m--call-recording--asr-transcription-rtpengine-pcap--wav--vosk)
 13. [Flow N — Automated Demo Gate (live_demo.sh)](#flow-n--automated-demo-gate-live_demosh)
 14. [Flow O — Failure-Path & Resilience Checks](#flow-o--failure-path--resilience-checks)
-15. [Troubleshooting & Known Quirks](#troubleshooting--known-quirks)
+15. [Flow P — Conference / Voicemail / Screening (Asterisk media server)](#flow-p--conference--voicemail--screening-asterisk-media-server)
+16. [Troubleshooting & Known Quirks](#troubleshooting--known-quirks)
 
 ---
 
@@ -69,7 +70,7 @@ Ensure the full stack is up and healthy **before** running any flow:
 
 ```bash
 cd /home/zkhattab/AI-SpamFilter-PMN/MVNO
-podman compose ps          # expect 34/34 compose services Up
+podman compose ps          # expect 37/37 compose services Up
 ./scripts/preflight.sh     # optional health preflight
 ```
 
@@ -817,6 +818,78 @@ podman logs mvno-kamailio --since 2m | grep "SMS BLOCKED BY MVNO INTERCEPTION CO
 
 ---
 
+## Flow P — Conference / Voicemail / Screening (Asterisk media server)
+
+**Goal**: prove the Asterisk sidecar (Decision D7) delivers the three call
+features — conference rooms, voicemail, and call screening with
+accept/decline/recorded-message — through the Kamailio edge.
+
+**Topology**: Kamailio keeps the edge/registrar/interceptor role; INVITEs to
+feature numbers are trunked to `mvno-asterisk` (10.89.0.63:5061) instead of
+LOCATION lookup:
+
+| Feature | Number | Kamailio regex | Asterisk target |
+|---|---|---|---|
+| Conference room | `7001`–`7999` | `^7[0-9]{3}$` | `ConfBridge(room)` |
+| Screening | `8000` | `^8000$` | `screening` context |
+| Voicemail main | `8XXX` | `^8[0-9]{3}$` (≠8000) | `VoicemailMain(mbox@default)` |
+
+Accept/decline is **native SIP** (200/183 = accept, 486/603 = decline) — every UA
+(Linphone, baresip, SipClient) already renders the accept/decline UI for a ringing
+call; Kamailio relays these untouched. No code was built for it.
+
+### P.1 — Two baresip rigs join a ConfBridge room
+
+```bash
+# tx dials room 7001 (background); rx dials the same room
+podman exec baresip-tx python3 /cfg/baresip_dial.py 7001 &
+# ...shortly after, rx joins too...
+podman exec baresip-tx python3 /cfg/baresip_dial.py 7001
+podman exec mvno-asterisk asterisk -rx "confbridge list"
+podman exec mvno-asterisk asterisk -rx "pjsip show channels"
+```
+
+**Expected**: two `Up` legs (15553332211 = tx, 15559998888 = rx) in
+`Conference 001` with media flowing (fresh pcap shows G.722 RTP between the rigs
+and the Asterisk bridge, ~0% loss). Hanging up both rigs clears the room
+(`confbridge list` → 0 users).
+
+### P.2 — Screening with accept / decline / recorded-message reply
+
+```bash
+podman exec baresip-tx python3 /cfg/baresip_dial.py 8000
+```
+
+**Expected**: Asterisk answers, plays the "state your name" prompt, and
+`Record()`s the caller's name (`ls /tmp/screening/*.wav` → ~160 KB for a few
+seconds of speech). The Read() menu then dispatches:
+
+- **1** — accept: `Dial(PJSIP/15559998888@screening-out)` rings the rig callee
+  through Kamailio (rx logs `Call established: sip:15550000001@10.89.0.23`);
+- **2** — decline: `Playback(vm-goodbye)` + hangup;
+- **3** — voicemail: `VoiceMail(1000@default)` records the message; the rig
+  callee later retrieves it via voicemail main.
+
+### P.3 — Voicemail main + retrieval
+
+```bash
+podman exec baresip-tx python3 /cfg/baresip_dial.py 8100   # mailbox 100
+# -> VoicemailMain(mailbox 100) on 15550000100
+podman exec mvno-asterisk asterisk -rx "voicemail show users"
+podman exec mvno-asterisk asterisk -rx "mailbox show 100@default"
+```
+
+**Expected**: `VoiceMailMain` registers (module is `app_voicemail.so`; the
+imap/odbc variants are `noload`ed — they clobber the registration), the mailbox
+exists, and a recorded message shows `NEW` with the caller's number.
+
+> **Recovery note**: `record_file`/menu key `#` in `confbridge.conf` and
+> `max_members` in `[general]` are rejected by Asterisk 20 — keep the shipped
+> config as the reference. Voicemail boxes are numeric only (`mailbox 100` =
+> 15550000100, `001` does not exist).
+
+---
+
 ## Raw mechanics (the original inline commands)
 
 The LIVE_DEMO guide now calls one-line helpers (`demo_call.sh`,
@@ -844,11 +917,14 @@ module uuid.so
 module_app account.so
 module_app menu.so
 module_app ctrl_tcp.so
-audio_source aufile,/media/speech8k.wav
+ctrl_tcp_listen 0.0.0.0:4444   # Issue 8.59: gate hangs up BOTH rigs before dialing
 EOF
 cat > state/baresip/rx/accounts <<'EOF'
 <sip:15559998888@10.89.0.23:5060>;auth_user=15559998888;auth_pass=testpass;answermode=auto
 EOF
+# auto-answer note (Issue 8.48): answermode=auto alone auto-answers in the
+# packaged build (verified live 2026-08-14). If a future baresip stops
+# auto-answering, add ;sip_autoanswer=yes to the account line.
 cat > state/baresip/tx/config <<'EOF'
 module_path /usr/lib/baresip/modules
 module stdio.so
@@ -912,6 +988,21 @@ podman exec baresip-tx bash -c "exec 3<>/dev/tcp/127.0.0.1/4444; \
 podman logs baresip-rx | grep -c "200 Answering"    # expect 1
 scripts/testing/newest.sh 'state/spool/pcaps/*.pcap'   # the fresh recording
 ```
+
+> **Gate dialing gotcha (Issue 8.59)**: for ASSERTIONS, do NOT pipe
+> `timeout N cat <&3` into `grep -q CALL_ESTABLISHED` — podman exec buffers the
+> pipe, so events only reach grep when the socket is torn down and a call that
+> established in 0.5 s looks like a full-timeout failure. Use the packaged
+> netstring-aware helper instead (returns the instant CALL_ESTABLISHED is seen):
+>
+> ```bash
+> podman exec baresip-tx python3 /cfg/baresip_dial.py --timeout 30
+> ```
+> (`scripts/testing/baresip_dial.py`; also available at `/cfg/baresip_dial.py`
+> inside both rigs — `state/baresip/{tx,rx}` are bind-mounted). Always hang up
+> BOTH rigs before dialing (`{"command":"hangup"}` with the CORRECT
+> `${#MSG}:` netstring length prefix) — a call left up by a manual test makes
+> rx refuse to auto-answer the next INVITE (Issue 8.59).
 
 ### 2. Raw binary SMPP 3.4 (what `send_raw_smpp.py` sends)
 

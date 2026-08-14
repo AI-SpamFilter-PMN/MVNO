@@ -27,8 +27,16 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 > * `beep` → Issue 8.43
 > * `hlr` → Issue 8.44
 > * `cold-start` → Issue 8.45
+> * `typing` → Issue 8.52
+> * `smpp` → Issue 8.55
+> * `cross-client` → Issue 8.56
+> * `jansson` → Issue 8.58
+> * `demo-verify` → Issue 8.59
+> * `reply_ok` → Issue 8.60
+> * `paging` → Issue 8.61
+> * `asterisk` → Issue 8.62
 
-<!-- check-issues frontier: Issue 8.45 -->
+<!-- check-issues frontier: Issue 8.62 -->
 
 ---
 
@@ -913,6 +921,313 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   fix_nated_contact() mints a self-loop — both phone-reachability, but
   disjoint mechanisms and disjoint fixes.
 
+### Issue 8.51: IP-SM-GW bridge silently dropped every Linphone-originated SMS — strict `To: <sip:` regex vs RFC 3261 bracketless form (5G→2G Cell 3)
+* Symptom: Android Linphone messages (and any client sending `To: sip:...@...`
+  WITHOUT angle brackets) were 407-challenged, re-sent authorized, then got NO
+  response — Kamailio relayed to the bridge but the bridge never replied;
+  after ~30 s Kamailio's tm timer sent 408 and the phone showed the message as
+  undelivered. Scripted senders (`ims_terminal.py`, which sends `To: <sip:..>`
+  WITH brackets) worked — which hid the bug.
+* Root Cause: `parse_sip_message()` used `To:\s*<sip:(\d+)@` — the `<` was
+  REQUIRED. RFC 3261 permits both forms; Linphone sends the bare form
+  (`To: sip:15554443322@localhost`). recipient resolved to `None` →
+  `recipient in MSISDN_2G` was False → `handle_inbound` returned SILENTLY (no
+  RELAY log, no 200).
+* Fix: make the `<` optional in both From and To regexes
+  (`From:\s*<?sip:` / `To:\s*<?sip:`), regression tests added
+  (`test_linphone_bracketless_to_and_from`).
+* Verification: live 2026-08-14 — `DIAGPHONE4-FIXED` from the phone relayed +
+  SMPP-submitted + landed in the 2G MS `sms.txt`, and the full sms_matrix
+  Cell 3 (5G→2G) went green.
+* Status: X (fixed 2026-08-14, `scripts/ip_sm_gw.py`; suite now 33/33)
+* Verified-by: live phone→2G delivery 2026-08-14 + sms_matrix Cell 3 green
+* Lesson: the scripted-only test path (all senders emit `<sip:..>`) masked a
+  real-client format divergence. Add the real phone as a matrix sender.
+* Distinct-from: 8.24 (AI-Filter mock chunked body) — different layer: 8.24 is
+  the API-side mock reading an empty body; 8.51 is the bridge's SIP header
+  parser rejecting a legal RFC 3261 bracketless form.
+* Distinct-from: 8.26 (bridge registrations die silently) — different defect:
+  8.26 is the bridge's REGISTER refresh (fixed Call-ID/CSeq) dying after hours;
+  8.51 is a per-message parse drop of bracketless From/To headers.
+* Distinct-from: 8.52 (typing indicators relayed) — different message class:
+  8.52 is RFC 3994 is-composing MESSAGEs being relayed; 8.51 is real SMS text
+  dropped because of a header-format parse miss.
+
+### Issue 8.52: Linphone RFC 3994 typing indicators relayed to the 2G MS as literal SMS
+* Symptom: while typing, the phone emits `MESSAGE` with
+  `Content-Type: application/im-iscomposing+xml`; the bridge relayed the raw
+  XML body to OsmoSMSC and the 2G MS displayed/stored it as an SMS
+  (`sms.txt` showed the raw `<isComposing><state>active</state>` XML).
+* Root Cause: no content-type gate anywhere — the bridge treated every relayed
+  MESSAGE as SMS and forwarded the XML body; Kamailio also passed it through to
+  the intercept API, polluting the SMS record store with fake "typing SMS".
+* Fix: two gates — (a) `is_typing_indicator()` in the bridge
+  (`scripts/ip_sm_gw.py`): is-composing content type is ACKed to Kamailio (so
+  the sender's delivery state stays clean) but never relayed to 2G, and
+  (b) a Kamailio `route[INTERCEPT_SMS]` gate (`$hdr(Content-Type) =~
+  "iscomposing"` → silent 200, no API call, no relay) so ANY client's typing
+  indicators are consumed before the intercept API or the bridge ever see them
+  — one gate covers every client, no reliance on client-specific body quirks.
+  Tests added.
+* Verification: live 2026-08-14 — `[SKIP] typing indicator` logged in the
+  bridge, `SMS TYPING-INDICATOR CONSUMED (im-iscomposing)` in Kamailio, only
+  the real text reached sms.txt, and no fake SMS row hit the API.
+* Status: X (fixed 2026-08-14)
+* Verified-by: live phone-typing run 2026-08-14 (both gates in the log)
+* Distinct-from: 8.51 (bracketless To drop) — different message class: 8.51
+  drops real SMS text on a parse miss; 8.52 relays non-SMS (typing) MESSAGEs
+  as SMS. Both are bridge 5G→2G defects, disjoint fixes.
+
+### Issue 8.53: Kamailio `debug=1` suppresses the `SMS INTERCEPT` L_INFO xlogs that prove the routing path
+* Symptom: during diagnosis, `podman logs mvno-kamailio` showed only the
+  jansson ERROR lines, never the `SMS INTERCEPT QUERY/PAYLOAD/RESPONSE` xlogs,
+  so it was impossible to see where the phone's message went.
+* Root Cause: `debug=1` (config line 15) prints only levels ≤ L_ERR;
+  `xlog("L_INFO")` needs a higher threshold. The config comment claims L_INFO
+  xlogs are "preserved" — they are not.
+* Fix: raise to `debug=3` (L_WARN + L_INFO-adjacent, no q_malloc spam) only
+  while diagnosing; revert to `debug=1` after. Consider a permanent `debug=3`
+  so intercept events stay visible without memory-allocator noise.
+* Verification: with `debug=3`, `podman logs mvno-kamailio` shows the
+  `SMS INTERCEPT QUERY/PAYLOAD/RESPONSE` xlogs during a live message;
+  with `debug=1` they are absent (observed 2026-08-14).
+* Status: AO (audited-only observation, 2026-08-14; low priority)
+* Distinct-from: 8.24 (AI-Filter chunked body) — different defect: 8.24 is the
+  mock not reading chunked bodies; 8.53 is a logging-threshold observation.
+
+### Issue 8.54: Stale usrloc contacts from retired bridge replicas linger and can fork 5G→2G traffic
+* Symptom: `state/kamailio/kamailio.db` `location` table held contacts for
+  `15551234567@10.89.0.54:5090` and `@10.89.0.55:5090` (previous bridge
+  replicas) alongside the live `10.89.0.53:5090` — messages to the phone would
+  fork to dead bridge IPs.
+* Root Cause: usrloc `db_mode=2` write-back persists contacts across restarts;
+  when the replica count dropped from 3 to 1 the dead contacts were never
+  expired/deregistered (their 1800 s Expires was refreshed by the old
+  instances before they died, or Kamailio restarts flushed the memory table
+  while the DB kept stale rows).
+* Fix: on a scale-down, deregister or prune stale contacts
+  (`kamcmd ul.rm`), or restart Kamailio AND clear the location table. Check
+  `sqlite3 state/kamailio/kamailio.db "SELECT username,contact FROM location"`
+  after any replica change. The 5G→5G twin-relay test (Cell 4) works because
+  it uses the live contact, but forked retries to dead IPs can surface as
+  latency/timeouts.
+* Verification: observed 2026-08-14 — the location table held
+  `15551234567@10.89.0.54:5090` and `@10.89.0.55:5090` alongside the live
+  `10.89.0.53:5090`; after pruning the stale rows the phone AOR had a single
+  binding and calls routed to the live contact only.
+* Status: AO (observed 2026-08-14; cleanup procedure, no code change yet)
+* Distinct-from: 8.37 (stale demo registrations mask retry flow) — different
+  source: 8.37 is leftover simulator registrations for a single AOR; 8.54 is
+  dead bridge-replica contacts surviving a scale-down.
+
+### Issue 8.55: SMPP `short_message` encoding — OsmoSMSC expects UNPACKED 7-bit chars with data_coding=0, not pre-packed GSM-7
+* Symptom: 5G→2G SMS delivered via the bridge displayed as raw packed garbage
+  on the 2G MS (`EY_T;J�...`) when the bridge sent `gsm7_encode()` output with
+  `data_coding=0x00`.
+* Root Cause: with data_coding=0, OsmoSMSC expects ONE OCTET PER SEPTET
+  (sm_length = character count) and packs to GSM-7 itself for the radio path.
+  Sending pre-packed septets double-encoded the message.
+* Fix: `smpp_submit_sm` sends `message.encode("ascii", errors="replace")`
+  (unpacked). A/B proven by `scripts/testing/smpp_ab_test.py` (packed →
+  garbled, ascii → clean) and updated unit test
+  (`test_submit_sm_payload_is_unpacked_ascii`).
+* Verification: `smpp_ab_test.py` — packed payload displayed as raw packed
+  garbage on the 2G MS; ascii payload displayed clean. Unit suite 33/33 green.
+* Status: X (fixed 2026-08-14)
+* Verified-by: smpp_ab_test.py A/B + unit test + live 5G→2G delivery clean
+
+### Issue 8.56: Cross-client `+`/`00`/`0`-prefixed From: breaks OCS balance lookup → SMS wrongly blocked as "Prepaid balance exhausted" (403)
+* Symptom: a message sent from the Java SipClient (or any client emitting
+  international-format From:, e.g. `From: <sip:+15551234567@...>` or
+  `00`/`0`-prefixed) was intercepted, then BLOCKED by the API with
+  `{"allow":false,"reason":"Prepaid balance exhausted"}` even though the
+  sender had balance 100. Scripted senders (`ims_terminal.py`) use bare
+  MSISDNs, so the SMS matrix never caught it.
+* Root Cause: Kamailio's `route[INTERCEPT_SMS]` passed `$fU` VERBATIM into the
+  intercept payload; the API's OCS check `subscriberService.getBalance(sender)`
+  looks up `+15551234567` in the SQLite subscriber DB, which stores BARE
+  MSISDNs (`15551234567`) — the lookup misses, balance reads 0, and the SMS is
+  blocked. `route(NORMALIZE)` only rewrites `$rU` (recipient) later via
+  `dp_translate`; the sender was never normalized.
+* Fix: `route[INTERCEPT_SMS]` now normalizes `$fU` into `$var(sender)` BEFORE
+  building the payload (strip `+20`→20, `+<cc>`→bare, `00[20]`→bare,
+  `0`→bare) and the jansson payload uses `$var(sender)`. One gate — every
+  client (Java SipClient, MizuDroid, Linphone intl mode) benefits.
+* Verification: live 2026-08-14 cross-client test — `From: <sip:+15551234567@..>`
+  message now passes interception (allowed/relayed) instead of 403;
+  `podman logs mvno-kamailio` shows `SMS INTERCEPT QUERY: sender=15551234567`
+  (bare) in the payload. Unit + config-compile green.
+* Status: X (fixed 2026-08-14, `configs/kamailio/kamailio.cfg`)
+* Verified-by: live Java-style `+`-prefixed message through the full
+  intercept→relay→SMPP chain on 2026-08-14
+* Distinct-from: 8.38 (stale init-db seed balance) — different defect: 8.38 is
+  the seeded `balance=100` never correcting; 8.56 is a live lookup keyed on a
+  `+`-prefixed MSISDN missing in the DB.
+* Distinct-from: 8.51 (bracketless To drop) — different header: 8.51 is the
+  bridge's To parse rejecting bare form; 8.56 is Kamailio sending an
+  unnormalized From to the API.
+
+### Issue 8.57: SMPP bind_response trailing system_id octet shifts SUBMIT_SM response parse → bogus non-zero status 0x04000000
+* Symptom: the bridge logged `SMPP BIND_TRANSCEIVER OK` but every SUBMIT_SM
+  returned a bogus non-zero status `0x04000000` while the SMS was actually
+  stored AND delivered to the 2G MS — misleading delivery-state accounting and
+  noisy per-message "FAILED" logs.
+* Root Cause: OsmoSMSC appends a 1-byte EMPTY `system_id` to its
+  `bind_transceiver_resp` body, making the PDU 17 bytes (header 16 + 1). The
+  bridge read only the 16-byte header, leaving the stray octet in the socket;
+  the next `SUBMIT_SM` response parse started one byte late, so the status
+  field was read shifted and decoded as `0x04000000` instead of `0x00000000`.
+* Fix: after bind, read `bind_clen = struct.unpack(">I", resp[:4])[0]` and
+  drain `bind_clen - 16` extra bytes (`_recv_exact(s, bind_clen - 16)`)
+  before sending SUBMIT_SM.
+* Verification: unit suite + live 5G→2G delivery now logs
+  `[SMPP] SUBMIT_SM OK` with status 0; no stray-octet shift. 33/33 tests green.
+* Status: X (fixed 2026-08-14, `scripts/ip_sm_gw.py`)
+* Verified-by: live delivery chain (5G→2G SMS matrix green) + unit test
+
+### Issue 8.58: Kamailio SMS intercept JSON built by string concatenation breaks on any body containing a double-quote
+* Symptom: an SMS body containing a `"` (or backslash/control char) produced a
+  malformed JSON payload to the API (`{"content":"say \"hi\""}` truncated),
+  which could 400 the intercept call or corrupt the stored content. The old
+  code hand-escaped via `s.replace` chains that never handled `"` correctly.
+* Root Cause: `route[INTERCEPT_SMS]` assembled the payload with string concat
+  + `s.replace` escaping — fragile and incorrect for quote/backslash/control
+  characters; the SMS body is attacker-controlled content.
+* Fix: build the payload with `jansson_set("string", ...)` so the JSON
+  serializer escapes natively. NOTE (empirical): `jansson_set` creates the
+  object from an UNINITIALIZED `$var(payload)`; a literal `""` initializer
+  makes it fail with "result has json error" — the cfg initializes
+  `$var(payload) = "{}"` and jansson_set then adds the three fields.
+* Verification: config `kamailio -c` compiles; live message with an embedded
+  `"` is relayed with a well-formed payload (`SMS INTERCEPT PAYLOAD` log shows
+  valid escaped JSON); 2G MS receives the literal text.
+* Status: X (fixed 2026-08-14, `configs/kamailio/kamailio.cfg`)
+* Verified-by: live quoted-body relay 2026-08-14 + `kamailio -c` clean
+* Distinct-from: 8.24 (chunked body mock) — different defect: 8.24 is the API
+  mock not reading chunked bodies; 8.58 is Kamailio's payload serialization.
+
+### Issue 8.59: demo-verify.sh rig-call gate false-FAILs — hardcoded RTP ports, buffered ctrl socket read, and a stuck call from a manual test
+* Symptom: the `[3/6] RIG CALL` gate failed with "call not established" and
+  "RTP packets" even though the media plane was perfect (two clean RTP
+  streams, 0% loss, 7811 packets). Manual dials produced CALL_ESTABLISHED.
+* Root Cause (three harness defects): (1) the tshark decode used HARDCODED
+  ports `10000`/`10022`, but rtpengine assigns dynamic ports from the
+  10000-20000 pool (observed 10032/10044) — `-Y rtp` matched nothing;
+  (2) the dial used `timeout 3 cat <&3 | grep -q CALL_ESTABLISHED`: podman
+  exec buffers the pipe, so events only reached grep when the socket closed —
+  a call establishing in 0.5 s looked like a 12 s timeout; (3) a call left up
+  by an earlier MANUAL test was never hung up (the cleanup used a wrong
+  netstring length prefix `7:` for the 20-char `{"command":"hangup"}`), and
+  baresip-rx with an active call refuses to auto-answer a second INVITE.
+* Fix: (a) decode the WHOLE range `udp.port==10000-20000`;
+  (b) new `scripts/testing/baresip_dial.py` — a netstring-aware python helper
+  inside the rigs (`/cfg/baresip_dial.py`) that returns the instant
+  CALL_ESTABLISHED is observed (proven 0.6 s warm); (c) the gate now hangs up
+  BOTH rigs before dialing, using the CORRECT `${#HANGUP_MSG}:` length prefix
+  (20), and `state/baresip/rx/config` gained `ctrl_tcp_listen 0.0.0.0:4444` so
+  rx's side can be cleared too.
+* Verification: full cold-start `demo-verify.sh` — ALL GATES PASS (exit 0)
+  twice, incl. `call established (tx->rx)` and `RTP packets (7811) / loss
+  0.0%`; repeated runs green.
+* Status: X (fixed 2026-08-14, `scripts/testing/demo-verify.sh` +
+  `scripts/testing/baresip_dial.py` + `state/baresip/rx/config`)
+* Verified-by: two consecutive full cold-start gate runs green on 2026-08-14
+* Distinct-from: 8.29 (baresip ctrl_tcp netstring dialing) — different
+  defect: 8.29 documented the netstring framing/protocol; 8.59 is the GATE's
+  buffered-pipe read + wrong-length-prefix hangup + hardcoded ports.
+
+### Issue 8.60: Bridge `reply_ok()` split on `\r\n` only — bare-LF (MizuDroid) MESSAGEs delivered but never ACKed to the sender
+* Symptom: a bare-LF SIP MESSAGE (MizuDroid/embedded-style line endings) was
+  relayed by the bridge and delivered to the 2G MS, but the SENDER never
+  received the final 200 OK — Kamailio retransmitted the MESSAGE twice (two
+  `[RELAY]` lines in the bridge log) and the sending terminal showed a
+  timeout. CRLF requests (Linphone, Java SipClient, baresip) were fine — which
+  hid the bug.
+* Root Cause: `reply_ok()` split the request on `"\r\n"` ONLY. A bare-LF
+  request therefore collapsed into ONE line: no Via/From/Call-ID/CSeq headers
+  were found, so the 200 OK was sent with EMPTY transaction headers —
+  Kamailio's tm could not match it to the in-flight transaction and kept
+  retransmitting. The SMS was stored + delivered; only the ACK was lost.
+* Fix: `reply_ok()` normalizes line endings first
+  (`req_text.replace("\r\n", "\n").split("\n")`) before extracting Via/From/
+  To/Call-ID/CSeq, so the 200 OK carries the transaction headers regardless of
+  the request's line-ending convention. Regression tests added
+  (`test_reply_ok_carries_headers_for_bare_lf_request` and the CRLF twin) —
+  suite now 35/35.
+* Verification: live 2026-08-14 cross-client run — MizuDroid-style bare-LF
+  message now gets `SIP/2.0 200 OK` (was TIMEOUT), message relayed + SMPP
+  SUBMIT_SM OK + delivered to the 2G MS `sms.txt`; Java-style `+`-prefixed
+  CRLF message also 200 OK.
+* Status: X (fixed 2026-08-14, `scripts/ip_sm_gw.py` + 2 tests)
+* Verified-by: live bare-LF MESSAGE 200 OK + sms.txt delivery on 2026-08-14
+* Distinct-from: 8.51 (bracketless To drop) — different layer: 8.51 is header
+  PARSING of the incoming request; 8.60 is the outbound 200 OK assembly (no
+  headers at all) for bare-LF requests.
+* Distinct-from: 8.25 (Via: Via: malformed 200) — different defect: 8.25 was a
+  duplicated `Via:` prefix; 8.60 is MISSING transaction headers entirely for
+  bare-LF input.
+
+### Issue 8.61: 2G radio paging stalls after long idle — MT-SMS queued in smsc.db but never paged to the MS (transient)
+* Symptom: mid-session (2026-08-14) 5G→2G messages were relayed by the bridge
+  and SUBMIT_SM'd OK (`[SMPP] SUBMIT_SM OK`), but the 2G MS `sms.txt` never
+  received them — the SMSC logged `Paging Response action (expired)` for
+  IMSI-001010000000004 and the rows stayed `sent=NULL` in `smsc.db`.
+  A raw SMPP control message sent BEFORE the stall (XC-JAVA-0814) delivered
+  fine; the stall started mid-session after the 2G MS sat idle for hours.
+* Root Cause: transient 2G radio path degradation (LAPD `MDL-ERROR-IND cause
+  3` / SDCCH `Unsolicited UA response` on mvno-2g-core; the virtual Um link
+  stopped delivering paging responses). Not a bridge/SMPP/Kamailio defect —
+  the messages were stored + accepted by the SMSC; the radio leg failed to
+  page. The SMS matrix passed ALL CELLS earlier the same day, so this is a
+  time-dependent 2G radio flake, not a code regression.
+* Fix (recovery runbook): restart the 2G chain atomically and re-attach the MS
+  (`podman restart mvno-2g-core mvno-osmosmsc mvno-2g-ms`), then wait for the
+  MS location update (`msc_a_fsm... LU` complete + `EVENT_REG_SUCCESS` in the
+  MS log) before re-sending. Rows whose retry cycles were exhausted stay in
+  smsc.db `sent=NULL` — re-submit fresh messages rather than waiting for them.
+* Verification: after the chain restart + MS re-attach, a fresh SMPP message
+  (RADIOOK-0814) delivered to sms.txt within ~25 s. The earlier queued rows
+  (id 81-87) had exhausted their retries during the stall and were
+  re-submitted fresh.
+* Status: AO (observed 2026-08-14; transient infra flake, recovery runbook
+  only — no code change)
+* Distinct-from: 8.54 (stale usrloc contacts) — different layer: 8.54 is
+  Kamailio routing to dead bridge replicas; 8.61 is the 2G radio paging leg.
+
+### Issue 8.62: Asterisk media-server sidecar — conference / voicemail / screening behind Kamailio (IMPLEMENTED)
+* Symptom (feature, not a fault): the interception core (Kamailio + rtpengine)
+  cannot MIX audio — rtpengine is a media relay/NAT anchor, not an MCU — so
+  conference calling, voicemail, and IVR call-screening had no home; the
+  decision doc recommended an Asterisk sidecar (ARCHITECTURE_DECISIONS.md D7).
+* Fix: added `mvno-asterisk` (Asterisk 20.6, Ubuntu 24.04 container — Debian
+  12 DROPPED the `asterisk` package so Ubuntu is used, matching the decision
+  doc + the baresip rig's base) at 10.89.0.63 on the bridge net; Kamailio
+  routes feature numbers to the SIP trunk at :5061:
+  - `7XXX` → ConfBridge room (conference calling)
+  - `8XXX` → VoicemailMain mailbox
+  - `8000` → screening demo: record name → accept (Dial rig callee as
+    registered UA 15550000001) / decline / leave a message
+  Configs in `configs/asterisk/`; compose service + build/save entries in
+  bootstrap.sh; screening subscriber provisioned via add-subscriber.sh.
+* Issues hit while implementing (documented here so nobody re-hits them):
+  (a) `asterisk` package absent from Debian 12 main → Ubuntu 24.04 base;
+  (b) `app_voicemail_imap.so`/`_odbc.so` clobber the file-based VoiceMailMain
+  registration (`noload` them in modules.conf);
+  (c) Asterisk needs `/var/lib/asterisk/documentation` (symlink to
+  /usr/share) or "Stasis initialization failed. ASTERISK EXITING!";
+  (d) Ubuntu modules live in /usr/lib/x86_64-linux-gnu/asterisk/modules;
+  (e) confbridge.conf: no `max_members` in [general] (Asterisk 20), no `#`
+  menu key, no `pin` on open rooms.
+* Verification: live 2026-08-14 — ConfBridge 001 held TWO callers
+  (15553332211 + 15559998888) with RTP recorded (2288 pkts, 0% loss) and a
+  clean hangup; VoicemailMain executed; screening Record() saved the caller
+  WAV and the accept-leg Dial connected to the rig callee
+  (`Call established: sip:15550000001@10.89.0.23` in baresip-rx).
+* Status: X (implemented 2026-08-14)
+* Verified-by: live conference + voicemail + screening-accept-leg on
+  2026-08-14 (confbridge list, core show channels, baresip-rx log)
+* Distinct-from: 8.29/8.59 (baresip ctrl_tcp) — different component: 8.29/8.59
+  are the baresip rig console/gate; 8.62 is the new Asterisk media server.
 
 ---
 
@@ -964,3 +1279,13 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * **Claim**: `-d udp.port==10000-20000,rtp` might decode 0 frames because the media relay uses only source ports, false-FAILing the proof harness.
 * **Why it is NOT a fault**: compose maps `10000-20000:10000-20000/udp` (1:1, both directions), so `udp.port==10000-20000` matches src and dst — the RTP decode works both ways.
 * **Status**: C · audited 2026-08-08 (moved here from the Issue 8.43 note).
+
+### Not-Issue N-3: rootless passt UDP port-forward silently drops replies to unbound test sockets (and Via-port ≠ source-port)
+* **Claim**: "Kamailio stopped answering" — a custom cross-client test script sent SIP MESSAGEs from an UNBOUND socket (ephemeral port) and got NO response (not even the 407), while `ims_terminal.py` worked.
+* **Why it is NOT a fault**: the rootless podman passt forwarder tracks UDP flows from the CONTAINER side; it only returns packets to the host port the client actually bound (the host source port). An unbound socket uses a random ephemeral source port per datagram, and (second gotcha) the Via header port must MATCH the bound source port — a mismatch (Via 5075, bound 5090) also gets silently dropped. Real SIP clients (Linphone, MizuDroid, Java SipClient) always bind their listen socket and set Via = source port, so this never affects production traffic — it is a harness-writing requirement: BIND the socket and keep Via == bound port (verified: bound 5090 + Via 5090 → 407; unbound → timeout; bound 5090 + Via 5075 → timeout).
+* **Status**: C · audited 2026-08-14 (test-harness artifact; documented in TESTING_REFERENCE so future scripts bind correctly).
+
+### Not-Issue N-4: Android keyguard/pattern bouncer blocked UI-automation taps during phone call testing (device-state artifact)
+* **Claim**: "the phone never answers — the stack is broken" — during the laptop→phone call verification, adb `input tap` on the Linphone Answer slider did nothing.
+* **Why it is NOT a fault**: the phone's screen had fallen asleep mid-test and the pattern/PIN keyguard bouncer (`AlternateBouncerView`) covered the call UI; `uiautomator dump` showed zero Linphone nodes and `dumpsys window` showed `NotificationShade`/bouncer focused. The call itself rang correctly (the incoming-call UI was verified earlier in the same session); the stack (Kamailio routing, rtpengine, Vosk) was healthy. Harness fix: `adb shell svc power stayon true` + dismiss keyguard before UI automation, and prefer the call NOTIFICATION's Answer action over the full-screen slider.
+* **Status**: C · audited 2026-08-14 (test-environment artifact, not a code defect).

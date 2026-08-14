@@ -46,3 +46,21 @@
   (`15557654321` = balance 0).
 - Walk through MVNO `docs/LIVE_DEMO.md` **S15** to test with your client as the
   external UA (LAN phone/laptop path, live Vosk verdict).
+
+## SMS (MESSAGE) interworking — cross-client verified 2026-08-14
+
+SipClient (or any RFC-3261 UA) can also reach the 2G leg by sending
+`MESSAGE` (digest auth, like REGISTER/INVITE):
+
+- **`To:` may be bracketless** (`To: sip:15554443322@host`) — the bridge
+  accepts the RFC 3261 bare form (Issue 8.51); `To: <sip:..>` also works.
+- **`From:` may carry an international prefix** (`+2015551234567`,
+  `015551234567`, `002015551234567`) — Kamailio normalizes it before the OCS
+  balance lookup, so a `+`-prefixed From: is **not** mis-blocked as "prepaid
+  balance exhausted" (Issue 8.56).
+- **Typing indicators are not delivered**: if SipClient emits RFC 3994
+  `application/im-iscomposing+xml` MESSAGEs (Linphone does), Kamailio consumes
+  them with a silent 200 — they never become SMS rows or reach a 2G handset
+  (Issue 8.52).
+- Receipt: the 2G MS `sms.txt` shows `[SMS from +<sender>] <body>` after a
+  successful relay → SMPP SUBMIT_SM.

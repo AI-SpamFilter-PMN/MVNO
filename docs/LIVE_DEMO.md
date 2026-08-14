@@ -892,10 +892,79 @@ NEW=$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap'); echo "$NEW"
 > Zero-balance / EIR-fraud / AI-block numbers answer with `SIP 403 Forbidden` —
 > correct terminal behavior; treat 403 as final (no retry loop).
 
+> **SMS from the same clients is supported too (2026-08-14)**: the bridge
+> accepts RFC 3261 bracketless `To: sip:..@..` headers (Linphone/MizuDroid
+> style, Issue 8.51), Kamailio normalizes `+`/`00`/`0`-prefixed `From:` before
+> the OCS balance lookup (Issue 8.56 — Java SipClient intl format no longer
+> 403s as "prepaid exhausted"), and RFC 3994 typing indicators are consumed
+> silently instead of being relayed as fake SMS (Issue 8.52). Any client that
+> sends `MESSAGE` with digest auth can reach the 2G leg; bare MSISDN or
+> international `+20…` From both work.
+
 > **Why this matters for integration**: MVNO exposes *standard* SIP (RFC 3261 +
 > digest, PCMU relay), so any standards-based client registers and calls with
 > **zero MVNO-side changes** — this is exactly the surface the `SipClient`
 > teammate repo targets.
+
+## S16 — Conference / Voicemail / Call-Screening (Asterisk media server) · optional
+
+**PURPOSE** — prove the media-plane features behind Kamailio: multi-party
+conference mixing (ConfBridge), voicemail, and a call-screening IVR. These
+need an MCU/media server — rtpengine is a relay, not a mixer. Implemented
+2026-08-14 as `mvno-asterisk` (Asterisk 20.6, Ubuntu 24.04 container, bridge
+IP 10.89.0.63) on a SIP trunk at `:5061`. Kamailio stays the edge proxy /
+registrar / AI gate; feature numbers are routed to Asterisk:
+
+| Dialed number | Feature |
+|---|---|
+| `7XXX` (e.g. `7001`) | ConfBridge conference room (multi-party audio) |
+| `8XXX` (e.g. `8100`) | Voicemail main (mailbox = the XXX digits; demo box 100 / 1000) |
+| `8000` | Screening demo: state your name, then **1** accept (live-Dial the rig callee) · **2** decline · **3** leave a message |
+| — (any) | Accept/decline for ordinary ringing calls is NATIVE SIP (200/486/603) in the UA — no dialplan |
+
+**Conference (S16a)** — two callers join the same room, media mixed:
+```bash
+podman exec baresip-tx python3 /cfg/baresip_dial.py --uri "sip:7001@10.89.0.23:5060" --timeout 30 &   # caller 1
+podman exec baresip-rx python3 /cfg/baresip_dial.py --uri "sip:7001@10.89.0.23:5060" --timeout 30 &   # caller 2
+sleep 8
+podman exec mvno-asterisk asterisk -rx "confbridge list 001"   # 2 users, both Up
+NEW=$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')
+tshark -r "$NEW" -d udp.port==10000-20000,rtp -q -z rtp,streams 2>/dev/null | head -8   # RTP, 0% loss
+# hang up both, conference empties:
+podman exec mvno-asterisk asterisk -rx "confbridge list"   # 0 users
+```
+**EXPECT** — `confbridge list 001` shows 2 channels (CallerID 15553332211 +
+15559998888); a fresh pcap has thousands of RTP packets at 0% loss; after
+hangup the bridge is empty.
+
+**Voicemail (S16b)** — dial `8100`, log in to mailbox `100` (password
+`testpass`), record a greeting / leave a message:
+```bash
+podman exec baresip-tx python3 /cfg/baresip_dial.py --uri "sip:8100@10.89.0.23:5060" --timeout 25
+podman exec mvno-asterisk asterisk -rx "core show channels"      # VoiceMailMain executing
+podman exec mvno-asterisk ls /var/spool/asterisk/voicemail/default/100/   # recorded msgs
+```
+**EXPECT** — `VoiceMailMain` runs (log: `Executing [8100@mvno:2]
+VoiceMailMain`), mailbox 100 exists, messages land under
+`/var/spool/asterisk/voicemail/default/100/INBOX/`.
+
+**Screening (S16c)** — the accept-leg really rings the rig:
+```bash
+podman exec baresip-tx python3 /cfg/baresip_dial.py --uri "sip:8000@10.89.0.23:5060" --timeout 35   # then press 1 / 2 / 3
+podman logs --since 2m baresip-rx | grep 'Call established'     # accept-leg reached the rig
+podman exec mvno-asterisk ls /tmp/screening-*.wav                # the recorded name
+```
+**EXPECT** — Record() saves the caller's name WAV; pressing **1** makes
+Asterisk Dial the rig callee as registered UA `15550000001` and baresip-rx
+logs `Call established: sip:15550000001@10.89.0.23`; **2** plays goodbye;
+**3** routes to Voicemail(1000).
+
+> **Why this matters**: a real conference/Voicemail/screening capability now
+> exists without any custom media code — stock Asterisk apps behind the
+> existing Kamailio gate. Any UA (phone, baresip rig, SipClient) dials the
+> feature number and gets the service; the interception core still records
+> and gates every call. See `docs/ARCHITECTURE_DECISIONS.md` §3 and
+> `docs/ISSUES.md` 8.62.
 
 ---
 

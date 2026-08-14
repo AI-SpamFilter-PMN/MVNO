@@ -153,6 +153,7 @@ make test-sms && make test-call            # policy-intercept endpoint checks
 | [docs/partner/](docs/partner/) | Ready-to-paste integration docs for each teammate repo (`sms-client`, `SipClient`, `Filteration-System`) — connection facts, credentials, payload schemas, "prove your integration" checklist. |
 | [docs/deployment_guide.md](docs/deployment_guide.md) | Deployment runbook — ports, configs, commands, troubleshooting. Primary team reference. |
 | [docs/ENVIRONMENT_MATRIX.md](docs/ENVIRONMENT_MATRIX.md) | Portability contract — supported OS/arch/runtime/kernel features; run `./scripts/preflight.sh` to verify. |
+| [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md) | Verified architecture decisions + researched recommendations (IP-SM-GW approach, NeonDB role, conference/voicemail platform) with evidence. |
 | [docs/REALTIME_AUDIO.md](docs/REALTIME_AUDIO.md) | Recording pipeline tiers (Tier-1 live tap / Tier-3 post-call), latency budget, systemd unit. |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Architectural roadmap and operational backlog. |
 | [docs/ISSUES.md](docs/ISSUES.md) | Root cause analysis log and Section 10 Cross-Repo Contract Specifications. |

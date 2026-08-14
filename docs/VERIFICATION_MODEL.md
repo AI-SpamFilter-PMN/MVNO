@@ -142,8 +142,8 @@ alone cannot guarantee non-redundancy or verified genuineness:
    to two anchors) — a planted re-file is the regression test for this.
 4. **Document** — add the block with `* Symptom / * Root Cause / * Fix /
    * Verification / * Status / * Verified-by`. New entries must use
-   section-max+1 (frontier is `<!-- check-issues frontier: Issue 8.45 -->`;
-   next free ID is 8.46) and a valid Status enum (`LL`/`RC`/`AO`/`X`/`C`).
+   section-max+1 (frontier is `<!-- check-issues frontier: Issue 8.61 -->`;
+   next free ID is 8.62) and a valid Status enum (`LL`/`RC`/`AO`/`X`/`C`).
 5. **Close** — when fixed, flip `* Status: X (resolved by <commit>)` — never
    delete an entry (ISSUES.md is the authoritative doc). Legacy entries still
    missing Status surface as the check-issues WARN backfill queue.

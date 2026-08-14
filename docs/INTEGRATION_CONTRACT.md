@@ -230,6 +230,15 @@ AI_FILTER_READ_TIMEOUT_SECONDS: 5
   REGISTER directly with `username=<MSISDN>`, `password=testpass`, realm `localhost`, server
   `<host-ip>:5060`, codec **PCMU only**. See `docs/LIVE_DEMO.md` S15 and
   `docs/partner/SipClient-INTEGRATION.md` (drop-in for the repo's README).
+- **International-format From: is normalized before interception (2026-08-14, Issue 8.56)**: clients
+  that legitimately emit `+`/`00`/`0`-prefixed numbers in the `From:` (Java SipClient, MizuDroid,
+  Linphone intl mode) are normalized to a bare MSISDN in `route[INTERCEPT_SMS]` BEFORE the OCS
+  balance lookup — an unnormalized `+1555..` lookup used to return balance 0 and wrongly block the
+  SMS as "Prepaid balance exhausted". Recipients (`$rU`) were already normalized by the dialplan.
+- **RFC 3994 typing indicators are consumed, not delivered (2026-08-14, Issue 8.52)**: `MESSAGE`
+  requests with `Content-Type: application/im-iscomposing+xml` (emitted by Linphone while typing)
+  are answered with a silent 200 by Kamailio `route[INTERCEPT_SMS]` and never reach the intercept
+  API or the 2G bridge — no fake SMS rows, no XML relayed to a handset.
 
 ### sms-client (`src/main/resources/application.properties`) — ⚠ re-verified 2026-08-09 against `origin/main @ 1a388af`
 > **Current truth (origin/main @ `1a388af`, refactored client)**: ships its **own
