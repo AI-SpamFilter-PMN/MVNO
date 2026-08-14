@@ -40,8 +40,9 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 > * `repo-root` → Issue 8.65
 > * `imdn` → Issue 8.66
 * `ausine-shadowing` → Issue 8.67
+* `asterisk-rtp-answer` → Issue 8.68
 
-<!-- check-issues frontier: Issue 8.67 -->
+<!-- check-issues frontier: Issue 8.68 -->
 
 ---
 
@@ -1281,6 +1282,15 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 * Status: X (fixed 2026-08-14)
 * Verified-by: live baresip-rx audio pipeline log (`pulse ---> aubuf`) on 2026-08-14
 * Distinct-from: 8.47 (baresip container pulse mount) — different defect: 8.47 was socket permissions and SELinux label; 8.67 is module ordering/priority inside baresip.conf.
+
+### Issue 8.68: Kamailio Asterisk feature route missing t_on_reply(RTP_ANSWER) leaking container IP to WiFi handsets (asterisk-rtp-answer)
+* Symptom: When an external WiFi handset (e.g. Android Linphone at 192.168.100.34) calls Asterisk feature extensions (`7XXX` ConfBridge or `8000` Screening), the call establishes and Asterisk transmits audio (`Transmit: >4000 pkts`), but Asterisk receives 0 packets from the handset (`Receive: 0 pkts`), causing one-way silence on the conference bridge.
+* Root Cause: In `configs/kamailio/kamailio.cfg`, the Asterisk feature block (`if ($rU =~ "^(7[0-9]{3}|8[0-9]{3})$")`) called `t_relay_to_udp("10.89.0.63", "5061")` without arming `t_on_reply("RTP_ANSWER")` (the asterisk-rtp-answer routing defect). When Asterisk emitted `200 OK` with its internal container IP (`c=IN IP4 10.89.0.63`), RTPEngine did not rewrite the SDP answer, sending an unroutable Podman subnet IP to the external WiFi phone.
+* Fix: Added `t_on_reply("RTP_ANSWER");` before `t_relay_to_udp()` in `configs/kamailio/kamailio.cfg` and restarted Kamailio.
+* Verification: Verified live 2026-08-14 — RTPEngine rewrote Asterisk's 200 OK SDP to `192.168.100.93`, and Asterisk `pjsip show channelstats` confirmed bidirectional RTP packet flow (`Receive: >0 pkts`).
+* Status: X (fixed 2026-08-14, commit `aa531c6`)
+* Verified-by: live ConfBridge 001 channelstats bidirectional RTP on 2026-08-14
+* Distinct-from: 8.62 (Asterisk sidecar) — different aspect: 8.62 is the sidecar service integration; 8.68 is the Kamailio onreply SDP rewriting trigger.
 
 ---
 
