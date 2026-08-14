@@ -35,8 +35,12 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
 > * `reply_ok` → Issue 8.60
 > * `paging` → Issue 8.61
 > * `asterisk` → Issue 8.62
+> * `jansson-body` → Issue 8.63
+> * `nostdin` → Issue 8.64
+> * `repo-root` → Issue 8.65
+> * `imdn` → Issue 8.66
 
-<!-- check-issues frontier: Issue 8.62 -->
+<!-- check-issues frontier: Issue 8.66 -->
 
 ---
 
@@ -1228,6 +1232,45 @@ This document is the authoritative troubleshooting, root-cause analysis, and dep
   2026-08-14 (confbridge list, core show channels, baresip-rx log)
 * Distinct-from: 8.29/8.59 (baresip ctrl_tcp) — different component: 8.29/8.59
   are the baresip rig console/gate; 8.62 is the new Asterisk media server.
+
+### Issue 8.63: Kamailio jansson_set() fails on raw $rb causing false-positive SMS blocks on mobile clients (jansson-body)
+* Symptom: When an external client (e.g. Android Linphone) sends a SIP MESSAGE, Kamailio logs:
+  `ERROR: jansson [jansson_funcs.c:189]: janssonmod_set(): value to add is not a string - "content"`
+  `WARNING: <script>: SMS BLOCKED BY MVNO INTERCEPTION CORE (jansson allow=false): 15551234567 -> 1555...`
+  The message was rejected with `403 Forbidden - SMS Blocked` and Linphone displayed delivery status `0 0 0 0` / undelivered.
+* Root Cause: `$rb` is a raw body buffer pseudo-variable. In Kamailio 5.7 `jansson_set("string", "content", "$rb", "$var(payload)")` fails if `$rb` contains null, binary, or non-string PV properties without explicit assignment to a string pseudo-variable `$var(content)` (the jansson-body serialization defect). When `jansson_set` failed, `$var(payload)` lacked the `"content"` key, causing `mvno-api` to receive a malformed request or trigger downstream failure, falling into Kamailio's `if ($var(allow) != 1)` 403 block.
+* Fix: Coerce `$rb` to an explicit string variable `$var(content) = $rb; if ($var(content) == $null || $var(content) == "") { $var(content) = " "; }` before passing to `jansson_set("string", "content", "$var(content)", "$var(payload)")` in `configs/kamailio/kamailio.cfg` `route[INTERCEPT_SMS]`.
+* Verification: Tested live 2026-08-14 — Linphone MESSAGE from `15551234567` ("message from ziad" and "a sms from mobile...") was accepted with 200 OK and successfully delivered into `/root/.osmocom/bb/sms.txt` on `mvno-2g-ms`.
+* Status: X (fixed 2026-08-14, commit `218dabe`)
+* Verified-by: live Linphone MESSAGE 200 OK + `sms.txt` inbox receipt on 2026-08-14
+* Distinct-from: 8.58 (`jansson` missing from Alpine package) — different defect: 8.58 was module loading failure; 8.63 is parameter PV type evaluation inside `jansson_set`.
+
+### Issue 8.64: ffmpeg PulseAudio capture hangs with exit 124 in background/subshell scripts without -nostdin (nostdin)
+* Symptom: `mic_probe.sh` or automated scripts hanging with exit code 124 (timeout) during `ffmpeg -f pulse` execution with 0 stderr captured (`FATAL: 3 s Pulse capture failed after retry`).
+* Root Cause: `ffmpeg` attempts to read terminal keyboard control characters from standard input (`stdin`). When spawned from non-interactive subshells, background scripts, or cron/tmux jobs, `ffmpeg` stalls waiting on stdin instead of streaming from the PipeWire PulseAudio socket (missing the nostdin flag).
+* Fix: Pass `-nostdin` flag to all automated `ffmpeg` capture invocations in `scripts/demo/mic_probe.sh`, `mic_verify.sh`, and `scripts/testing/`.
+* Verification: `bash scripts/demo/mic_probe.sh` executes synchronously in 7s without hanging, capturing 3s of live ambient audio at `-42.8 dB` with `exit_code == 0`.
+* Status: X (fixed 2026-08-14, commit `218dabe`)
+* Verified-by: `bash scripts/demo/mic_probe.sh` clean pass (exit 0) on 2026-08-14
+* Distinct-from: 8.47 (baresip container pulse mount) — different defect: 8.47 was container socket permission/labels; 8.64 is `ffmpeg` CLI stdin blocking in subshells.
+
+### Issue 8.65: Broken REPO_ROOT path calculation (/..) in scripts/demo/ user scripts (repo-root)
+* Symptom: `user_demo.sh`, `user_call.sh`, and `user_sms.sh` failed with `No such file or directory` when calling helper scripts in `scripts/testing/` or `scripts/demo/`.
+* Root Cause: `REPO_ROOT` was defined as `$(cd "$(dirname "$0")/.." && pwd)` inside `scripts/demo/*.sh`, resolving to `.../MVNO/scripts` instead of the repository root `.../MVNO` (`/../..`) — the repo-root path defect.
+* Fix: Updated `REPO_ROOT` calculation to `/../..` across `user_demo.sh`, `user_call.sh`, and `user_sms.sh`.
+* Verification: `bash scripts/demo/user_sms.sh` and `user_demo.sh` resolve paths correctly and execute without missing script errors.
+* Status: X (fixed 2026-08-14, commit `218dabe`)
+* Verified-by: `user_demo.sh` menu launch and `user_sms.sh` execution on 2026-08-14
+* Distinct-from: 8.45 (cold-start path conventions) — different scope: 8.45 is Makefile targets; 8.65 is subshell relative directory resolution.
+
+### Issue 8.66: Linphone IMDN delivery notification badge mismatch with standard transport SIP 200 OK (imdn)
+* Symptom: Linphone displays `0 0 0 0` / pending delivery icon for standard SIP MESSAGEs because Linphone's chat engine by default expects RFC 5438 IMDN XML delivery receipts (`application/imdn+xml`) from the SIP server, while standard SIP SMS gateways only return transport-level `SIP/2.0 200 OK`.
+* Root Cause: Linphone 6.x default chat mode treats SIP MESSAGE as an IM session requiring RFC 5438 positive delivery notifications (`<imdn><delivery-notification><status><delivered/></status></delivery-notification></imdn>`). When only SIP 200 OK is returned, the message is physically delivered to the SMSC/recipient, but the UI keeps the badge in unconfirmed state due to missing imdn receipts.
+* Fix: Documented in `docs/device-registration-linphone-mizudroid.md` to disable "Request delivery notifications" / "IMDN" in Linphone Advanced Settings, or accept that transport 200 OK delivers the message to the 2G/5G queue.
+* Verification: Verified message landing in `/root/.osmocom/bb/sms.txt` while Linphone showed pending status badge.
+* Status: AO (observed and documented 2026-08-14)
+* Verified-by: 2G MS receipt log vs Linphone UI badge comparison on 2026-08-14
+* Distinct-from: 8.52 (typing indicator filter) — different RFC: 8.52 is RFC 3994 iscomposing XML; 8.66 is RFC 5438 IMDN delivery receipts.
 
 ---
 
