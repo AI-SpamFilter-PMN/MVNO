@@ -35,7 +35,7 @@
  🔐 TEST 3: STIR/SHAKEN ES256 PASSporT (RFC 8224 / 8588) VALIDATION
 ==========================================================================
 [*] Generated SIP Identity Header:
-eyJhbGciOiJFUzI1NiIsInBwdCI6InNoYWtlbiIsInR5cCI6InBhc3Nwb3J0IiwieDV1IjoiaHR0cHM6Ly9jZXJ0Lm12bm8ubmV0L3Jvb3QucGVtIn0.eyJhdHRlc3QiOiJBIiwiZGVzdCI6eyJ0biI6WyIxNTU1OTk5ODg4OCJdfSwiaWF0IjoxNzg2NzM2NjMwLCJvcmlnIjp7InRuIjoiMTU1NTMzMzIyMTEifSwib3JpZ2lkIjoidXJuOnV1aWQ6OGQ4NGVhYjctOTlhYy00NmVlLWE5YmQtZjc3MmNjZDk0ZGE4In0.-GMIis5K5VWsJONGFLOb341Ev9g-XzPNzVvjVby5SgdXYrsAPn1ojbp8piJbzh5VwwP5OKeGLBcywVuNmjJyxg;info=<https://cert.mvno.net/root.pem>;alg=ES256;ppt=shaken
+eyJhbGciOiJFUzI1NiIsInBwdCI6InNoYWtlbiIsInR5cCI6InBhc3Nwb3J0IiwieDV1IjoiaHR0cHM6Ly9jZXJ0Lm12bm8ubmV0L3Jvb3QucGVtIn0.eyJhdHRlc3QiOiJBIiwiZGVzdCI6eyJ0biI6WyIxNTU1OTk5ODg4OCJdfSwiaWF0IjoxNzg2NzM2NzU0LCJvcmlnIjp7InRuIjoiMTU1NTMzMzIyMTEifSwib3JpZ2lkIjoidXJuOnV1aWQ6NGY1OGI1YTQtNmRlMS00NjgzLWI5ZmItOWMwNzY3MGYwZmNlIn0.mLR_GnNZS4qonRLVUZT3NfkJnF56xpWV1Sqoq1xldrjnZKDboOggHOTOs9-uqWUwKKiMugskHllRVATlOvyrEA;info=<https://cert.mvno.net/root.pem>;alg=ES256;ppt=shaken
 
 [*] Decoded JOSE Header: {
   "alg": "ES256",
@@ -50,11 +50,11 @@ eyJhbGciOiJFUzI1NiIsInBwdCI6InNoYWtlbiIsInR5cCI6InBhc3Nwb3J0IiwieDV1IjoiaHR0cHM6
       "15559998888"
     ]
   },
-  "iat": 1786736630,
+  "iat": 1786736754,
   "orig": {
     "tn": "15553332211"
   },
-  "origid": "urn:uuid:8d84eab7-99ac-46ee-a9bd-f772ccd94da8"
+  "origid": "urn:uuid:4f58b5a4-6de1-4683-b9fb-9c07670f0fce"
 }
 [+] RFC 8588 Claims & Structure Verified.
 [*] Verification Result: {
@@ -100,46 +100,48 @@ Voucher redeemed successfully! Added 50 Credits ($50.00) to your balance.
 [*] Originate output: 
 
 [*] Asterisk Live Logs:
-[1;30m       > [0m0x7f7e08039890 -- Strict RTP learning complete - Locking on source address 192.168.100.93:10688
+[1;30m    -- [0m<Local/911@mvno-00000005;2> Playing 'beep.gsm' (language 'en')
+[1;30m    -- [0mExecuting [911@mvno:5] [1;36mPlayback[0m("[1;35mLocal/911@mvno-00000005;2[0m", "[1;35mvm-intro[0m") in new stack
+[1;30m    -- [0m<Local/911@mvno-00000005;2> Playing 'vm-intro.gsm' (language 'en')
+[1;30m  == [0mSpawn extension (mvno, 911, 5) exited non-zero on 'Local/911@mvno-00000005;2'
 [1;30m    -- [0mRemote UNIX connection
 [1;30m    -- [0mRemote UNIX connection disconnected
-[1;30m    -- [0mChannel PJSIP/mvno-trunk-00000005 left 'softmix' base-bridge <c4a6ffc0-ad12-41a7-a188-76a22d0b0ad4>
-[1;30m    -- [0mChannel PJSIP/mvno-trunk-00000004 left 'softmix' base-bridge <c4a6ffc0-ad12-41a7-a188-76a22d0b0ad4>
-[1;30m    -- [0mChannel CBAnn/001-00000004;2 left 'softmix' base-bridge <c4a6ffc0-ad12-41a7-a188-76a22d0b0ad4>
-[1;30m    -- [0mChannel PJSIP/mvno-trunk-00000003 left 'softmix' base-bridge <c4a6ffc0-ad12-41a7-a188-76a22d0b0ad4>
-[1;30m    -- [0m<CBAnn/001-00000004;1> Playing 'confbridge-leave.gsm' (language 'en')
-[1;30m    -- [0m<CBAnn/001-00000004;1> Playing 'confbridge-leave.gsm' (language 'en')
-[1;30m    -- [0m<CBAnn/001-00000004;1> Playing 'confbridge-leave.gsm' (language 'en')
+[1;30m    -- [0mRemote UNIX connection
+[1;30m    -- [0mRemote UNIX connection disconnected
+[1;30m    -- [0mRemote UNIX connection
+[1;30m    -- [0mRemote UNIX connection disconnected
 [1;30m    -- [0mRemote UNIX connection
 [1;30m    -- [0mRemote UNIX connection disconnected
 [1;30m    -- [0mRemote UNIX connection
 [1;30m    -- [0mRemote UNIX connection disconnected
 [1;30m    -- [0mCalled 911@mvno
-[1;30m    -- [0mExecuting [911@mvno:1] [1;36mNoOp[0m("[1;35mLocal/911@mvno-00000005;2[0m", "[1;35mMVNO-EMERGENCY-911: Emergency call from [0m") in new stack
-[1;30m    -- [0mExecuting [911@mvno:2] [1;36mAnswer[0m("[1;35mLocal/911@mvno-00000005;2[0m", "[1;35m[0m") in new stack
-[1;30m    -- [0mLocal/911@mvno-00000005;1 answered
-[1;30m       > [0mLaunching Wait(2) on Local/911@mvno-00000005;1
-[1;30m    -- [0mExecuting [911@mvno:3] [1;36mSet[0m("[1;35mLocal/911@mvno-00000005;2[0m", "[1;35mVOLUME(TX)=3[0m") in new stack
-[1;30m    -- [0mExecuting [911@mvno:4] [1;36mPlayback[0m("[1;35mLocal/911@mvno-00000005;2[0m", "[1;35mbeep[0m") in new stack
-[1;30m    -- [0m<Local/911@mvno-00000005;2> Playing 'beep.gsm' (language 'en')
-[1;30m    -- [0mExecuting [911@mvno:5] [1;36mPlayback[0m("[1;35mLocal/911@mvno-00000005;2[0m", "[1;35mvm-intro[0m") in new stack
-[1;30m    -- [0m<Local/911@mvno-00000005;2> Playing 'vm-intro.gsm' (language 'en')
-[1;30m  == [0mSpawn extension (mvno, 911, 5) exited non-zero on 'Local/911@mvno-00000005;2'
+[1;30m    -- [0mExecuting [911@mvno:1] [1;36mNoOp[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35mMVNO-EMERGENCY-911: Emergency call from [0m") in new stack
+[1;30m    -- [0mExecuting [911@mvno:2] [1;36mAnswer[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35m[0m") in new stack
+[1;30m    -- [0mLocal/911@mvno-00000006;1 answered
+[1;30m       > [0mLaunching Wait(2) on Local/911@mvno-00000006;1
+[1;30m    -- [0mExecuting [911@mvno:3] [1;36mSet[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35mVOLUME(TX)=3[0m") in new stack
+[1;30m    -- [0mExecuting [911@mvno:4] [1;36mPlayback[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35mbeep[0m") in new stack
+[1;30m    -- [0m<Local/911@mvno-00000006;2> Playing 'beep.gsm' (language 'en')
+[1;30m    -- [0mExecuting [911@mvno:5] [1;36mPlayback[0m("[1;35mLocal/911@mvno-00000006;2[0m", "[1;35mvm-intro[0m") in new stack
+[1;30m    -- [0m<Local/911@mvno-00000006;2> Playing 'vm-intro.gsm' (language 'en')
+[1;30m  == [0mSpawn extension (mvno, 911, 5) exited non-zero on 'Local/911@mvno-00000006;2'
 
 [+] Asterisk PSAP Emergency Gateway Answer & Audio Execution Confirmed!
 🎉 ALL EMERGENCY 911/112 PRIORITY PREEMPTION TESTS PASSED!
 ==========================================================================
- 📡 TEST 6: 5G CORE L7 DEEP PACKET INSPECTION (DPI) ENGINE VALIDATION
+ 📡 TEST 6: REAL SOCKET 5G CORE L7 DEEP PACKET INSPECTION (DPI) VALIDATION
 ==========================================================================
-[*] Starting DPI Probe on port 9092...
-[*] Querying DPI Prometheus Exporter (http://localhost:9092/metrics)...
+[*] Spawning live DPI sniffer engine on ports 5353 (DNS), 15000 (RTP), 9092 (Metrics)...
+[*] Transmitting REAL DNS packet (35 bytes) over wire to 127.0.0.1:5353...
+[*] Transmitting REAL RTP Voice packet (172 bytes) over wire to 127.0.0.1:15000...
+[*] Fetching live metrics from DPI Exporter (http://localhost:9092/metrics)...
 
-[*] Exported DPI Metrics:
+[*] Live Exported DPI Telemetry:
 # HELP mvno_dpi_bytes_total Total Layer 7 payload bytes inspected by 5G UPF DPI engine.
 # TYPE mvno_dpi_bytes_total counter
 mvno_dpi_bytes_total{protocol="dns",slice="embb"} 35
 mvno_dpi_bytes_total{protocol="tls",slice="embb"} 0
-mvno_dpi_bytes_total{protocol="http",slice="embb"} 74
+mvno_dpi_bytes_total{protocol="http",slice="embb"} 0
 mvno_dpi_bytes_total{protocol="rtp",slice="embb"} 172
 mvno_dpi_bytes_total{protocol="other",slice="embb"} 0
 
@@ -147,14 +149,20 @@ mvno_dpi_bytes_total{protocol="other",slice="embb"} 0
 # TYPE mvno_dpi_flows_active gauge
 mvno_dpi_flows_active{protocol="dns"} 1
 mvno_dpi_flows_active{protocol="tls"} 0
-mvno_dpi_flows_active{protocol="http"} 1
+mvno_dpi_flows_active{protocol="http"} 0
 mvno_dpi_flows_active{protocol="rtp"} 1
 
 # HELP mvno_dpi_threats_intercepted_total Malicious L7 hostnames and phishing flows intercepted.
 # TYPE mvno_dpi_threats_intercepted_total counter
 mvno_dpi_threats_intercepted_total{threat_type="phishing",protocol="dns"} 1
 
-🎉 ALL 5G CORE L7 DPI PROBE TESTS PASSED!
+[*] Empirical Metrics Check:
+  - Captured DNS Bytes: 35.0 (Expected: 35)
+  - Captured RTP Bytes: 172.0 (Expected: 172)
+  - Intercepted Phishing Threats: 1.0 (Expected: >= 1)
+  - Active DNS Flows: 1.0 (Expected: >= 1)
+
+🎉 ALL REAL-SOCKET 5G CORE L7 DPI PROBE TESTS PASSED EMPIRICALLY!
 ==========================================================================
  🚀 MVNO SOTA ADVANCED CARRIER INNOVATIONS & ANTI-FRAUD TEST SUITE
 ==========================================================================
