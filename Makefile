@@ -423,3 +423,16 @@ graduation: init-db seed-mongo
 	@echo ""
 	@echo "🎉 GRADUATION PASS — cold start + 8-cell gate + live-mic headline + VL proof, all green"
 
+# Emergency call termination across Asterisk, Baresip UAs, and Android handsets
+hangup:
+	@bash scripts/testing/hangup_all.sh
+
+# Launches the full NOC multi-pane tmux demo cockpit
+cockpit:
+	@bash scripts/demo/demo_live.sh
+
+# Launches detached Wireshark GUI pre-filtered for MVNO/AI-Filter SIP, SMPP, RTP, and REST traffic
+wireshark:
+	@bash scripts/demo/demo_live.sh --wireshark
+
+

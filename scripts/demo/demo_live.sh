@@ -270,13 +270,16 @@ launch_wireshark() {
     [ -n "${WAYLAND_DISPLAY:-}" ] && plat="wayland"
     local xa=":"
     [ "${plat}" = "xcb" ] && xa="${XAUTHORITY:-$HOME/.Xauthority}"
+    # Multi-Interface capture: capture 'any' so LAN (Android phone), container bridge, and localhost are all captured.
+    local iface="any"
+    local cap_filter="port 5060 or port 5061 or port 2775 or port 2076 or port 8080 or port 8081 or port 8000 or port 8008 or (udp portrange 10000-20000)"
     mkdir -p state/logs
     setsid nohup env QT_QPA_PLATFORM="$plat" DISPLAY="${DISPLAY:-}" \
         WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" XAUTHORITY="$xa" \
-        wireshark -k -i lo -f "udp portrange 10000-20000 or port 5060" \
-        -d "udp.port==10000-20000,rtp" >> state/logs/wireshark-gui.log 2>&1 &
-    echo "  🦈 Wireshark GUI launched detached (Qt platform=${plat}) — errors: state/logs/wireshark-gui.log"
-    echo "  post-hoc: wireshark -r \"\$(scripts/testing/newest.sh 'state/spool/pcaps/*.pcap')\" -d udp.port==10000-20000,rtp"
+        wireshark -k -i "$iface" -f "$cap_filter" \
+        -d "udp.port==10000-20000,rtp" -Y "sip || smpp || rtp || http" >> state/logs/wireshark-gui.log 2>&1 &
+    echo "  🦈 Wireshark GUI launched detached (interface=${iface}, Qt platform=${plat}) — errors: state/logs/wireshark-gui.log"
+    echo "  Filter: SIP (5060), Asterisk (5061), SMPP (2775/2076), RTP (10000-20000), REST APIs (8080/8081/8000)"
 }
 
 [ "${GUI_CAP}" -eq 1 ] && launch_wireshark
