@@ -272,11 +272,24 @@ public class AiFilterService {
      */
     public InterceptResponse classifyTranscript(final String callId, final String transcript,
                                                 final String callerMsisdn, final String calleeMsisdn) {
-        return classifyTranscriptInternal(callId, transcript, callerMsisdn, calleeMsisdn);
+        return classifyTranscriptInternal(callId, transcript, callerMsisdn, calleeMsisdn, null);
+    }
+
+    /**
+     * Post-call transcript classification with caller/callee and recording URL.
+     *
+     * @param recordingUrl Optional URL where the recording WAV can be downloaded
+     *                     (e.g. {@code http://mvno-api:8080/api/v1/recordings/<file>.wav}).
+     */
+    public InterceptResponse classifyTranscript(final String callId, final String transcript,
+                                                final String callerMsisdn, final String calleeMsisdn,
+                                                final String recordingUrl) {
+        return classifyTranscriptInternal(callId, transcript, callerMsisdn, calleeMsisdn, recordingUrl);
     }
 
     private InterceptResponse classifyTranscriptInternal(final String callId, final String transcript,
-                                                         final String callerMsisdn, final String calleeMsisdn) {
+                                                         final String callerMsisdn, final String calleeMsisdn,
+                                                         final String recordingUrl) {
         // Step 1: Fast-path check — if circuit breaker is OPEN, fail-open immediately (~0.1ms)
         if (isCircuitOpen()) {
             return failOpen("circuit_open", "AI filter circuit open — SLA allow");
@@ -310,7 +323,7 @@ public class AiFilterService {
         // The caller/callee MSISDNs are threaded from the call CDR metadata (null
         // when the spool-only path cannot resolve them). tryVoiceFilter sends the
         // REAL subscriber MSISDNs — never the recording hash nor a fabricated id.
-        InterceptResponse fromVoiceFilter = tryVoiceFilter(callerMsisdn, calleeMsisdn, transcript);
+        InterceptResponse fromVoiceFilter = tryVoiceFilter(callerMsisdn, calleeMsisdn, transcript, recordingUrl);
         if (fromVoiceFilter != null) {
             // Filteration-System is authoritative: DROP_CALL blocks, ALLOW_CALL allows.
             // A locally flagged call that the decider allows still carries a review
@@ -377,12 +390,14 @@ public class AiFilterService {
      */
     private InterceptResponse tryVoiceFilter(final String callerMsisdn,
                                              final String calleeMsisdn,
-                                             final String transcript) {
+                                             final String transcript,
+                                             final String recordingUrl) {
         try {
             final Map<String, Object> body = Map.of(
                 "callerId", callerMsisdn == null ? "" : callerMsisdn,
                 "receiverId", calleeMsisdn == null ? "" : calleeMsisdn,
-                "transcript", transcript
+                "transcript", transcript,
+                "recordingUrl", recordingUrl == null ? "" : recordingUrl
             );
             final VoiceFilterResponse resp = restClient.post()
                     .uri(vfUrl)
