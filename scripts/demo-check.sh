@@ -15,11 +15,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
-# Dynamic Host IP synchronization
+# Dynamic Host IP synchronization (zero git churn via state/kamailio/advertise.cfg)
 DETECTED_HOST_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}' | head -n1 || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
-if [ -f configs/kamailio/kamailio.cfg ]; then
-    sed -i -E "s/advertise [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:5060/advertise ${DETECTED_HOST_IP}:5060/g" configs/kamailio/kamailio.cfg
-fi
+mkdir -p state/kamailio
+echo "listen=udp:10.89.0.23:5060 advertise ${DETECTED_HOST_IP}:5060" > state/kamailio/advertise.cfg
 
 PASS=0
 FAIL=0

@@ -38,10 +38,9 @@ DETECTED_HOST_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}' | head -n
 export HOST_IP="${HOST_IP:-$DETECTED_HOST_IP}"
 echo "HOST_IP=${HOST_IP}" > .env
 
-# Dynamically synchronize advertised IP in Kamailio & RTPEngine configs
-if [ -f configs/kamailio/kamailio.cfg ]; then
-    sed -i -E "s/advertise [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:5060/advertise ${HOST_IP}:5060/g" configs/kamailio/kamailio.cfg
-fi
+# Dynamically synchronize advertised IP in Kamailio (zero git churn via state/kamailio/advertise.cfg)
+mkdir -p state/kamailio
+echo "listen=udp:10.89.0.23:5060 advertise ${HOST_IP}:5060" > state/kamailio/advertise.cfg
 if [ -f configs/rtpengine/rtpengine.conf ]; then
     sed -i -E "s/interface=eth0![0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/interface=eth0!${HOST_IP}/g" configs/rtpengine/rtpengine.conf
 fi
