@@ -977,6 +977,19 @@ def get_live_status():
     # Genuine in-JVM DSP analysis on real call audio (0 hardcodes)
     dsp_data = get_real_dsp_analysis() if rtp_sessions > 0 else None
 
+def check_spool_pipeline_status():
+    """Check live status of the Vosk/RTPEngine live_tap audio streamer."""
+    try:
+        res = subprocess.run("pgrep -f live_tap.sh", shell=True, capture_output=True, text=True)
+        pids = res.stdout.strip().split()
+        if pids:
+            return f"LIVE (live_tap PID {pids[0]})"
+    except Exception:
+        pass
+    if os.path.exists(os.path.join(REPO_ROOT, "state/spool")):
+        return "STANDBY (Spool Ready)"
+    return "OFFLINE"
+
     return {
         "active_calls": rtp_sessions,
         "caller": caller_msisdn,
@@ -993,7 +1006,8 @@ def get_live_status():
             "latency_ms": ep.get("latency_ms", 0),
             "display_name": ep["display_name"]
         },
-        "dsp": dsp_data
+        "dsp": dsp_data,
+        "spool_status": check_spool_pipeline_status()
     }
 
 class CockpitHandler(BaseHTTPRequestHandler):
@@ -1031,14 +1045,24 @@ class CockpitHandler(BaseHTTPRequestHandler):
                     for nf in new_files:
                         try:
                             with open(nf, "r") as f:
-                                text_content = f.read().strip()
-                            if text_content:
-                                is_scam = any(w in text_content.lower() for w in ["blocked", "verify", "account", "bank", "pin", "wire"])
+                                raw_text = f.read().strip()
+                            clean_text = raw_text
+                            # Unpack JSON if Vosk wrote JSON-structured transcript
+                            if raw_text.startswith("{") and raw_text.endswith("}"):
+                                try:
+                                    j_val = json.loads(raw_text)
+                                    clean_text = j_val.get("text", "").strip() if isinstance(j_val, dict) else raw_text
+                                except Exception:
+                                    clean_text = raw_text
+                            
+                            # Filter out empty or whitespace-only silence
+                            if clean_text and clean_text not in ('""', "''", "{}") and len(clean_text) > 0:
+                                is_scam = any(w in clean_text.lower() for w in ["blocked", "verify", "account", "bank", "pin", "wire", "urgent", "fraud"])
                                 t_str = time.strftime("%H:%M:%S")
                                 trans_payload = json.dumps({
                                     "type": "transcript",
                                     "time": t_str,
-                                    "text": text_content,
+                                    "text": clean_text,
                                     "flagged": is_scam
                                 })
                                 self.wfile.write(f"data: {trans_payload}\n\n".encode("utf-8"))
