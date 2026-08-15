@@ -131,3 +131,26 @@ then switch `rtpengine.conf` to `recording-method=proc` and deploy the
 recording daemon container. The retired WS2 artifacts (Dockerfile,
 `rtpengine-recording.conf`, `docker/spool/wavs` mounts) are recoverable from
 git history if this path is ever pursued.
+
+---
+
+## Acoustic Biometrics vs Speech Synthesis (`espeak-ng` vs `VoiceCloneDetector`)
+
+The platform cleanly separates semantic speech recognition from acoustic biometric detection:
+
+```
+[ demo_call.sh / live_demo.sh ]
+       │
+       ▼ (espeak-ng Synthesizes Spoken Phrases)
+[ RTP Audio Stream / .wav Spool ]
+       ├──► [ Vosk JNI ASR ] ────────► [ NLP / AI Spam Filter ] (Transcribes Scam Phrases)
+       └──► [ VoiceCloneDetector ] ──► [ DSP Advisory Flag ] (Measures Flatline Monotone Carrier)
+```
+
+| Component | Target Domain | Signal Input | Classification Threshold | Output Contract |
+|---|---|---|---|---|
+| **`espeak-ng`** | ASR Test Fixture | Formant-synthesis phonetic TTS | $\sigma_{F_0} \approx 61.5\text{ samples}, \text{Jitter} \approx 7.16\%$ | Produces words for Vosk ASR |
+| **`VoiceCloneDetector`** | Robocall Biometric Probe | 256-pt DFT Spectral Centroid + Pitch Jitter | $\sigma_{F_0} < 0.6\text{ samples} \lor \text{Jitter} < 0.01\%$ | `advisoryOnly: true` (Flag-only) |
+| **`test_voice_clone_dsp.py`** | Monotone Threat Fixture | $220\text{ Hz} + 440\text{ Hz}$ zero-jitter sine carrier | $\sigma_{F_0} = 0.00, \text{Jitter} = 0.007\%$ | Exercises `ROBOTIC_MONOTONE_CARRIER` |
+
+> **Architectural Guardrail**: `espeak-ng` produces dynamic human-like prosody and is mathematically classified as `NATURAL_CONVERSATIONAL_SPEECH`. The DSP detector is intentionally NOT retuned with brittle spectral flatness heuristics to avoid false-flagging real human subscribers. Monotone robocall threats are verified via the dedicated $220\text{ Hz}$ carrier generator in `test_voice_clone_dsp.py`.
