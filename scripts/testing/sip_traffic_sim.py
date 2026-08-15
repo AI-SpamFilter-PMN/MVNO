@@ -164,7 +164,29 @@ def register_subscriber(username, password, host="127.0.0.1", port=5060,
     return None
 
 
-def _sdp(c_ip, media_port):
+G722_OPT = "9"   # payload type 9 = G.722/16000 (HD wideband)
+
+
+def _sdp(c_ip, media_port, codec="pcmu"):
+    """Build the local SDP offer/answer.
+
+    codec="pcmu" -> G.711 &mu;-law only (historic default).
+    codec=g722 or g722+pcmu -> offer wideband G.722 along with PCMU fallback, so a
+    real UA/phone (e.g. Android MizuDroid/Linphone, which default to G.722) can
+    negotiate HD over the rtpengine relay. rtpengine is codec-agnostic (no
+    transcoding config), so the negotiated payload type passes through.
+    """
+    if codec == "g722":
+        return (
+            "v=0\r\n"
+            f"o=user1 53655765 23536879 IN IP4 {c_ip}\r\n"
+            "s=-\r\n"
+            f"c=IN IP4 {c_ip}\r\n"
+            "t=0 0\r\n"
+            f"m=audio {media_port} RTP/AVP {G722_OPT} 0\r\n"
+            f"a=rtpmap:{G722_OPT} G722/16000\r\n"
+            "a=rtpmap:0 PCMU/8000\r\n"
+        )
     return (
         "v=0\r\n"
         f"o=user1 53655765 23536879 IN IP4 {c_ip}\r\n"
@@ -267,7 +289,7 @@ def _wait_for(resp_sock, deadline, wanted, log=True):
     return None
 
 
-def run_uas(msisdn, password, host, port, bind_ip, listen_port, rtp_seconds=0):
+def run_uas(msisdn, password, host, port, bind_ip, listen_port, rtp_seconds=0, codec="pcmu"):
     """Register a callee and answer INVITEs; count RTP received on the media port."""
     sip = register_subscriber(msisdn, password, host, port, bind_ip, listen_port)
     if sip is None:
@@ -342,7 +364,7 @@ def run_uas(msisdn, password, host, port, bind_ip, listen_port, rtp_seconds=0):
                 tx_peer[0] = (offer_ip, offer_port)
             reply("SIP/2.0 100 Trying")
             reply("SIP/2.0 180 Ringing")
-            sdp = _sdp(bind_ip, media_port)
+            sdp = _sdp(bind_ip, media_port, codec)
             reply("SIP/2.0 200 OK",
                   f"Contact: <sip:{msisdn}@{bind_ip}:{listen_port}>\r\n"
                   f"Content-Type: application/sdp\r\n"
@@ -355,13 +377,13 @@ def run_uas(msisdn, password, host, port, bind_ip, listen_port, rtp_seconds=0):
 
 
 def run_call_with_media(caller, callee, password, host, port, bind_ip, listen_port,
-                        rtp_seconds):
+                        rtp_seconds, codec="pcmu"):
     """Full dialog: digest INVITE -> ACK -> RTP stream -> BYE."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind((bind_ip, listen_port))
     s.settimeout(10)
     call_id = f"call-{int(time.time())}@mvno"
-    sdp = _sdp(bind_ip, listen_port + 1)
+    sdp = _sdp(bind_ip, listen_port + 1, codec)
     uri = f"sip:{callee}@localhost:{port}"
 
     def build_invite(auth=""):
@@ -442,11 +464,11 @@ def run_call_with_media(caller, callee, password, host, port, bind_ip, listen_po
     return True
 
 
-def send_sip_invite(caller, callee, password, host="127.0.0.1", port=5060):
+def send_sip_invite(caller, callee, password, host="127.0.0.1", port=5060, codec="pcmu"):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(10)
     call_id = f"call-{int(time.time())}@127.0.0.1"
-    sdp = _sdp("127.0.0.1", 30002)
+    sdp = _sdp("127.0.0.1", 30002, codec)
 
     def build_invite(auth_header=""):
         auth = f"Authorization: {auth_header}\r\n" if auth_header else ""
@@ -524,6 +546,8 @@ if __name__ == "__main__":
     parser.add_argument("--uas", default=None, metavar="MSISDN", help="UAS role: register MSISDN and answer INVITEs, counting RTP")
     parser.add_argument("--rtp", type=int, default=0, metavar="SECONDS", help="Caller role with real RTP media for N seconds")
     parser.add_argument("--deregister", action="store_true", help="Digest-authenticated Contact: * Expires: 0 deregister of --callee (clears ALL usrloc bindings for the AoR)")
+    parser.add_argument("--codec", default="pcmu", choices=["pcmu", "g722"],
+                        help="Codec to offer/answer: pcmu (G.711u, default), g722 (wideband G.722/16000 + PCMU fallback)")
     args = parser.parse_args()
 
     if args.deregister:
@@ -532,14 +556,14 @@ if __name__ == "__main__":
 
     if args.uas:
         ok = run_uas(args.uas, args.password, args.host, args.port,
-                     args.bind_ip, args.listen_port, args.rtp)
+                     args.bind_ip, args.listen_port, args.rtp, args.codec)
         sys.exit(0 if ok else 1)
 
     if args.rtp > 0:
-        print(f"=== Full IMS call with RTP media ({args.caller} -> {args.callee}, {args.rtp}s) ===")
+        print(f"=== Full IMS call with RTP media ({args.caller} -> {args.callee}, {args.rtp}s, {args.codec}) ===")
         ok = run_call_with_media(args.caller, args.callee, args.password,
                                  args.host, args.port, args.bind_ip,
-                                 args.listen_port, args.rtp)
+                                 args.listen_port, args.rtp, args.codec)
         sys.exit(0 if ok else 1)
 
     print(f"=== Registering Callee {args.callee} (via {args.host}:{args.port}) ===")
@@ -547,6 +571,6 @@ if __name__ == "__main__":
                                  args.bind_ip, args.listen_port)
     time.sleep(1)
     print("=== Sending Real SIP INVITE Call (digest-authenticated) ===")
-    inv_ok = send_sip_invite(args.caller, args.callee, args.password, args.host, args.port)
+    inv_ok = send_sip_invite(args.caller, args.callee, args.password, args.host, args.port, args.codec)
     if not (reg_ok and inv_ok):
         sys.exit(1)
