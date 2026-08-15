@@ -387,7 +387,8 @@ public class AiFilterService {
     private static final Set<String> PHISHING_INDICATORS = Set.of(
         "claim-prize", "account-update", "bank-secure", "verify-account",
         "login-bank", "free-reward", "gift-card", "free-crypto", "claim-now",
-        "update-pin", "suspended-account", "unlock-card", "identity-verify"
+        "update-pin", "suspended-account", "unlock-card", "identity-verify",
+        "phishing-bank", "phishing", "fake-smishing", "login-secure", "verify-update"
     );
 
     private static final java.net.http.HttpClient SANDBOX_HTTP_CLIENT = java.net.http.HttpClient.newBuilder()

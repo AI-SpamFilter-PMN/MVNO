@@ -10,8 +10,7 @@
 • Host LAN IP: 192.168.100.93
 • ADB Attached Devices:
 List of devices attached
-dc76f546	device
-  ✓ Physical Android Handset (dc76f546) detected online via ADB.
+  [!] Physical handset dc76f546 not in ADB list — proceeding with live LAN softphone endpoints.
 
 ════════════════════════════════════════════════════════════════════════
  🚀 STAGE 2: LIVE SIP REGISTRATION (KAMAILIO USRLOC DB)
@@ -19,12 +18,12 @@ dc76f546	device
 • Active Live Registered AoRs in Kamailio DB:
 15554443322|sip:15554443322@10.89.0.53:5090|n/a
 15557778888|sip:15557778888@10.89.0.53:5090|n/a
-15553332211|sip:15553332211@10.89.0.61:56263|baresip v4.10.0 (x86_64/Linux)
+15559998888|sip:15559998888@10.89.0.14:5070|n/a
 15559998888|sip:15559998888@10.89.0.60:58658|baresip v4.10.0 (x86_64/Linux)
-15551234567|sip:15551234567@192.168.100.36:42120;transport=udp|LinphoneAndroid/6.2.5 (Mi Note 10 Lite) LinphoneSDK/5.5.15 (tags/5.5.15^0)
+15551234567|sip:15551234567@192.168.100.37:37019;transport=udp|LinphoneAndroid/6.2.5 (Mi Note 10 Lite) LinphoneSDK/5.5.15 (tags/5.5.15^0)
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ ℹ️  ADAPTIVE DEMO DISCOVERY: Physical Handset Not Active on Wi-Fi       │
-│    Reason: Handset in DB (192.168.100.36) but unreachable via SIP OPTIO │
+│    Reason: Handset in DB (192.168.100.37) but unreachable via SIP OPTIO │
 │ 💻 AUTOMATIC FALLBACK: 💻 Laptop Dual-Leg Softphone Rig (15559998888 - baresip-rx) │
 │    Zero-Delay Seamless Execution Guaranteed (<10ms switch)               │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -38,10 +37,10 @@ dc76f546	device
   SIP Handshake Response:
 0.60s "type":"CALL_OUTGOING"
   0.60s "type":"CALL_LOCAL_SDP"
-  0.61s "type":"CALL_RINGING"
-  0.61s "type":"CALL_ANSWERED"
-  0.61s "type":"CALL_REMOTE_SDP"
-  0.61s "type":"CALL_ESTABLISHED"
+  0.62s "type":"CALL_RINGING"
+  0.62s "type":"CALL_ANSWERED"
+  0.62s "type":"CALL_REMOTE_SDP"
+  0.62s "type":"CALL_ESTABLISHED"
   ✓ Live SIP Call Established (💻 Laptop Dual-Leg Softphone Rig (15559998888 - baresip-rx)) & Media Anchored across RTPEngine.
   • Streaming live audio across RTP pipeline for 12.0s...
 
@@ -49,11 +48,11 @@ dc76f546	device
  🚀 STAGE 4: LIVE VOSK ASR JNI SPEECH TRANSCRIPTION (GENUINE IN-CALL RTP DECODE)
 ════════════════════════════════════════════════════════════════════════
 • Sourcing genuine in-call RTP media stream from Stage 3 PCAP recording...
-  ✓ Decoding real call PCAP: state/spool/pcaps/7d8f2e23d7de2a05-1cfc3af1dfcf56f4.pcap
+  ✓ Decoding real call PCAP: state/spool/pcaps/1daaccd7a9abbba2-b4c2a6501e019927.pcap
   
 • Awaiting Native Java 21 Vosk JNI lattice transcription from decoded call audio...
 • Vosk ASR JNI Transcribed Text:
-  "magnetic magnet"
+  "workers"
   ✓ Genuine In-Call Speech-to-Text & AI Classification Verified.
 
 ════════════════════════════════════════════════════════════════════════
@@ -85,12 +84,12 @@ Participants:
 [3/4] [DEMO-ADAPTIVE] Handset not responsive on Wi-Fi — ConfBridge active between Laptop softphone endpoints.
 
 [4/4] Verifying Active Participants in Asterisk ConfBridge...
-  • Mixing 3-party audio in ConfBridge room 001 for 12.0s...
+  • Mixing 3-party audio in ConfBridge room 001 for 25.0s...
 Asterisk ConfBridge Status:
 Channel                        Flags  User Profile     Bridge Profile   Menu             CallerID
 ============================== ====== ================ ================ ================ ================
-PJSIP/mvno-trunk-00000021      E      default_user     default_bridge   default_menu     15553332211
-PJSIP/mvno-trunk-00000022      E      default_user     default_bridge   default_menu     15559998888
+PJSIP/mvno-trunk-0000005e      E      default_user     default_bridge   default_menu     15553332211
+PJSIP/mvno-trunk-0000005f      E      default_user     default_bridge   default_menu     15559998888
 
 ======================================================================
  🎉 MULTI-PARTY CONFERENCE CALL EMPIRICALLY VERIFIED!
@@ -103,10 +102,10 @@ PJSIP/mvno-trunk-00000022      E      default_user     default_bridge   default_
  🚀 STAGE 7: LIVE CARRIER OBSERVABILITY & STRICT TSDB METRIC ASSERTIONS
 ════════════════════════════════════════════════════════════════════════
 • VictoriaMetrics Real-Time PromQL Metrics:
-  - Total Call Requests: 34.0 (Target: >= 1)
-  - Total SMS Requests:  70.0 (Target: >= 1)
+  - Total Call Requests: 50.0 (Target: >= 1)
+  - Total SMS Requests:  45.0 (Target: >= 1)
   - 5G SA UPF Sessions:  3.0 (Target: == 3)
-  - RTPEngine Uptime:    487.0s (Target: > 0)
+  - RTPEngine Uptime:    36931.0s (Target: > 0)
   - Grafana NOC URL:     http://192.168.100.93:3000/d/mvno-unified-noc
 
 ════════════════════════════════════════════════════════════════════════

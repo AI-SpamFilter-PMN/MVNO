@@ -18,7 +18,8 @@ TESTS = [
     ("STIR/SHAKEN ES256 Cryptographic Signer", "python3 scripts/testing/test_stir_shaken.py"),
     ("Stateful Interactive USSD Gateway (*100#)", "python3 scripts/testing/test_ussd_portal.py"),
     ("Emergency 911/112 Layer 0 Preemption", "python3 scripts/testing/test_emergency_bypass.py"),
-    ("5G Core L7 Deep Packet Inspection (DPI)", "python3 scripts/testing/test_dpi_probe.py")
+    ("5G Core L7 Deep Packet Inspection (DPI)", "python3 scripts/testing/test_dpi_probe.py"),
+    ("Zero-Mock Carrier Supervisor Cockpit & SSE", "python3 scripts/testing/test_cockpit_zero_mock.py")
 ]
 
 def main():

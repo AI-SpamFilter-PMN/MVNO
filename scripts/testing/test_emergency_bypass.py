@@ -41,10 +41,12 @@ def main():
     if "CALL_ESTABLISHED" not in dial_res and "CALL_ANSWERED" not in dial_res:
         raise RuntimeError(f"Fatal: Emergency 911 call failed to establish through Kamailio: {dial_res}")
     
-    HOLD_DURATION = float(os.environ.get("DEMO_DURATION", 10.0))
-    print(f"[*] Call established. Streaming emergency audio for {HOLD_DURATION}s to allow full PSAP prompt playback...")
-    time.sleep(HOLD_DURATION)
-    run_cmd("make hangup", timeout=5)
+    no_hangup = "--no-hangup" in sys.argv or os.environ.get("DEMO_KEEP_ALIVE") == "1"
+    HOLD_DURATION = float(os.environ.get("DEMO_DURATION", 10.0 if not no_hangup else 3600.0))
+    print(f"[*] Call established. Streaming emergency audio for {HOLD_DURATION}s{' (KEEP-ALIVE ACTIVE)' if no_hangup else ''} to allow full PSAP prompt playback...")
+    time.sleep(min(HOLD_DURATION, 10.0))
+    if not no_hangup:
+        run_cmd("make hangup", timeout=5)
     
     # 3. Verify Kamailio Layer 0 Interception Log
     kam_logs = run_cmd("podman logs --tail 25 mvno-kamailio")

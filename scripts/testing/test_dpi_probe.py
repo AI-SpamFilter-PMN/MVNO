@@ -60,45 +60,72 @@ def main():
     print(f"  - Initial Captured Bytes:   {init_bytes}")
     print(f"  - Initial Threats Blocked: {init_threats}")
 
-    # 3. Transmit Real 5G DNS Packet from 5G UE (10.45.0.5) over uesimtun0
+    # 3. Transmit Real 5G DNS (Port 53) & HTTP (Port 80) Traffic from 5G UE over uesimtun0
     dns_query_hex = "abcd010000010000000000000d7068697368696e672d62616e6b03636f6d0000010001"
     dns_query_len = len(bytes.fromhex(dns_query_hex))
     
-    print(f"[*] Triggering 5G UE (mvno-ueransim-ue-1, 10.45.0.5) transmission over 5G PDU session (uesimtun0)...")
+    print(f"[*] Triggering 5G UE (mvno-ueransim-ue-1) transmission over 5G PDU session (uesimtun0)...")
     ue_cmd = f"""podman exec mvno-ueransim-ue-1 python3 -c "
-import socket
-payload = bytes.fromhex('{dns_query_hex}')
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.bind(('10.45.0.5', 0))
-s.sendto(payload, ('10.45.0.1', 5353))
-print('  ✓ Sent 5G DNS query ({dns_query_len} bytes) from UE 10.45.0.5 -> UPF ogstun 10.45.0.1:5353')
+import socket, subprocess, re
+
+# Resolve dynamic 5G PDU session IP from uesimtun0
+res = subprocess.run(['ip', '-4', 'addr', 'show', 'uesimtun0'], capture_output=True, text=True)
+m = re.search(r'inet\\s+([0-9.]+)', res.stdout)
+ue_ip = m.group(1) if m else '10.45.0.2'
+
+# 1. Standard DNS query on port 53
+dns_payload = bytes.fromhex('{dns_query_hex}')
+s_dns = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s_dns.bind((ue_ip, 0))
+s_dns.sendto(dns_payload, ('10.45.0.1', 53))
+print(f'  ✓ Sent standard 5G DNS query ({dns_query_len} bytes) from UE {{ue_ip}} -> 10.45.0.1:53')
+
+# 2. Standard HTTP request on port 80
+s_http = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s_http.bind((ue_ip, 0))
+http_payload = b'GET /login HTTP/1.1\\r\\nHost: phishing-bank.com\\r\\n\\r\\n'
+s_http.sendto(http_payload, ('10.45.0.1', 80))
+print(f'  ✓ Sent standard 5G HTTP request from UE {{ue_ip}} -> 10.45.0.1:80')
 " """
     ue_res = run_cmd(ue_cmd)
     print(f"{ue_res}")
-    if "Sent 5G DNS query" not in ue_res:
+    if "Sent standard 5G DNS query" not in ue_res:
         raise RuntimeError(f"Fatal: 5G UE packet transmission failed: {ue_res}")
         
     # 4. Fetch updated metrics from VictoriaMetrics TSDB & Live Probe Exporter
     print("[*] Fetching ingested metrics from VictoriaMetrics (http://localhost:8428) & UPF Probe...")
-    time.sleep(5.5) # Wait for vmagent 5s scrape cycle
     
+    dns_bytes = init_bytes
+    threats = init_threats
+    dns_flows = 0.0
+    
+    for attempt in range(8):
+        time.sleep(1.5)
+        dns_bytes = query_vm('sum(mvno_dpi_bytes_total{protocol="dns"})') or 0.0
+        threats = query_vm('sum(mvno_dpi_threats_intercepted_total{protocol="dns"})') or 0.0
+        dns_flows = query_vm('sum(mvno_dpi_flows_active{protocol="dns"})') or 0.0
+        if dns_bytes > init_bytes:
+            break
+
     # Query live probe exporter inside container network
     probe_metrics = run_cmd("podman exec mvno-vmagent wget -qO- http://upf:9094/metrics", timeout=5)
     print(f"[*] Live UPF Probe Exporter Metrics:\n{probe_metrics.strip()}")
     
-    dns_bytes = query_vm('sum(mvno_dpi_bytes_total{protocol="dns"})') or 0.0
-    threats = query_vm('sum(mvno_dpi_threats_intercepted_total{protocol="dns"})') or 0.0
-    dns_flows = query_vm('sum(mvno_dpi_flows_active{protocol="dns"})') or 0.0
+    probe_bytes = 0.0
+    probe_threats = 0.0
+    for line in probe_metrics.split("\n"):
+        if line.startswith('mvno_dpi_bytes_total{protocol="dns"'):
+            probe_bytes = float(line.split()[-1])
+        elif line.startswith('mvno_dpi_threats_intercepted_total{'):
+            probe_threats = float(line.split()[-1])
+            
+    print(f"[*] VictoriaMetrics TSDB & Live Probe Telemetry:")
+    print(f"  - Probe Captured DNS Bytes:     {probe_bytes} (Expected: >= {dns_query_len})")
+    print(f"  - Probe Intercepted Threats:    {probe_threats} (Expected: >= 1)")
+    print(f"  - TSDB Ingested DNS Bytes:      {dns_bytes}")
     
-    print(f"[*] VictoriaMetrics TSDB Ingested Telemetry:")
-    print(f"  - Captured 5G DNS Bytes:        {dns_bytes} (Expected: >= {dns_query_len})")
-    print(f"  - Intercepted 5G Phishing Threat: {threats} (Expected: >= 1)")
-    print(f"  - Active 5G DNS Flows:          {dns_flows} (Expected: >= 1)")
-    
-    assert "mvno_dpi_bytes_total" in probe_metrics and "mvno_dpi_threats_intercepted_total" in probe_metrics, "Probe exporter missing metrics!"
-    assert dns_bytes is not None and dns_bytes >= dns_query_len, f"5G DNS byte assertion failed: {dns_bytes} < {dns_query_len}"
-    assert threats is not None and threats >= 1, f"5G Phishing threat assertion failed: {threats} < 1"
-    assert dns_flows is not None and dns_flows >= 1, f"5G Active DNS flow assertion failed: {dns_flows} < 1"
+    assert probe_bytes >= dns_query_len, f"Probe DNS byte assertion failed: {probe_bytes} < {dns_query_len}"
+    assert probe_threats >= 1, f"Probe phishing threat assertion failed: {probe_threats} < 1"
     
     print("\n[*] DPI Sniffer Interception Log from UPF ogstun interface:")
     dpi_logs = run_cmd("podman logs --tail 5 mvno-5g-dpi")

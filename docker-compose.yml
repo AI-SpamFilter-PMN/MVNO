@@ -180,6 +180,9 @@ services:
     image: docker.io/library/python:3.11-slim
     container_name: mvno-5g-dpi
     network_mode: "service:upf"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     volumes:
       - ./scripts/dpi/dpi_probe.py:/dpi_probe.py:ro,z
     command: ["python3", "-u", "/dpi_probe.py"]

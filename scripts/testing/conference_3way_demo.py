@@ -97,9 +97,10 @@ def main():
 
     # 4. Verification in Asterisk
     print("\n[4/4] Verifying Active Participants in Asterisk ConfBridge...")
-    CONF_DURATION = float(os.environ.get("DEMO_DURATION", 12.0))
-    print(f"  • Mixing 3-party audio in ConfBridge room 001 for {CONF_DURATION}s...")
-    time.sleep(CONF_DURATION)
+    no_hangup = "--no-hangup" in sys.argv or os.environ.get("DEMO_KEEP_ALIVE") == "1"
+    CONF_DURATION = float(os.environ.get("DEMO_DURATION", 25.0 if not no_hangup else 3600.0))
+    print(f"  • Mixing 3-party audio in ConfBridge room 001 for {CONF_DURATION}s{' (KEEP-ALIVE ACTIVE)' if no_hangup else ''}...")
+    time.sleep(min(CONF_DURATION, 12.0))
     res = run_cmd("podman exec mvno-asterisk asterisk -rx 'confbridge list 001'")
     print(f"Asterisk ConfBridge Status:\n{res}")
     
@@ -113,6 +114,15 @@ def main():
     if "1555" not in res or "default_bridge" not in res:
         subprocess.run(["make", "hangup"], capture_output=True, check=False)
         raise RuntimeError("Empirical assertion FAILED: ConfBridge room 001 has no active participant channels!")
+
+    if no_hangup:
+        print("\n[DEMO-KEEP-ALIVE] Conference is staying alive for presenter narration.")
+        print("Press Ctrl+C or run 'make hangup' when ready to end.")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n[Operator Interrupted] Hanging up conference...")
 
     # Clean termination
     subprocess.run(["make", "hangup"], capture_output=True, check=False)

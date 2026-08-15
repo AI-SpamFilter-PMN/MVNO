@@ -1,63 +1,63 @@
 ==========================================================================================
  🔬 STRICT GRAFANA CARRIER TSDB METRICS & SRE VALIDATOR
 ==========================================================================================
-[*] Total authoritative metric series in VictoriaMetrics TSDB: 2908
+[*] Total authoritative metric series in VictoriaMetrics TSDB: 2909
 
 📂 DASHBOARD: MVNO 5G SA — Core Network & Data Plane Slicing
 #   | Panel Title                        | Status | Metric / Live Value
 ------------------------------------------------------------------------------------------
 1   | 📱 Registered 5G UEs                | PASS   | 3 (Metric: ran_ue)
 2   | 📶 Active 5G PDU Sessions (UPF)     | PASS   | 3 (Metric: fivegs_upffunction_upf_sessionnbr)
-3   | 🔍 5G L7 Inspected Payload          | PASS   | 595 (Metric: mvno_dpi_bytes_total)
+3   | 🔍 5G L7 Inspected Payload          | PASS   | 2741 (Metric: mvno_dpi_bytes_total)
 4   | ⚡ 5G Core Functions (AMF/SMF/UPF)  | PASS   | 1 (Metric: up)
-5   | 📊 5G Application Flow Distribution | PASS   | 17 (Metric: mvno_dpi_flows_active)
-6   | 🌊 5G Decapsulated L7 User-Plane Ba | PASS   | 595 (Metric: mvno_dpi_bytes_total)
+5   | 📊 5G Application Flow Distribution | PASS   | 12 (Metric: mvno_dpi_flows_active)
+6   | 🌊 5G Decapsulated L7 User-Plane Ba | PASS   | 420 (Metric: mvno_dpi_bytes_total)
 
 📂 DASHBOARD: MVNO IMS — Voice Signaling & RTP Media Performance
 #   | Panel Title                        | Status | Metric / Live Value
 ------------------------------------------------------------------------------------------
 7   | Active RTP Sessions                | PASS   | 0 (Metric: rtpengine_sessions)
-8   | Stuck RTP Streams                  | PASS   | 0 (Metric: rtpengine_zero_packet_streams_total)
+8   | Stuck RTP Streams                  | PASS   | 9 (Metric: rtpengine_zero_packet_streams_total)
 9   | RTP Packet Errors                  | PASS   | 0 (Metric: rtpengine_packet_errors_total)
 10  | Available Media Ports              | PASS   | 10001 (Metric: rtpengine_ports_free)
-11  | Total Processed Calls              | PASS   | 34 (Metric: mvno_call_requests_total)
-12  | 🌊 Real-Time RTP Media Stream Bandw | PASS   | 12697.933333333332 (Metric: rtpengine_bytes_total)
-13  | 📊 SIP Signaling Call Rate (INVITEs | PASS   | 0.03333333333333333 (Metric: mvno_call_requests_total)
+11  | Total Processed Calls              | PASS   | 50 (Metric: mvno_call_requests_total)
+12  | 🌊 Real-Time RTP Media Stream Bandw | PASS   | 4445.8 (Metric: rtpengine_bytes_total)
+13  | 📊 SIP Signaling Call Rate (INVITEs | PASS   | 0.016666666666666666 (Metric: mvno_call_requests_total)
 
 📂 DASHBOARD: MVNO SOC — AI Anti-Fraud & Cyber Security Mesh
 #   | Panel Title                        | Status | Metric / Live Value
 ------------------------------------------------------------------------------------------
-14  | 🚨 Malicious SMS / Smishing Blocked | PASS   | 56 (Metric: mvno_sms_blocked_total)
+14  | 🚨 Malicious SMS / Smishing Blocked | PASS   | 26 (Metric: mvno_sms_blocked_total)
 15  | 📞 Fraudulent Voice Calls Blocked   | PASS   | 0 (Metric: mvno_call_blocked_total)
-16  | 🔍 5G UPF Phishing Intercepts       | PASS   | 17 (Metric: mvno_dpi_threats_intercepted_total)
+16  | 🔍 5G UPF Phishing Intercepts       | PASS   | 12 (Metric: mvno_dpi_threats_intercepted_total)
 17  | 🔐 EIR SIM-Swap Violations          | PASS   | 0 (Metric: mvno_eir_sim_swap_detected_total)
-18  | ⚡ Offline Vosk ASR Speech Transcri | PASS   | 300 (Metric: mvno_vosk_transcriptions_total)
-19  | 🛡️ Smishing URLs Neutralized by Sa | PASS   | 56 (Metric: mvno_smishing_url_blocked_total)
+18  | ⚡ Offline Vosk ASR Speech Transcri | PASS   | 364 (Metric: mvno_vosk_transcriptions_total)
+19  | 🛡️ Smishing URLs Neutralized by Sa | PASS   | 26 (Metric: mvno_smishing_url_blocked_total)
 
 📂 DASHBOARD: MVNO NOC — Unified
 #   | Panel Title                        | Status | Metric / Live Value
 ------------------------------------------------------------------------------------------
-20  | 📱 Total SMS Processed              | PASS   | 70 (Metric: mvno_sms_requests_total)
-21  | 🎙️ Total Voice Calls               | PASS   | 34 (Metric: mvno_call_requests_total)
-22  | 🛡️ Threats Blocked                 | PASS   | 56 (Metric: mvno_call_blocked_total,mvno_sms_blocked_total)
+20  | 📱 Total SMS Processed              | PASS   | 45 (Metric: mvno_sms_requests_total)
+21  | 🎙️ Total Voice Calls               | PASS   | 50 (Metric: mvno_call_requests_total)
+22  | 🛡️ Threats Blocked                 | PASS   | 26 (Metric: mvno_sms_blocked_total,mvno_call_blocked_total)
 23  | 📡 5G SA Active UEs                 | PASS   | 3 (Metric: ran_ue)
-24  | 🚨 5G L7 DPI Intercepts             | PASS   | 17 (Metric: mvno_dpi_threats_intercepted_total)
-25  | ⏱️ Media Relay Uptime              | PASS   | 487 (Metric: rtpengine_uptime_seconds)
-26  | 📊 Total 5G Inspected Payload       | PASS   | 595 (Metric: mvno_dpi_bytes_total)
-27  | ⚡ Offline Vosk ASR Speech Transcri | PASS   | 300 (Metric: mvno_vosk_transcriptions_total)
-28  | 📱 SMS Ingestion vs Spam Neutraliza | PASS   | 70 (Metric: mvno_sms_requests_total)
-29  | 📱 SMS Ingestion vs Spam Neutraliza | PASS   | 56 (Metric: mvno_sms_blocked_total)
-30  | Active 5G Data Plane Flows by Prot | PASS   | 17 (Metric: mvno_dpi_flows_active)
-31  | 📈 5G UPF L7 User-Plane Traffic by  | PASS   | 595 (Metric: mvno_dpi_bytes_total)
-32  | 🎙️ Voice Call Signaling & Intercep | PASS   | 34 (Metric: mvno_call_requests_total)
+24  | 🚨 5G L7 DPI Intercepts             | PASS   | 12 (Metric: mvno_dpi_threats_intercepted_total)
+25  | ⏱️ Media Relay Uptime              | PASS   | 36931 (Metric: rtpengine_uptime_seconds)
+26  | 📊 Total 5G Inspected Payload       | PASS   | 2741 (Metric: mvno_dpi_bytes_total)
+27  | ⚡ Offline Vosk ASR Speech Transcri | PASS   | 364 (Metric: mvno_vosk_transcriptions_total)
+28  | 📱 SMS Ingestion vs Spam Neutraliza | PASS   | 45 (Metric: mvno_sms_requests_total)
+29  | 📱 SMS Ingestion vs Spam Neutraliza | PASS   | 26 (Metric: mvno_sms_blocked_total)
+30  | Active 5G Data Plane Flows by Prot | PASS   | 12 (Metric: mvno_dpi_flows_active)
+31  | 📈 5G UPF L7 User-Plane Traffic by  | PASS   | 420 (Metric: mvno_dpi_bytes_total)
+32  | 🎙️ Voice Call Signaling & Intercep | PASS   | 50 (Metric: mvno_call_requests_total)
 33  | 🎙️ Voice Call Signaling & Intercep | PASS   | 0 (Metric: mvno_call_blocked_total)
-34  | 🌊 Real-Time RTP Media Stream Bandw | PASS   | 12697.933333333332 (Metric: rtpengine_bytes_total)
-35  | 2G ➔ 5G Relay                      | PASS   | 0 (Metric: mvno_bridge_sms_2g_to_5g_total)
+34  | 🌊 Real-Time RTP Media Stream Bandw | PASS   | 4445.8 (Metric: rtpengine_bytes_total)
+35  | 2G ➔ 5G Relay                      | PASS   | 8 (Metric: mvno_bridge_sms_2g_to_5g_total)
 36  | 5G ➔ 2G Backhaul                   | PASS   | 0 (Metric: mvno_bridge_sms_5g_to_2g_total)
 37  | Bridge Failures                    | PASS   | 0 (Metric: mvno_bridge_sms_failures_total)
-38  | Bridge Ingress Attempts            | PASS   | 0 (Metric: mvno_bridge_sms_attempts_total)
+38  | Bridge Ingress Attempts            | PASS   | 8 (Metric: mvno_bridge_sms_attempts_total)
 39  | Active RTP Sessions                | PASS   | 0 (Metric: rtpengine_sessions)
-40  | Stuck RTP Streams                  | PASS   | 0 (Metric: rtpengine_zero_packet_streams_total)
+40  | Stuck RTP Streams                  | PASS   | 9 (Metric: rtpengine_zero_packet_streams_total)
 41  | RTP Packet Errors                  | PASS   | 0 (Metric: rtpengine_packet_errors_total)
 42  | Available Ports                    | PASS   | 10001 (Metric: rtpengine_ports_free)
 43  | 🟢 Live Core Health (up=1)          | PASS   | 10 (Metric: up)
@@ -65,18 +65,18 @@
 📂 DASHBOARD: MVNO VictoriaMetrics System NOC
 #   | Panel Title                        | Status | Metric / Live Value
 ------------------------------------------------------------------------------------------
-44  | Uptime                             | PASS   | 18185 (Metric: vm_app_uptime_seconds)
-45  | Cache Entries                      | PASS   | 23090 (Metric: vm_cache_entries)
-46  | Ingestion Rows/s                   | PASS   | 1102.53 (Metric: vm_rows_added_to_storage_total)
-47  | Slow Row Inserts                   | PASS   | 394 (Metric: vm_slow_row_inserts_total)
-48  | Disk Used                          | PASS   | 975859 (Metric: vm_data_size_bytes)
-49  | Free Disk Space                    | PASS   | 25880817664 (Metric: vm_free_disk_space_bytes)
+44  | Uptime                             | PASS   | 22195 (Metric: vm_app_uptime_seconds)
+45  | Cache Entries                      | PASS   | 28858 (Metric: vm_cache_entries)
+46  | Ingestion Rows/s                   | PASS   | 1117.8633333333332 (Metric: vm_rows_added_to_storage_total)
+47  | Slow Row Inserts                   | PASS   | 513 (Metric: vm_slow_row_inserts_total)
+48  | Disk Used                          | PASS   | 1460198 (Metric: vm_data_size_bytes)
+49  | Free Disk Space                    | PASS   | 25320890368 (Metric: vm_free_disk_space_bytes)
 50  | Storage Read-Only                  | PASS   | 0 (Metric: vm_storage_is_read_only)
-51  | Next Retention In                  | PASS   | 2445243 (Metric: vm_next_retention_seconds)
-52  | TSDB Parts                         | PASS   | 31 (Metric: vm_parts)
-53  | Pending Rows                       | PASS   | 4058 (Metric: vm_pending_rows)
+51  | Next Retention In                  | PASS   | 2408799 (Metric: vm_next_retention_seconds)
+52  | TSDB Parts                         | PASS   | 42 (Metric: vm_parts)
+53  | Pending Rows                       | PASS   | 4205 (Metric: vm_pending_rows)
 54  | RW Pending Data                    | PASS   | 0 (Metric: vmagent_remotewrite_pending_data_bytes)
-55  | RemoteWrite Push Pipeline          | PASS   | 3.6 (Metric: vmagent_remotewrite_blocks_sent_total)
+55  | RemoteWrite Push Pipeline          | PASS   | 3.6033333333333335 (Metric: vmagent_remotewrite_blocks_sent_total)
 56  | RemoteWrite Push Pipeline          | PASS   | 0 (Metric: vmagent_remotewrite_errors_total)
 57  | RemoteWrite Push Pipeline          | PASS   | 0 (Metric: vmagent_remotewrite_push_failures_total)
 58  | RemoteWrite Connection Health      | PASS   | 0 (Metric: vmagent_remotewrite_retries_count_total)
