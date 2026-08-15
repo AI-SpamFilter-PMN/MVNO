@@ -1006,14 +1006,14 @@ class CockpitHandler(BaseHTTPRequestHandler):
                 self.send_header("Connection", "keep-alive")
                 self.end_headers()
                 
-                seen_files = set(glob.glob(os.path.join(SPOOL_ARCHIVE, "*.txt")))
+                seen_files = set(glob.glob(os.path.join(SPOOL_ARCHIVE, "*.txt")) + glob.glob(os.path.join(REPO_ROOT, "state/spool/*.txt")))
                 init_msg = json.dumps({"type": "telemetry", **get_live_status()})
                 self.wfile.write(f"data: {init_msg}\n\n".encode("utf-8"))
                 self.wfile.flush()
                 
                 while True:
                     time.sleep(1.5)
-                    current_files = set(glob.glob(os.path.join(SPOOL_ARCHIVE, "*.txt")))
+                    current_files = set(glob.glob(os.path.join(SPOOL_ARCHIVE, "*.txt")) + glob.glob(os.path.join(REPO_ROOT, "state/spool/*.txt")))
                     new_files = current_files - seen_files
                     for nf in new_files:
                         try:
