@@ -115,11 +115,17 @@ userplane_up() {
     # --- 5. UAS REGISTER over the 5G path (uplink + downlink dialog) -----------
     podman cp "${SCRIPT_DIR}/sip_traffic_sim.py" mvno-ueransim-ue-1:/tmp/sip_traffic_sim.py >/dev/null 2>&1 || true
     podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
-    podman exec mvno-ueransim-ue-1 sh -c "rm -f /tmp/uas.log; nohup python3 -u /tmp/sip_traffic_sim.py --uas ${AOR} --host ${KAM_IP} --port ${KAM_PORT} --bind-ip ${UE_IP} --listen-port 5070 > /tmp/uas.log 2>&1 &" || true
+    podman exec mvno-ueransim-ue-1 sh -c "rm -f /tmp/uas.log; nohup python3 -u /tmp/sip_traffic_sim.py --uas ${AOR} --host ${KAM_IP} --port ${KAM_PORT} --bind-ip ${UE_IP} --listen-port 5070 --reg-contact sip:${AOR}@10.89.0.14:5070 > /tmp/uas.log 2>&1 &" || true
     sleep 5
     local UAS_LOG
     UAS_LOG=$(podman exec mvno-ueransim-ue-1 cat /tmp/uas.log 2>/dev/null || true)
     local DL_AFTER="$(dl_count)"; DL_AFTER="${DL_AFTER:-0}"
+    # Root-cause cleanup (Issue 8.xx): deregister the SPECIFIC 5G-path contact
+    # (stored as 10.89.0.14:5070 due to UPF SNAT) BEFORE pkill'ing the UAS. A
+    # bare pkill leaves the usrloc binding behind, forking live calls to a dead
+    # 5G leg. Contact-specific (NOT Contact: *) so the co-registered baresip-rx
+    # binding for the same AOR is preserved.
+    podman exec mvno-ueransim-ue-1 sh -c "python3 /tmp/sip_traffic_sim.py --deregister-contact sip:${AOR}@10.89.0.14:5070 --callee ${AOR} --host ${KAM_IP} --port ${KAM_PORT} --password testpass --bind-ip ${UE_IP} --listen-port 5070" 2>/dev/null || true
     podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
 
     # --- 6. Assertions ---------------------------------------------------------

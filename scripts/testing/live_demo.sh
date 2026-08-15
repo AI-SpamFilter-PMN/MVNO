@@ -350,12 +350,17 @@ echo "  ue-1 5G IP (dynamic): $UE_IP"
 podman exec mvno-ueransim-ue-1 sh -c 'ip route replace 10.89.0.23/32 dev uesimtun0 2>/dev/null' || true
 podman cp "${SCRIPT_DIR}/sip_traffic_sim.py" mvno-ueransim-ue-1:/tmp/sip_traffic_sim.py >/dev/null
 podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
-podman exec mvno-ueransim-ue-1 sh -c "rm -f /tmp/uas.log; nohup python3 -u /tmp/sip_traffic_sim.py --uas ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 --bind-ip $UE_IP --listen-port 5070 > /tmp/uas.log 2>&1 &"
+podman exec mvno-ueransim-ue-1 sh -c "rm -f /tmp/uas.log; nohup python3 -u /tmp/sip_traffic_sim.py --uas ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 --bind-ip $UE_IP --listen-port 5070 --reg-contact sip:${MVNO_UAS_AOR}@10.89.0.14:5070 > /tmp/uas.log 2>&1 &"
 sleep 4
 BEFORE=$(podman exec mvno-upf cat /sys/class/net/ogstun/statistics/tx_bytes 2>/dev/null || echo 0)
 OUT=$(podman exec mvno-ueransim-ue-1 python3 /tmp/sip_traffic_sim.py --rtp 3 --caller ${MVNO_MSISDN_FUNDED} --callee ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 --bind-ip "$UE_IP" --listen-port 5072 2>&1) || true
 AFTER=$(podman exec mvno-upf cat /sys/class/net/ogstun/statistics/tx_bytes 2>/dev/null || echo 0)
 UAS_LOG=$(podman exec mvno-ueransim-ue-1 cat /tmp/uas.log 2>/dev/null || true)
+# Targeted deregister of the SPECIFIC 5G-path contact (stored 10.89.0.14:5070
+# via UPF SNAT) before pkill, so no stale usrloc binding forks live calls to a
+# dead 5G leg. Contact-specific (not Contact: *) preserves the co-registered
+# baresip-rx binding for the shared MVNO_UAS_AOR.
+podman exec mvno-ueransim-ue-1 sh -c "python3 /tmp/sip_traffic_sim.py --deregister-contact sip:${MVNO_UAS_AOR}@10.89.0.14:5070 --callee ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 --password testpass --bind-ip ${UE_IP} --listen-port 5070" 2>/dev/null || true
 podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
 echo "$OUT"
 echo "--- UAS side (5G-path callee) ---"
@@ -382,6 +387,7 @@ echo -e "${YELLOW}[5d/13] 🛡️ Fail-Open Proof: RTPEngine DOWN -> call still 
 podman rm -f ims-uas58 ims-caller59 >/dev/null 2>&1 || true
 # Drop the 5b UAS binding (same AOR 15559998888) so this section's callee is
 # unambiguous; a stale registration would fork the INVITE to the 5G-path UAS.
+podman exec mvno-ueransim-ue-1 sh -c "python3 /tmp/sip_traffic_sim.py --deregister-contact sip:${MVNO_UAS_AOR}@10.89.0.14:5070 --callee ${MVNO_UAS_AOR} --host 10.89.0.23 --port 5060 --password testpass --bind-ip ${UE_IP} --listen-port 5070" 2>/dev/null || true
 podman exec mvno-ueransim-ue-1 pkill -f sip_traffic_sim 2>/dev/null || true
 podman stop mvno-rtpengine >/dev/null 2>&1
 sleep 2

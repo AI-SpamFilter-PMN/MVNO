@@ -23,11 +23,17 @@ RTP media plane (real G.711 PCMU through rtpengine, record-call spooling):
 import argparse
 import hashlib
 import math
+import signal
 import socket
 import struct
 import sys
 import threading
 import time
+
+# Registry of registration Call-IDs keyed by the bound UDP socket's fileno, so
+# the UAS can deregister itself with the SAME Call-ID it registered with.
+# (socket.socket objects disallow arbitrary attribute assignment on some builds.)
+_REG_CALLIDS = {}
 
 
 def calculate_digest_response(username, realm, password, method, uri, nonce):
@@ -45,26 +51,42 @@ def _extract_nonce(resp_text, header):
     return ""
 
 
-def deregister_subscriber(username, password, host="127.0.0.1", port=5060):
-    """Digest-authenticated deregister: REGISTER carrying Contact: * with
-    Expires: 0 clears ALL bindings for the AoR in Kamailio's usrloc
-    (Issue 8.37 pattern — the demo leaves stale registrations behind; a plain
-    Expires: 0 with a specific Contact only drops that one binding).
+def deregister_subscriber(username, password, host="127.0.0.1", port=5060, contact="*",
+                           bind_ip="127.0.0.1", listen_port=5070):
+    """Digest-authenticated deregister: REGISTER carrying a specific Contact with
+    Expires: 0 removes ONLY that one binding; contact="*" clears ALL bindings.
+    contact filtering preserves co-registered live UAs (e.g. the baresip-rx rig
+    sharing the AOR) from being wiped by a stale 5G-path probe deregister.
+    (Issue 8.37 pattern — the demo leaves stale registrations behind.)
+
+    IMPORTANT (5G-path stale-binding fix): the socket MUST be bound to the SAME
+    (bind_ip, listen_port) the UAS registered from. Kamailio runs
+    force_rport()+fix_nated_contact() on every REGISTER, so a deregister from an
+    ephemeral source port is NAT-rewritten to a source that doesn't match the
+    stored binding and the specific contact is silently NOT removed (200 OK with
+    the binding still live). Binding to the UAS's own source port makes
+    fix_nated_contact() yield the identical stored address, so the binding is
+    actually removed. Loopback bind_ip (legacy path) stays unbound, matching
+    register_subscriber()'s handling.
+
     Returns True on SIP/2.0 200 OK."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(3)
+    if not bind_ip.startswith("127."):
+        s.bind((bind_ip, listen_port))
     call_id = f"dereg-{username}-{int(time.time())}@127.0.0.1"
 
     def build_reg(cseq, auth=""):
         auth_hdr = f"Authorization: {auth}\r\n" if auth else ""
+        contact_hdr = "*" if contact == "*" else f"<{contact}>"
         return (
             f"REGISTER sip:localhost:{port} SIP/2.0\r\n"
-            f"Via: SIP/2.0/UDP 127.0.0.1:5070;branch=z9hG4bK-drg{cseq}-{username}\r\n"
+            f"Via: SIP/2.0/UDP {bind_ip}:{listen_port};branch=z9hG4bK-drg{cseq}-{username}\r\n"
             f"From: <sip:{username}@localhost>;tag=tag-drg-{username}\r\n"
             f"To: <sip:{username}@localhost>\r\n"
             f"Call-ID: {call_id}\r\n"
             f"CSeq: {cseq} REGISTER\r\n"
-            f"Contact: *\r\n"
+            f"Contact: {contact_hdr}\r\n"
             f"{auth_hdr}"
             f"Expires: 0\r\n"
             f"Content-Length: 0\r\n\r\n"
@@ -103,6 +125,70 @@ def deregister_subscriber(username, password, host="127.0.0.1", port=5060):
     return False
 
 
+def deregister_self(sock, username, password, host, port, contact):
+    """Deregister a SPECIFIC contact using the SAME socket + Call-ID that the
+    UAS registered with. This is the only form Kamailio's registrar removes a
+    bare-contact binding by: save() matches the existing binding on (AOR, Call-ID),
+    so a deregister with a fresh Call-ID (see deregister_subscriber) or the
+    wildcard would either be ignored or wipe co-registered UAs (baresip-rx).
+    Returns True on SIP/2.0 200 OK. socket must be the bound registration socket."""
+    call_id = _REG_CALLIDS.get(sock.fileno())
+    if not call_id:
+        print(f"[-] deregister_self: no Call-ID registered for socket {sock.fileno()}")
+        return False
+    s = sock
+    s.settimeout(3)
+
+    def build_reg(cseq, auth=""):
+        auth_hdr = f"Authorization: {auth}\r\n" if auth else ""
+        bind_ip, listen_port = s.getsockname()
+        contact_hdr = "*" if contact == "*" else f"<{contact}>"
+        return (
+            f"REGISTER sip:localhost:{port} SIP/2.0\r\n"
+            f"Via: SIP/2.0/UDP {bind_ip}:{listen_port};branch=z9hG4bK-sd{cseq}-{username}\r\n"
+            f"From: <sip:{username}@localhost>;tag=tag-sd-{username}\r\n"
+            f"To: <sip:{username}@localhost>\r\n"
+            f"Call-ID: {call_id}\r\n"
+            f"CSeq: {cseq} REGISTER\r\n"
+            f"Contact: {contact_hdr}\r\n"
+            f"{auth_hdr}"
+            f"Expires: 0\r\n"
+            f"Content-Length: 0\r\n\r\n"
+        )
+
+    # The registration already consumed CSeq 1 (challenge) and 2 (auth), and
+    # deregister_self reuses the SAME Call-ID, so Kamailio's registrar rejects a
+    # replayed/invalid CSeq number. Start the deregister CSeq strictly above the
+    # registration's max (use an offset that stays valid across retries).
+    base_cseq = 100
+    s.sendto(build_reg(base_cseq).encode(), (host, port))
+    try:
+        resp1, _ = s.recvfrom(4096)
+        resp1_str = resp1.decode("utf-8", errors="ignore")
+    except Exception as e:
+        print(f"[-] Self-deregister failed for {username}: {e}")
+        return False
+    nonce = _extract_nonce(resp1_str, "www-authenticate")
+    if not nonce:
+        print(f"[-] Self-deregister failed for {username}: No nonce received")
+        return False
+    digest = calculate_digest_response(username, "localhost", password, "REGISTER",
+                                       f"sip:localhost:{port}", nonce)
+    auth = f'Digest username="{username}", realm="localhost", nonce="{nonce}", uri="sip:localhost:{port}", response="{digest}"'
+    s.sendto(build_reg(base_cseq + 1, auth).encode(), (host, port))
+    try:
+        resp2, _ = s.recvfrom(4096)
+        resp2_str = resp2.decode("utf-8", errors="ignore")
+    except Exception as e:
+        print(f"[-] SIP self-DEREGISTER response error: {e}")
+        return False
+    if "200 OK" in resp2_str:
+        print(f"[+] Self-DEREGISTER 200 OK for {username} contact {contact} (Call-ID-matched)")
+        return True
+    print(f"[-] Self-DEREGISTER rejected for {username}:\n{resp2_str}")
+    return False
+
+
 def register_subscriber(username, password, host="127.0.0.1", port=5060,
                         bind_ip="127.0.0.1", listen_port=5070):
     """Register via a socket bound to (bind_ip, listen_port) so the source
@@ -116,6 +202,7 @@ def register_subscriber(username, password, host="127.0.0.1", port=5060,
     if not bind_ip.startswith("127."):
         s.bind((bind_ip, listen_port))
     call_id = f"reg-{username}-{int(time.time())}@127.0.0.1"
+    _REG_CALLIDS[s.fileno()] = call_id   # expose so the UAS can deregister itself with the same Call-ID
 
     def build_reg(cseq, auth=""):
         auth_hdr = f"Authorization: {auth}\r\n" if auth else ""
@@ -289,8 +376,14 @@ def _wait_for(resp_sock, deadline, wanted, log=True):
     return None
 
 
-def run_uas(msisdn, password, host, port, bind_ip, listen_port, rtp_seconds=0, codec="pcmu"):
-    """Register a callee and answer INVITEs; count RTP received on the media port."""
+def run_uas(msisdn, password, host, port, bind_ip, listen_port, rtp_seconds=0, codec="pcmu",
+            reg_contact=None):
+    """Register a callee and answer INVITEs; count RTP received on the media port.
+
+    reg_contact: the contact Kamailio stores for this UAS (e.g. the UPF-SNAT'd
+    'sip:<msisdn>@10.89.0.14:5070' on the 5G path). When set, the UAS deregisters
+    ITS OWN Call-ID-scoped binding on SIGTERM (pkill) so no stale usrloc contact
+    is left behind while co-registered UAs (baresip-rx) are preserved."""
     sip = register_subscriber(msisdn, password, host, port, bind_ip, listen_port)
     if sip is None:
         return False
@@ -299,6 +392,21 @@ def run_uas(msisdn, password, host, port, bind_ip, listen_port, rtp_seconds=0, c
     media.bind((bind_ip, listen_port + 1))
     media.settimeout(1)
     media_port = listen_port + 1
+
+    def _self_cleanup(signum, frame):
+        # pkill sends SIGTERM: deregister OUR OWN binding (same Call-ID) before
+        # dying, so Kamailio actually removes it (matches on Call-ID) and we do
+        # NOT wipe co-registered UAs (baresip-rx has a different Call-ID).
+        try:
+            deregister_self(sip, msisdn, password, host, port,
+                            reg_contact or f"sip:{msisdn}@{bind_ip}:{listen_port}")
+        except Exception as e:
+            print(f"[UAS] self-deregister error on SIGTERM: {e}")
+        sys.exit(0)
+
+    if reg_contact:
+        signal.signal(signal.SIGTERM, _self_cleanup)
+        signal.signal(signal.SIGINT, _self_cleanup)
 
     rx_bytes = [0]
     def media_loop():
@@ -544,19 +652,33 @@ if __name__ == "__main__":
     parser.add_argument("--bind-ip", default="127.0.0.1", help="Local bind IP (container IP on mvno_net for media tests)")
     parser.add_argument("--listen-port", type=int, default=5070, help="Local UDP listen port (media on port+1)")
     parser.add_argument("--uas", default=None, metavar="MSISDN", help="UAS role: register MSISDN and answer INVITEs, counting RTP")
+    parser.add_argument("--reg-contact", default=None, metavar="SIP_URI", help="(UAS role) the contact Kamailio stores (e.g. UPF-SNAT'd sip:<msisdn>@10.89.0.14:5070 on the 5G path); enables Call-ID-scoped self-deregister on SIGTERM")
     parser.add_argument("--rtp", type=int, default=0, metavar="SECONDS", help="Caller role with real RTP media for N seconds")
-    parser.add_argument("--deregister", action="store_true", help="Digest-authenticated Contact: * Expires: 0 deregister of --callee (clears ALL usrloc bindings for the AoR)")
+    parser.add_argument("--deregister", action="store_true", help="Digest-authenticated Contact: * Expires: 0 deregister of --callee (clears ALL usrloc bindings for the AoR; binds --bind-ip:--listen-port so fix_nated_contact matches the stored binding)")
+    parser.add_argument("--deregister-contact", default=None, metavar="SIP_URI",
+                        help="Digest-authenticated Expires: 0 deregister of --callee for a SPECIFIC Contact URI only "
+                             "(e.g. sip:15559998888@10.89.0.14:5070). Unlike --deregister it does NOT wipe other "
+                             "co-registered bindings (e.g. a live baresip-rx sharing the AoR). ",
+                        )
     parser.add_argument("--codec", default="pcmu", choices=["pcmu", "g722"],
                         help="Codec to offer/answer: pcmu (G.711u, default), g722 (wideband G.722/16000 + PCMU fallback)")
     args = parser.parse_args()
 
     if args.deregister:
-        ok = deregister_subscriber(args.callee, args.password, args.host, args.port)
+        ok = deregister_subscriber(args.callee, args.password, args.host, args.port,
+                                   bind_ip=args.bind_ip, listen_port=args.listen_port)
+        sys.exit(0 if ok else 1)
+
+    if args.deregister_contact:
+        ok = deregister_subscriber(args.callee, args.password, args.host, args.port,
+                                   contact=args.deregister_contact,
+                                   bind_ip=args.bind_ip, listen_port=args.listen_port)
         sys.exit(0 if ok else 1)
 
     if args.uas:
         ok = run_uas(args.uas, args.password, args.host, args.port,
-                     args.bind_ip, args.listen_port, args.rtp, args.codec)
+                     args.bind_ip, args.listen_port, args.rtp, args.codec,
+                     reg_contact=args.reg_contact)
         sys.exit(0 if ok else 1)
 
     if args.rtp > 0:
