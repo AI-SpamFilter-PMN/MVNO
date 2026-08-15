@@ -669,7 +669,7 @@ HTML_DASHBOARD = """<!DOCTYPE html>
                 document.getElementById('dsp-jitter').innerText = `${data.dsp.jitter}%`;
                 document.getElementById('dsp-centroid').innerText = `${data.dsp.centroid} Hz`;
                 document.getElementById('dsp-classification').innerText = data.dsp.classification;
-                document.getElementById('dsp-classification').style.color = data.dsp.classification === 'SYNTHETIC_AI_VOICE_CLONE' ? '#ef4444' : '#22c55e';
+                document.getElementById('dsp-classification').style.color = (data.dsp.classification === 'ROBOTIC_MONOTONE_CARRIER' || data.dsp.classification === 'SYNTHETIC_AI_VOICE_CLONE') ? '#ef4444' : '#22c55e';
             } else {
                 document.getElementById('voice-score').innerText = '—';
                 document.getElementById('voice-bar').style.width = '0%';
