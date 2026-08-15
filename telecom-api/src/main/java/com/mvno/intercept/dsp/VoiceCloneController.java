@@ -1,5 +1,6 @@
 package com.mvno.intercept.dsp;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,9 +15,11 @@ import java.util.Map;
 public class VoiceCloneController {
 
     private final VoiceCloneDetector voiceCloneDetector;
+    private final MeterRegistry meterRegistry;
 
-    public VoiceCloneController(final VoiceCloneDetector voiceCloneDetector) {
+    public VoiceCloneController(final VoiceCloneDetector voiceCloneDetector, final MeterRegistry meterRegistry) {
         this.voiceCloneDetector = voiceCloneDetector;
+        this.meterRegistry = meterRegistry;
     }
 
     @PostMapping("/voice-clone")
@@ -33,6 +36,7 @@ public class VoiceCloneController {
         }
 
         final VoiceCloneDetector.VoiceAnalysisResult result = voiceCloneDetector.analyzePcm(pcmBytes, sampleRate);
+        meterRegistry.counter("mvno.voice.clone.flagged", "classification", result.classification()).increment();
         return ResponseEntity.ok(result);
     }
 }

@@ -28,8 +28,11 @@ public class VoiceCloneDetector {
         boolean syntheticSuspect,
         double jitterPercent,
         double spectralCentroidHz,
+        double spectralFlatness,
+        double pitchStdDev,
         double confidence,
-        String classification
+        String classification,
+        boolean advisoryOnly
     ) {}
 
     /**
@@ -41,7 +44,7 @@ public class VoiceCloneDetector {
      */
     public VoiceAnalysisResult analyzePcm(final byte[] pcmBytes, final int sampleRate) {
         if (pcmBytes == null || pcmBytes.length < 320) {
-            return new VoiceAnalysisResult(false, 0.0, 0.0, 0.0, "INSUFFICIENT_AUDIO");
+            return new VoiceAnalysisResult(false, 0.0, 0.0, 0.0, 0.0, 0.0, "INSUFFICIENT_AUDIO", true);
         }
 
         final int numSamples = pcmBytes.length / 2;
@@ -58,7 +61,7 @@ public class VoiceCloneDetector {
         final List<Double> pitchPeriods = extractPitchPeriods(samples, sampleRate);
 
         if (pitchPeriods.size() < 3) {
-            return new VoiceAnalysisResult(false, 0.0, spectralCentroid, 0.5, "UNVOICED_AUDIO");
+            return new VoiceAnalysisResult(false, 0.0, spectralCentroid, spectralFlatness, 0.0, 0.5, "UNVOICED_AUDIO", true);
         }
 
         // 3. Pitch Dynamics & Relative Average Perturbation (RAP Jitter)
@@ -66,12 +69,12 @@ public class VoiceCloneDetector {
         final double pitchStdDev = calculatePitchStdDev(pitchPeriods);
 
         // Honest Acoustic Classification:
-        // Monotone robocall / fixed tone detection (pitch variation stdDev < 0.6 Hz across utterance)
-        final boolean isMonotoneRobocall = (pitchStdDev < 0.6);
+        // Monotone synthesizer / fixed test carrier (pitch variation stdDev < 0.6 or jitter < 0.01% across utterance)
+        final boolean isMonotoneRobocall = (pitchStdDev < 0.6 || rapJitter < 0.01);
         final String verdict = isMonotoneRobocall ? "ROBOTIC_MONOTONE_CARRIER" : "NATURAL_CONVERSATIONAL_SPEECH";
         final double confidence = isMonotoneRobocall ? 0.98 : 0.92;
 
-        return new VoiceAnalysisResult(isMonotoneRobocall, rapJitter, spectralCentroid, confidence, verdict);
+        return new VoiceAnalysisResult(isMonotoneRobocall, rapJitter, spectralCentroid, spectralFlatness, pitchStdDev, confidence, verdict, true);
     }
 
     /**
