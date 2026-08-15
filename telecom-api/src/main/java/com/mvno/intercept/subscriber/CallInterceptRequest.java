@@ -19,5 +19,10 @@ public record CallInterceptRequest(
     String caller,
     String callee,
     @JsonProperty("call_id") String callId,
-    String imei
-) {}
+    String imei,
+    String identity
+) {
+    public CallInterceptRequest(String caller, String callee, String callId, String imei) {
+        this(caller, callee, callId, imei, null);
+    }
+}

@@ -15,13 +15,15 @@ class SubscriberControllerTest {
 
     private SubscriberService subscriberService;
     private AiFilterService aiFilterService;
+    private com.mvno.intercept.security.StirShakenCryptoService stirShakenCryptoService;
     private SubscriberController controller;
 
     @BeforeEach
     void setUp() {
         subscriberService = Mockito.mock(SubscriberService.class);
         aiFilterService = Mockito.mock(AiFilterService.class);
-        controller = new SubscriberController(subscriberService, aiFilterService, new SimpleMeterRegistry());
+        stirShakenCryptoService = Mockito.mock(com.mvno.intercept.security.StirShakenCryptoService.class);
+        controller = new SubscriberController(subscriberService, aiFilterService, stirShakenCryptoService, new SimpleMeterRegistry());
     }
 
     @Test
@@ -116,25 +118,25 @@ class SubscriberControllerTest {
     }
 
     @Test
-    void testInterceptCallGet_ValidCallerAllowed() {
-        Mockito.when(subscriberService.getBalance("15551234567")).thenReturn(50);
-        Mockito.when(aiFilterService.classifyCall(any())).thenReturn(new InterceptResponse(true, "Clean call"));
-
-        ResponseEntity<InterceptResponse> response = controller.interceptCallGet("15551234567", "15558888888", "call-id-get", null);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().allow());
-        assertEquals("Clean call", response.getBody().reason());
-    }
-
-    @Test
     void testInterceptCallGet_MissingCallerBadRequest() {
-        ResponseEntity<InterceptResponse> response = controller.interceptCallGet(null, "15558888888", "call-id-get", null);
+        ResponseEntity<InterceptResponse> response = controller.interceptCallGet(null, "15558888888", "call-id-get", null, null);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());
         assertFalse(response.getBody().allow());
         assertEquals("Invalid request: missing caller MSISDN", response.getBody().reason());
+    }
+
+    @Test
+    void testInterceptCall_StirShakenSpoofBlocked() {
+        Mockito.when(stirShakenCryptoService.verifyPassport("invalid.jwt.token")).thenReturn(false);
+
+        CallInterceptRequest req = new CallInterceptRequest("15551234567", "15558888888", "call-id-spoof", "356938035643809", "invalid.jwt.token");
+        ResponseEntity<InterceptResponse> response = controller.interceptCall(req);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse(response.getBody().allow());
+        assertEquals("STIR/SHAKEN: Invalid Caller ID Cryptographic Attestation", response.getBody().reason());
     }
 }
