@@ -35,8 +35,16 @@ public class VoiceCloneController {
             } catch (final Exception ignored) {}
         }
 
+        final String msisdn = (String) req.getOrDefault("msisdn", req.getOrDefault("caller", "unknown"));
+        final String imei = (String) req.getOrDefault("imei", "unknown");
+
         final VoiceCloneDetector.VoiceAnalysisResult result = voiceCloneDetector.analyzePcm(pcmBytes, sampleRate);
         meterRegistry.counter("mvno.voice.clone.flagged", "classification", result.classification()).increment();
+        meterRegistry.counter("mvno.dsp.robotic_flagged",
+            "verdict", result.classification(),
+            "msisdn", msisdn,
+            "imei", imei
+        ).increment();
         return ResponseEntity.ok(result);
     }
 }

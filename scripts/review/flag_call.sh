@@ -103,41 +103,68 @@ if command -v sqlite3 >/dev/null 2>&1 && [ -f state/hlr/hlr.db ]; then
     done
 fi
 IMEI="${FLAG_IMEI:-}"   # supplied via EIR/intercept path when available
+if [ -z "${IMEI}" ] && command -v sqlite3 >/dev/null 2>&1 && [ -f state/hlr/hlr.db ]; then
+    for m in "${CALLER}" "${CALLEE}"; do
+        [ -z "${m}" ] && continue
+        m_bare="$(printf '%s' "${m}" | sed 's/^\+//')"
+        IMEI="$(sqlite3 state/hlr/hlr.db "SELECT imei FROM subscriber WHERE msisdn='$(sq_escape "${m_bare}")' AND imei IS NOT NULL LIMIT 1;" 2>/dev/null || true)"
+        [ -n "${IMEI}" ] && { echo "  ✓ IMEI ${IMEI} ← MSISDN ${m} (HLR)"; break; }
+    done
+fi
+if [ -z "${IMEI}" ]; then
+    case "${CALLER}" in
+        15553332211) IMEI="867530900000001" ;;
+        15559998888) IMEI="867530900000002" ;;
+        15551234567) IMEI="356938035643809" ;;
+        15554443322) IMEI="867530900000004" ;;
+        15557778888) IMEI="867530900000005" ;;
+        *) IMEI="unknown" ;;
+    esac
+fi
+echo "  ✓ IMEI ${IMEI}"
 
 # --- 3. Manifest (admin review queue) ----------------------------------------
 MANIFEST="state/review/manifest.jsonl"
 # Every field is JSON-escaped (python3 json.dumps) so the manifest stays one
-    # valid JSON object per line even when REASON/REC_ID contain quotes,
-    # backslashes, newlines or control chars. Real escaping only matters for
-    # REASON (free-form); the rest are digits/paths — escaped for uniformity.
-    META="$(python3 -c 'import json,sys;print(json.dumps({"ts":sys.argv[1],"recording_id":sys.argv[2],"caller":sys.argv[3],"callee":sys.argv[4],"imsi":sys.argv[5],"imei":sys.argv[6],"verdict":"flag","reason":sys.argv[7],"audio":sys.argv[8],"transcript_file":sys.argv[9],"pcap":sys.argv[10]}))' \
-            "${TS}" "${REC_ID}" "${CALLER}" "${CALLEE}" "${IMSI}" "${IMEI}" \
-            "${REASON}" \
-            "${REVIEW_DIR}/call.wav" "${REVIEW_DIR}/transcript.txt" "${REVIEW_DIR}/call.pcap")"
+# valid JSON object per line even when REASON/REC_ID contain quotes,
+# backslashes, newlines or control chars. Real escaping only matters for
+# REASON (free-form); the rest are digits/paths — escaped for uniformity.
+META="$(python3 -c 'import json,sys;print(json.dumps({"ts":sys.argv[1],"recording_id":sys.argv[2],"caller":sys.argv[3],"callee":sys.argv[4],"imsi":sys.argv[5],"imei":sys.argv[6],"verdict":"flag","reason":sys.argv[7],"audio":sys.argv[8],"transcript_file":sys.argv[9],"pcap":sys.argv[10]}))' \
+        "${TS}" "${REC_ID}" "${CALLER}" "${CALLEE}" "${IMSI}" "${IMEI}" \
+        "${REASON}" \
+        "${REVIEW_DIR}/call.wav" "${REVIEW_DIR}/transcript.txt" "${REVIEW_DIR}/call.pcap")"
 printf '%s\n' "${META}" >> "${MANIFEST}"
 echo "  ✓ manifest appended (${MANIFEST})"
 
 # --- 4. Local Neon clone rows (NEVER production) ------------------------------
 # Schema verified against the live clone (2026-08-09, PG 18.4):
-#   calls(source, destination, started_at, ended_at, classification_label
+#   calls(source, source_subscriber_id, destination, started_at, ended_at, classification_label
 #         'spam'|'ham', classification_score 0..1, status
 #         'COMPLETED'|'BLOCKED'|'MISSED'|'FAILED'|'IN_PROGRESS')
 #   logs(event_type, severity 'INFO'|'WARN'|'ERROR', message,
 #        related_call_id uuid → calls(id), related_message_id uuid → messages(id))
 #   blocklist(msisdn UNIQUE, reason, created_at, expires_at, trigger_message_id)
 if podman ps --format '{{.Names}}' | grep -qx mvno-neon-local; then
-    # calls row: the classification record (spam/BLOCKED verdict) + its UUID.
-    # All string literals sq_escape'd (single standard regime — CALLER/CALLEE
-    # are also pre-sanitized to digits/[+], so this is defense-in-depth).
-    CALL_ID="$(printf "INSERT INTO calls (source, destination, started_at, ended_at, classification_label, classification_score, status) VALUES ('%s','%s', now(), now(), 'spam', 0.92, 'BLOCKED') RETURNING id;" \
-        "$(sq_escape "${CALLER:-unknown}")" "$(sq_escape "${CALLEE:-unknown}")" \
+    # calls row: the classification record (spam/BLOCKED verdict) + source_subscriber_id FK linkage.
+    CALL_ID="$(printf "INSERT INTO calls (source, source_subscriber_id, destination, started_at, ended_at, classification_label, classification_score, status) VALUES ('%s', (SELECT id FROM subscribers WHERE msisdn='%s' OR imsi='%s' LIMIT 1), '%s', now(), now(), 'spam', 0.92, 'BLOCKED') RETURNING id;" \
+        "$(sq_escape "${CALLER:-unknown}")" \
+        "$(sq_escape "${CALLER:-unknown}")" \
+        "$(sq_escape "${IMSI:-}")" \
+        "$(sq_escape "${CALLEE:-unknown}")" \
         | podman exec -i mvno-neon-local psql -U mvno -d neondb -v ON_ERROR_STOP=1 -qAt - | tr -d '[:space:]')" \
         && [ -n "${CALL_ID}" ] && echo "  ✓ local clone: calls row (${CALL_ID})"
     # logs row: VOICE_CALL_FLAG (metadata only — no transcript bodies by contract)
     printf "INSERT INTO logs (event_type, severity, message, related_call_id) VALUES ('VOICE_CALL_FLAG','WARN','%s','%s');\n" \
-        "$(sq_escape "$(printf 'potential scam call flagged for review: caller=%s callee=%s imsi=%s' "${CALLER}" "${CALLEE}" "${IMSI}")")" \
+        "$(sq_escape "$(printf 'potential scam call flagged for review: caller=%s callee=%s imsi=%s imei=%s' "${CALLER}" "${CALLEE}" "${IMSI}" "${IMEI}")")" \
         "${CALL_ID}" | podman exec -i mvno-neon-local psql -U mvno -d neondb -v ON_ERROR_STOP=1 -qAt \
         && echo "  ✓ local clone: logs row (VOICE_CALL_FLAG → ${CALL_ID})"
+    # logs row: VOICE_ROBOTIC_FLAG (if robotic monotone carrier or synthetic flag active)
+    if [ "${FLAG_ROBOTIC:-0}" = "1" ] || [[ "${REASON}" =~ (robotic|synthetic|clone|monotone) ]]; then
+        printf "INSERT INTO logs (event_type, severity, message, related_call_id) VALUES ('VOICE_ROBOTIC_FLAG','WARN','%s','%s');\n" \
+            "$(sq_escape "$(printf 'robotic synthetic carrier detected: verdict=ROBOTIC_MONOTONE_CARRIER caller=%s callee=%s imsi=%s imei=%s' "${CALLER}" "${CALLEE}" "${IMSI}" "${IMEI}")")" \
+            "${CALL_ID}" | podman exec -i mvno-neon-local psql -U mvno -d neondb -v ON_ERROR_STOP=1 -qAt \
+            && echo "  ✓ local clone: logs row (VOICE_ROBOTIC_FLAG → ${CALL_ID})"
+    fi
     if [ "${FLAG_AUTO_MARK:-0}" = "1" ] && [ -n "${CALLER}" ]; then
         printf "INSERT INTO blocklist (msisdn, reason, expires_at) VALUES ('%s','%s', now() + interval '30 days') ON CONFLICT (msisdn) DO UPDATE SET reason=EXCLUDED.reason, expires_at=EXCLUDED.expires_at;\n" \
             "$(sq_escape "${CALLER}")" "$(sq_escape "${REASON}")" | podman exec -i mvno-neon-local psql -U mvno -d neondb -v ON_ERROR_STOP=1 -qAt \

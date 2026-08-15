@@ -1,5 +1,6 @@
 package com.mvno.intercept.filter;
 
+import com.mvno.intercept.dsp.VoiceCloneDetector;
 import com.mvno.intercept.subscriber.CallInterceptRequest;
 import com.mvno.intercept.subscriber.InterceptResponse;
 import com.mvno.intercept.subscriber.SMSInterceptRequest;
@@ -52,14 +53,26 @@ public class AiFilterService {
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicLong circuitOpenUntilEpochMs = new AtomicLong(0);
 
+    private final VoiceCloneDetector voiceCloneDetector;
+
+    @org.springframework.beans.factory.annotation.Autowired
     public AiFilterService(final RestClient restClient,
                            @Value("${ai-filter.url:http://ai-filter:8000/api/v1/classify}") final String baseUrl,
                            @Value("${filteration.voice.url:}") final String voiceFilterUrl,
-                           final MeterRegistry meterRegistry) {
+                           final MeterRegistry meterRegistry,
+                           final VoiceCloneDetector voiceCloneDetector) {
         this.restClient = restClient;
         this.baseUrl = baseUrl;
         this.vfUrl = voiceFilterUrl.isBlank() ? baseUrl : voiceFilterUrl;
         this.meterRegistry = meterRegistry;
+        this.voiceCloneDetector = voiceCloneDetector != null ? voiceCloneDetector : new VoiceCloneDetector();
+    }
+
+    public AiFilterService(final RestClient restClient,
+                           final String baseUrl,
+                           final String voiceFilterUrl,
+                           final MeterRegistry meterRegistry) {
+        this(restClient, baseUrl, voiceFilterUrl, meterRegistry, new VoiceCloneDetector());
     }
 
     /**
@@ -80,13 +93,19 @@ public class AiFilterService {
         if (req != null && req.content() != null) {
             final String smishThreat = scanSmishingUrls(req.content());
             if (smishThreat != null) {
-                meterRegistry.counter("mvno.smishing.url.blocked", "threat", smishThreat).increment();
+                meterRegistry.counter("mvno.smishing.url.blocked",
+                    "threat", smishThreat,
+                    "msisdn", req.sender() != null ? req.sender() : "unknown"
+                ).increment();
                 logger.warn("SMISHING PHISHING URL INTERCEPTED: sender={} threat='{}'", req.sender(), smishThreat);
                 return new InterceptResponse(false, "SMISHING_URL_BLOCKED: " + smishThreat);
             }
             final String scamWord = scanScamKeywords(req.content());
             if (scamWord != null) {
-                meterRegistry.counter("mvno.vosk.scamflag", "word", scamWord).increment();
+                meterRegistry.counter("mvno.vosk.scamflag",
+                    "word", scamWord,
+                    "msisdn", req.sender() != null ? req.sender() : "unknown"
+                ).increment();
                 return new InterceptResponse(true, "scam-keyword-review: " + scamWord);
             }
         }
@@ -137,6 +156,8 @@ public class AiFilterService {
      * @return InterceptResponse decision (allow: true/false).
      */
     public InterceptResponse classifyCall(final CallInterceptRequest req) {
+        final String caller = (req != null && req.caller() != null) ? req.caller() : "unknown";
+
         // Step 1: Fast-path check — if circuit breaker is OPEN, fail-open immediately (~0.1ms)
         if (isCircuitOpen()) {
             return failOpen("circuit_open", "AI filter circuit open — SLA allow");
@@ -146,9 +167,9 @@ public class AiFilterService {
             // Step 2: Build JSON classification request payload for Voice Call
             final Map<String, Object> body = Map.of(
                 "event_type", "VOICE_CALL",
-                "caller_msisdn", req.caller(),
-                "callee_msisdn", req.callee(),
-                "call_id", req.callId() != null ? req.callId() : "",
+                "caller_msisdn", caller,
+                "callee_msisdn", (req != null && req.callee() != null) ? req.callee() : "",
+                "call_id", (req != null && req.callId() != null) ? req.callId() : "",
                 "timestamp_epoch_ms", System.currentTimeMillis()
             );
 
@@ -159,22 +180,18 @@ public class AiFilterService {
                     .retrieve()
                     .body(TranscriptionResult.class);
 
-            // Step 4: On successful response, reset consecutive failure counter to 0
             if (result != null) {
                 consecutiveFailures.set(0);
                 return new InterceptResponse(result.allow(), result.reason());
             }
 
-            // Fallback for null response body
             return failOpen("empty_response", "AI filter returned empty response — SLA allow");
 
         } catch (final RestClientException e) {
-            // Network / Timeout Exception: record failure & trigger SLA fail-open
             recordFailure(e);
             return failOpen("unreachable", "AI filter unreachable — SLA allow");
 
         } catch (final Exception e) {
-            // Unexpected internal error: log & trigger SLA fail-open
             logger.error("Unexpected error in Call AI classification: {}", e.getMessage(), e);
             return failOpen("internal", "Gateway internal error — SLA allow");
         }
