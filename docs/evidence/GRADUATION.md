@@ -8,7 +8,7 @@ assertion that refuses to pass on stale or synthetic data.
 > **2026-08-09 addendum — unattended `MVNO_MIC_SOFT=1` PASS:**
 > `make graduation` re-run with `MVNO_MIC_SOFT=1` (silent-mic tolerated so a
 > headless cold-start passes). Full evidence:
-> `docs/evidence/graduation-run-2026-08-09-final.log`.
+> `docs/evidence/runs/graduation-run-2026-08-09-final.log`.
 > Results: mic probe PASSED; **gate 0/3 PASS** (subscriber topology);
 > **gate 1/3 PASS** (5G preflight — REGISTER 200 OK + GTP-U DL 0→2 pkts +
 > NRF 9/9); **gate 2/3 PASS** (SMS matrix 8/8 cells + AI-block); fresh mic
@@ -30,7 +30,7 @@ assertion that refuses to pass on stale or synthetic data.
 | [6/6] Headline | forced fresh mic capture → non-empty **this-run** transcript | RED headless (expected) — see §4 |
 | [7/7] Anti-theater | VictoriaLogs row for this run's interception | PASS (5 rows, counter `1.0`) |
 
-Full command output: `docs/evidence/graduation-run-2026-08-08.log` (staged from
+Full command output: `docs/evidence/runs/graduation-run-2026-08-08.log` (staged from
 the live run, filtered for stage markers + assertions).
 
 ---
@@ -107,7 +107,7 @@ for 10 s. The fresh capture is then non-empty → [6/6] and [7/7] both PASS →
 
 ## 6. Evidence artifacts
 
-* `docs/evidence/graduation-run-2026-08-08.log` — filtered live run output
+* `docs/evidence/runs/graduation-run-2026-08-08.log` — filtered live run output
 * `state/spool/archived/mic_probe_*.wav` / `mic_call_*.wav` — this run's captures
 * `docs/ISSUES.md` §5.9 amendment + §7.3 — regression write-ups
 * VictoriaLogs query (repeatable):

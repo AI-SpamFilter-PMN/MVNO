@@ -17,10 +17,10 @@ cold-start-test:
 
 # Master SRE evidence generator
 evidence:
-	@mkdir -p docs/evidence
-	python3 ./scripts/testing/test_all_advanced_features.py | tee docs/evidence/advanced-features-test-2026-08-14.log
-	python3 ./scripts/testing/live_hardware_smoke_test.py | tee docs/evidence/e2e-smoke-test-2026-08-14.log
-	python3 ./scripts/testing/verify_grafana_live_metrics.py | tee docs/evidence/grafana-metrics-audit-2026-08-14.log
+	@mkdir -p docs/evidence/runs
+	python3 ./scripts/testing/test_all_advanced_features.py | tee docs/evidence/runs/advanced-features-test-2026-08-14.log
+	python3 ./scripts/testing/live_hardware_smoke_test.py | tee docs/evidence/runs/e2e-smoke-test-2026-08-14.log
+	python3 ./scripts/testing/verify_grafana_live_metrics.py | tee docs/evidence/runs/grafana-metrics-audit-2026-08-14.log
 
 # Launches all rootless container services using scripts/up.sh
 up:

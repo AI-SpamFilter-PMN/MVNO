@@ -1106,13 +1106,32 @@ the SIP/RTP live while the Wireshark GUI captures it — the call equivalent of 
 
 The AUTO/`make graduation`/`gate` path is canned and deterministic. The
 **user-driven** companion takes LIVE, dynamic input from the operator — your
-own SMS body and your own voice — reusing the same tested primitives.
+own SMS body and your own voice — reusing the same tested primitives (`send_rest_sms.sh`, `demo_call.sh`, `mic_record.sh`, `live_tap`, `NativeVoskService`).
+
+### 1. Interactive Execution Order
 
 ```bash
-make user-demo          # interactive menu (order: up -> mic probe -> SMS -> call)
-make user-sms  BODY="<your text>" FLOW=2g-2g    # any flow: 2g2g|2g5g|5g2g|5g5g|ai
-make user-call  CALLEE=15559998888              # speak ~10 s, see your words live
+# 1) Stack up (all containers, Vosk small-model + live-tap daemon)
+make up
+
+# 2) Confirm the microphone is audible (non-fatal)
+bash scripts/demo/mic_probe.sh
+
+# 3) USER SMS — type any body, pick any MVNO flow
+make user-sms BODY="You have won a prize, call us now" FLOW=2g-2g
+#   or interactively:
+make user-demo            # menu → 3) User SMS
+
+# 4) USER LIVE VOICE CALL — speak 10s, Vosk transcribes YOUR words
+make user-call CALLEE=15559998888              # speak ~10 s, see your words live
+#   or interactively:
+make user-demo            # menu → 4) User Call
+
+# 5) Evidence: scam-flag counters
+curl -s localhost:8080/actuator/prometheus | grep mvno_vosk_scamflag
 ```
+
+### 2. Auto vs User Comparison
 
 | Entry | Auto (canned) | User (live/dynamic) |
 |---|---|---|
@@ -1120,10 +1139,25 @@ make user-call  CALLEE=15559998888              # speak ~10 s, see your words li
 | Call | `demo_call.sh` / `graduation` (canned phrase) | `user_call.sh` — **you speak**, live Vosk |
 | Voice | baresip UAs + `--codec g722` sim | your phone/softphone or the mic |
 
-The user-driven family lives in `scripts/demo/` (`user_demo.sh` menu,
-`user_sms.sh` MO-write, `user_call.sh`); the AUTO test harness stays in
-`scripts/testing/` (`*matrix*`, `gate.sh`) — never mixed. Full details:
-`docs/USER_DEMO.md`.
+### 3. User SMS Flow Routing Table
+
+`user_sms.sh "<body>" <flow>` — `<flow>` is one of:
+
+| flow | route | sender → recipient |
+|---|---|---|
+| `2g-2g` | 2G SMSC direct | 15557778888 → 15554443322 |
+| `2g-5g` | SMSC→SIP relay | 15554443322 → 15551234567 |
+| `5g-2g` | bridge→SMPP | 15551234567 → 15554443322 |
+| `5g-5g` | Kamailio twin | 15551234567 → 15557654321 |
+| `ai` | 5G→5G AI-block | 15551234567 → 15557654321 (no delivery) |
+
+Example — a real scam body flagged live (advisory-only, non-blocking):
+```bash
+make user-sms BODY="your bank account has been blocked, please verify your details" FLOW=5g-5g
+```
+The Interception Gateway runs balance $\rightarrow$ EIR $\rightarrow$ AI-spam. A scam keyword match
+increments the review counter (`mvno_vosk_scamflag_total{word="..."}`) and returns **allow=true**
+(NEVER hard-blocks the call/SMS) — adhering to the zero-trust advisory contract.
 
 > **Exact phone / softphone values** (Linphone, MizuDroid, SipClient, baresip-UAs):
 > proxy `sip:<HOST-LAN-IP>:5060` (discover `hostname -I | awk '{print $1}'`),

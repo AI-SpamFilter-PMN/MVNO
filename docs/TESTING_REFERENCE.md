@@ -1265,4 +1265,4 @@ make user-call CALLEE=15559998888
 proxy `sip:<HOST-LAN-IP>:5060` (`hostname -I | awk '{print $1}'`), username a funded MSISDN (`15551234567` …),
 password `testpass`, realm `localhost`, transport UDP/TCP; dial `15559998888`
 (baresip-rx auto-answer). Negotiated codec G.722/16000 or PCMU/8000. Full
-nuts-and-bolts in `docs/USER_DEMO.md` and `docs/LIVE_DEMO.md` §S12.
+nuts-and-bolts in `docs/LIVE_DEMO.md` §S12.
