@@ -438,7 +438,20 @@ HTML_DASHBOARD = """<!DOCTYPE html>
                     <span id="stir-status" style="color: var(--text-muted);">N/A</span>
                 </div>
                 
-                <div style="margin-top: 14px; font-weight: 600; font-size: 11px; color: var(--text-muted); text-transform: uppercase;">
+                <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color); font-size: 11px; color: var(--text-muted);">
+                    <div style="font-weight: 600; margin-bottom: 4px;">📡 Monitored Network UEs & Trunks:</div>
+                    <div style="display:flex; flex-wrap: wrap; gap: 4px;">
+                        <span class="chip" style="font-size:10px; padding:2px 6px;">📱 Android (15551234567)</span>
+                        <span class="chip" style="font-size:10px; padding:2px 6px;">💻 5G Softphone (15559998888)</span>
+                        <span class="chip" style="font-size:10px; padding:2px 6px;">💻 2G Softphone (15553332211)</span>
+                        <span class="chip" style="font-size:10px; padding:2px 6px;">📶 5G NR (15557778888)</span>
+                        <span class="chip" style="font-size:10px; padding:2px 6px;">📻 2G GSM (15554443322)</span>
+                        <span class="chip" style="font-size:10px; padding:2px 6px;">🚨 PSAP (911)</span>
+                        <span class="chip" style="font-size:10px; padding:2px 6px;">👥 Conf (7001)</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 12px; font-weight: 600; font-size: 11px; color: var(--text-muted); text-transform: uppercase;">
                     Active Call Controls:
                 </div>
                 <div class="btn-group">
