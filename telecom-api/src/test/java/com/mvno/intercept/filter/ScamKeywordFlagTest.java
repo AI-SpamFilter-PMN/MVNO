@@ -84,7 +84,7 @@ class ScamKeywordFlagTest {
     }
 
     @Test
-    @DisplayName("SMS scam content is FLAGGED (allow true) via mvno.vosk.scamflag — user-driven path")
+    @DisplayName("Untrusted SMS scam content is FLAGGED (allow true) via mvno.vosk.scamflag — user-driven path")
     void smsScamFlagNonBlocking() {
         final MeterRegistry reg = new SimpleMeterRegistry();
         final AiFilterService svc = new AiFilterService(
@@ -92,16 +92,39 @@ class ScamKeywordFlagTest {
                 "http://127.0.0.1:1/api/v1/classify",
                 "",
                 reg);
+        // Untrusted external sender (not in trusted list)
         final com.mvno.intercept.subscriber.SMSInterceptRequest sms =
                 new com.mvno.intercept.subscriber.SMSInterceptRequest(
-                        "15557778888", "15554443322",
+                        "19998887777", "15554443322",
                         "your bank account has been blocked, please verify your details");
 
         final InterceptResponse v = svc.classifySms(sms);
         assertTrue(v.allow(), "SMS scam body must NOT block (allow true)");
-        assertTrue(v.reason().startsWith("scam-keyword-review"), "reason flags for review");
+        assertTrue(v.reason().contains("scam-keyword-review"), "reason flags for review: " + v.reason());
         assertTrue(reg.get("mvno.vosk.scamflag").counter().count() > 0,
-                "scamflag metric fired for the SMS content");
+                "scamflag metric fired for the untrusted SMS content");
+    }
+
+    @Test
+    @DisplayName("Trusted sender SMS with keywords bypasses local scan (no false-positive scamflag)")
+    void trustedSenderBypassesLocalScamFlag() {
+        final MeterRegistry reg = new SimpleMeterRegistry();
+        final AiFilterService svc = new AiFilterService(
+                RestClient.builder().build(),
+                "http://127.0.0.1:1/api/v1/classify",
+                "",
+                reg);
+        // Trusted sender (e.g. 15557778888 in default trusted list)
+        final com.mvno.intercept.subscriber.SMSInterceptRequest trustedSms =
+                new com.mvno.intercept.subscriber.SMSInterceptRequest(
+                        "15557778888", "15554443322",
+                        "your bank account has been confirmed, your balance is $100");
+
+        final InterceptResponse v = svc.classifySms(trustedSms);
+        assertTrue(v.allow(), "Trusted SMS must be allowed");
+        assertFalse(v.reason().contains("scam-keyword-review"), "Trusted SMS must not have local scam flag in reason: " + v.reason());
+        assertEquals(0, reg.find("mvno.vosk.scamflag").counters().size(),
+                "No scamflag metric should be created/incremented for trusted sender");
     }
 
     @Test

@@ -49,6 +49,7 @@ ai-filter:
 filteration:
   voice:
     url: ${FILTERATION_VOICE_URL:http://filteration-system:8000/api/v1/voice/filter}
+  trusted-senders: ${FILTERATION_TRUSTED_SENDERS:15551234567,15559998888,15553332211,15557778888,15554443322,7001,911}
 
 # ------------------------------------------------------------------------------
 # Gateway API-Key Authentication (Zero-Trust Section 1.2)

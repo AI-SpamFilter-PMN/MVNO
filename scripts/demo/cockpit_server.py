@@ -929,6 +929,19 @@ def discover_active_call_participants():
 
     return caller, callee
 
+def check_spool_pipeline_status():
+    """Check live status of the Vosk/RTPEngine live_tap audio streamer."""
+    try:
+        res = subprocess.run("pgrep -f live_tap.sh", shell=True, capture_output=True, text=True)
+        pids = res.stdout.strip().split()
+        if pids:
+            return f"LIVE (live_tap PID {pids[0]})"
+    except Exception:
+        pass
+    if os.path.exists(os.path.join(REPO_ROOT, "state/spool")):
+        return "STANDBY (Spool Ready)"
+    return "OFFLINE"
+
 def get_live_status():
     """Build genuine live telemetry payload from TSDB, Kamailio, and 5G Core."""
     rtp_sessions = int(query_vm_metric("rtpengine_sessions"))
@@ -976,19 +989,6 @@ def get_live_status():
 
     # Genuine in-JVM DSP analysis on real call audio (0 hardcodes)
     dsp_data = get_real_dsp_analysis() if rtp_sessions > 0 else None
-
-def check_spool_pipeline_status():
-    """Check live status of the Vosk/RTPEngine live_tap audio streamer."""
-    try:
-        res = subprocess.run("pgrep -f live_tap.sh", shell=True, capture_output=True, text=True)
-        pids = res.stdout.strip().split()
-        if pids:
-            return f"LIVE (live_tap PID {pids[0]})"
-    except Exception:
-        pass
-    if os.path.exists(os.path.join(REPO_ROOT, "state/spool")):
-        return "STANDBY (Spool Ready)"
-    return "OFFLINE"
 
     return {
         "active_calls": rtp_sessions,

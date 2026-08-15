@@ -48,6 +48,7 @@ public class AiFilterService {
     private final String baseUrl;
     private final String vfUrl;
     private final MeterRegistry meterRegistry;
+    private final Set<String> trustedSenders;
 
     // Thread-safe atomic counters for tracking consecutive failures & circuit cooldown epoch
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
@@ -59,6 +60,7 @@ public class AiFilterService {
     public AiFilterService(final RestClient restClient,
                            @Value("${ai-filter.url:http://ai-filter:8000/api/v1/classify}") final String baseUrl,
                            @Value("${filteration.voice.url:}") final String voiceFilterUrl,
+                           @Value("${filteration.trusted-senders:15551234567,15559998888,15553332211,15557778888,15554443322,7001,911}") final String trustedSendersConfig,
                            final MeterRegistry meterRegistry,
                            final VoiceCloneDetector voiceCloneDetector) {
         this.restClient = restClient;
@@ -66,17 +68,36 @@ public class AiFilterService {
         this.vfUrl = voiceFilterUrl.isBlank() ? baseUrl : voiceFilterUrl;
         this.meterRegistry = meterRegistry;
         this.voiceCloneDetector = voiceCloneDetector != null ? voiceCloneDetector : new VoiceCloneDetector();
+        this.trustedSenders = parseTrustedSenders(trustedSendersConfig);
     }
 
     public AiFilterService(final RestClient restClient,
                            final String baseUrl,
                            final String voiceFilterUrl,
                            final MeterRegistry meterRegistry) {
-        this(restClient, baseUrl, voiceFilterUrl, meterRegistry, new VoiceCloneDetector());
+        this(restClient, baseUrl, voiceFilterUrl, "15551234567,15559998888,15553332211,15557778888,15554443322,7001,911", meterRegistry, new VoiceCloneDetector());
+    }
+
+    private Set<String> parseTrustedSenders(final String config) {
+        if (config == null || config.isBlank()) {
+            return Set.of("15551234567", "15559998888", "15553332211", "15557778888", "15554443322", "7001", "911");
+        }
+        return java.util.Arrays.stream(config.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    public boolean isTrustedSender(final String msisdn) {
+        if (msisdn == null || msisdn.isBlank()) {
+            return false;
+        }
+        final String clean = msisdn.replaceAll("[^0-9]", "");
+        return trustedSenders.contains(clean) || trustedSenders.contains(msisdn);
     }
 
     /**
-     * Constructs SMS classification payload and proxies it to AI filter.
+     * Constructs SMS classification payload and proxies it to AI filter / Filteration-System decider.
      * Enforces SLA fail-open rules if AI server is unreachable or circuit is open.
      * 
      * @param req Incoming SMS interception request.
@@ -88,39 +109,49 @@ public class AiFilterService {
             return failOpen("circuit_open", "AI filter circuit open — SLA allow");
         }
 
-        // Step 1b: local deterministic scam-keyword flag (SMS too). A hit is a
-        // REVIEW FLAG (allow=true, NEVER a hard block) + mvno.vosk.scamflag.
+        final String sender = (req != null && req.sender() != null) ? req.sender() : "unknown";
+        final boolean isTrusted = isTrustedSender(sender);
+
+        String localFlagHint = null;
+
+        // Step 1b: Local deterministic scan for untrusted senders (trusted org senders bypass local keyword scan)
         if (req != null && req.content() != null) {
             final String smishThreat = scanSmishingUrls(req.content());
             if (smishThreat != null) {
                 meterRegistry.counter("mvno.smishing.url.blocked",
                     "threat", smishThreat,
-                    "msisdn", req.sender() != null ? req.sender() : "unknown"
+                    "msisdn", sender
                 ).increment();
-                logger.warn("SMISHING PHISHING URL INTERCEPTED: sender={} threat='{}'", req.sender(), smishThreat);
+                logger.warn("SMISHING PHISHING URL INTERCEPTED: sender={} threat='{}'", sender, smishThreat);
                 return new InterceptResponse(false, "SMISHING_URL_BLOCKED: " + smishThreat);
             }
-            final String scamWord = scanScamKeywords(req.content());
-            if (scamWord != null) {
-                meterRegistry.counter("mvno.vosk.scamflag",
-                    "word", scamWord,
-                    "msisdn", req.sender() != null ? req.sender() : "unknown"
-                ).increment();
-                return new InterceptResponse(true, "scam-keyword-review: " + scamWord);
+
+            if (!isTrusted) {
+                final String scamWord = scanScamKeywords(req.content());
+                if (scamWord != null) {
+                    meterRegistry.counter("mvno.vosk.scamflag",
+                        "word", scamWord,
+                        "msisdn", sender
+                    ).increment();
+                    localFlagHint = "scam-keyword-review: " + scamWord;
+                    logger.info("UNTRUSTED SMS SCAM KEYWORD FLAGGED (forwarded to decider): sender={} word='{}'", sender, scamWord);
+                }
             }
         }
+
+        final boolean locallyFlagged = (localFlagHint != null);
 
         try {
             // Step 2: Build JSON classification request payload for SMS
             final Map<String, Object> body = Map.of(
                 "event_type", "SMS",
-                "sender_msisdn", req.sender(),
-                "recipient_msisdn", req.recipient(),
-                "content_text", req.content(),
+                "sender_msisdn", sender,
+                "recipient_msisdn", (req != null && req.recipient() != null) ? req.recipient() : "unknown",
+                "content_text", (req != null && req.content() != null) ? req.content() : "",
                 "timestamp_epoch_ms", System.currentTimeMillis()
             );
 
-            // Step 3: Execute POST request to external AI model microservice
+            // Step 3: Execute POST request to external AI model microservice / Filteration-System decider
             final TranscriptionResult result = restClient.post()
                     .uri(baseUrl)
                     .body(body)
@@ -130,21 +161,33 @@ public class AiFilterService {
             // Step 4: On successful response, reset consecutive failure counter to 0
             if (result != null) {
                 consecutiveFailures.set(0);
-                return new InterceptResponse(result.allow(), result.reason());
+                if (!result.allow()) {
+                    return new InterceptResponse(false, result.reason());
+                }
+                final String reason = locallyFlagged 
+                    ? result.reason() + " (" + localFlagHint + ")" 
+                    : result.reason();
+                return new InterceptResponse(true, reason);
             }
 
-            // Fallback for null response body
-            return failOpen("empty_response", "AI filter returned empty response — SLA allow");
+            // Decider returned empty: surface local review flag if flagged, else SLA allow
+            return failOpen("empty_response", locallyFlagged
+                    ? ("AI filter empty — " + localFlagHint)
+                    : "AI filter returned empty response — SLA allow");
 
         } catch (final RestClientException e) {
             // Network / Timeout Exception: record failure & trigger SLA fail-open
             recordFailure(e);
-            return failOpen("unreachable", "AI filter unreachable — SLA allow");
+            return failOpen("unreachable", locallyFlagged
+                    ? ("AI filter unreachable — " + localFlagHint)
+                    : "AI filter unreachable — SLA allow");
 
         } catch (final Exception e) {
             // Unexpected internal error: log & trigger SLA fail-open
             logger.error("Unexpected error in SMS AI classification: {}", e.getMessage(), e);
-            return failOpen("internal", "Gateway internal error — SLA allow");
+            return failOpen("internal", locallyFlagged
+                    ? ("Gateway internal error — " + localFlagHint)
+                    : "Gateway internal error — SLA allow");
         }
     }
 
