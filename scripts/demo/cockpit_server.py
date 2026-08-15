@@ -23,6 +23,7 @@ import glob
 import urllib.request
 import urllib.parse
 import urllib.error
+import re
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -31,6 +32,14 @@ from endpoint_selector import resolve_callee_endpoint, get_host_lan_ip
 
 PORT = 8085
 SPOOL_ARCHIVE = os.path.join(REPO_ROOT, "state/spool/archived")
+
+# Operator auth: destructive /api/action/* POST endpoints require this key.
+# Reuse the gateway's established env-override (X_API_KEY) with the same demo
+# fallback as telecom-api/application.yml so cockpit + gateway stay in sync.
+API_KEY = os.environ.get("X_API_KEY", "mvno-demo-key-2026")
+# Strict target validation for /api/action/dial: bare E.164/feature digits or a
+# well-formed sip: URI. Anything else (shell metacharacters, quotes, spaces) is rejected.
+_TARGET_RE = re.compile(r"^(?:[0-9+*#]+|sip:[0-9+*#@.:]+)$")
 
 SUBSCRIBERS = {
     "15553332211": {
@@ -743,7 +752,7 @@ HTML_DASHBOARD = """<!DOCTYPE html>
                 banner.style.background = '#16a34a20';
                 banner.style.color = '#4ade80';
                 banner.style.border = '1px solid #16a34a60';
-                banner.innerText = `✓ Outbound Call Established to ${target}`;
+                banner.innerText = `✓ Outbound Call Dispatched to ${target}`;
             })
             .catch(e => {
                 banner.style.background = '#ef444420';
@@ -848,7 +857,7 @@ def get_real_dsp_analysis():
         req = urllib.request.Request(
             "http://localhost:8080/api/v1/intercept/dsp/voice-clone",
             data=json.dumps({"pcm_base64": b64, "sample_rate": rate}).encode(),
-            headers={"Content-Type": "application/json", "X-API-Key": "mvno-demo-key-2026"}
+            headers={"Content-Type": "application/json", "X-API-Key": API_KEY}
         )
         with urllib.request.urlopen(req, timeout=1.2) as resp:
             data = json.loads(resp.read().decode())
@@ -1080,57 +1089,120 @@ class CockpitHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def _authorized(self):
+        """H1: Gate destructive POST actions.
+
+        Access model (fixes the operator-UI regression while keeping remote
+        access key-protected):
+          * Same-origin requests — i.e. the operator's own dashboard served from
+            this host (its fetches carry a Referer/Origin whose host equals the
+            request Host, or a loopback Host) — are trusted and allowed without
+            a key. This is what the 6 in-page fetch('/api/action/*') calls send.
+          * Any other request (remote/LAN curl/script, cross-origin browser CSRF)
+            MUST present a valid X-API-Key, else 401.
+        A malicious cross-origin page cannot forge a same-origin Referer (browsers
+        set it to the attacker's real origin), so this preserves the CSRF guard.
+        """
+        host = self.headers.get("Host", "")
+        origin = self.headers.get("Origin") or ""
+        referer = self.headers.get("Referer") or ""
+
+        def hostname(u):
+            # Extract bare hostname from a URL / host header, stripping scheme,
+            # path and port. Returns '' if unusable/absent.
+            return u.split("//")[-1].split("/")[0].split(":")[0]
+
+        def looks_same_origin(u):
+            # A URL is treated as same-origin when (a) its bare hostname equals
+            # the request Host, or (b) it is an explicit loopback alias. An
+            # absent/empty header (u=='' -> '') never matches -> key required.
+            if not u:
+                return False
+            hn = hostname(u)
+            if hn == hostname(host):
+                return True
+            return hn in ("localhost", "127.0.0.1", "::1")
+
+        same_origin = looks_same_origin(origin) or looks_same_origin(referer)
+
+        if not same_origin:
+            supplied = self.headers.get("X-API-Key", "")
+            if not supplied or supplied != API_KEY:
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"status":"UNAUTHORIZED","error":"missing or invalid X-API-Key"}')
+                return False
+        return True
+
+    def _send_json(self, code, payload):
+        """Helper: write a JSON response."""
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _read_body(self):
+        """Defensively parse a JSON request body. Handles missing/oversized/
+        malformed Content-Length and invalid JSON without crashing the handler."""
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except (TypeError, ValueError):
+            length = 0
+        if length < 0 or length > 4 * 1024 * 1024:  # cap at 4 MiB
+            length = 0
+        raw = self.rfile.read(length).decode("utf-8", "replace") if length > 0 else "{}"
+        try:
+            return json.loads(raw)
+        except Exception:
+            return {}
+
     def do_POST(self):
+        # ── H1: Require operator API key on all destructive /api/action/* endpoints ──
+        # Also reject cross-origin browser POSTs (CSRF guard). LAN operator traffic
+        # from the served cockpit is same-origin/localhost and passes.
+        if not self._authorized():
+            return
         try:
             if self.path == "/api/action/accept":
                 # Answer across all softphone and physical handset endpoints
                 send_baresip_command("baresip-rx", {"command": "accept"})
                 send_baresip_command("baresip-tx", {"command": "accept"})
-                subprocess.run("adb -s dc76f546 shell 'input keyevent 5' 2>/dev/null || true", shell=True)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(b'{"status":"CALL_ACCEPTED_SUCCESS"}')
+                subprocess.run(["adb", "-s", "dc76f546", "shell", "input keyevent 5"],
+                               capture_output=True, timeout=3)
+                self._send_json(200, {"status": "CALL_ACCEPTED_SUCCESS"})
 
             elif self.path == "/api/action/hangup":
                 send_baresip_command("baresip-rx", {"command": "hangup"})
                 send_baresip_command("baresip-tx", {"command": "hangup"})
-                subprocess.run("podman exec mvno-asterisk asterisk -rx 'channel request hangup all' 2>/dev/null || true", shell=True)
-                subprocess.run("make hangup 2>/dev/null || true", shell=True)
-                subprocess.run("adb -s dc76f546 shell 'input keyevent 6' 2>/dev/null || true", shell=True)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(b'{"status":"CALL_TERMINATED_SUCCESS"}')
+                subprocess.run(["podman", "exec", "mvno-asterisk", "asterisk", "-rx", "channel request hangup all"],
+                               capture_output=True, timeout=5)
+                subprocess.run(["make", "hangup"], capture_output=True, timeout=10)
+                subprocess.run(["adb", "-s", "dc76f546", "shell", "input keyevent 6"],
+                               capture_output=True, timeout=3)
+                self._send_json(200, {"status": "CALL_TERMINATED_SUCCESS"})
 
             elif self.path == "/api/action/dial":
-                # Custom outbound dial
-                length = int(self.headers.get("Content-Length", 0))
-                body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
-                try:
-                    dial_req = json.loads(body)
-                except Exception:
-                    dial_req = {}
-                target = dial_req.get("target", "15551234567")
+                # Custom outbound dial (H2: no shell=True; target is regex-validated)
+                dial_req = self._read_body()
+                target = str(dial_req.get("target", "15551234567"))
+                if not _TARGET_RE.match(target):
+                    self._send_json(400, {"status": "INVALID_TARGET",
+                                          "error": "target must be digits/#/*/+ or a sip:<digits>@<host> URI"})
+                    return
                 lan_ip = get_host_lan_ip()
                 uri = target if target.startswith("sip:") else f"sip:{target}@{lan_ip}:5060"
-                subprocess.Popen(f"podman exec baresip-tx python3 /cfg/baresip_dial.py --uri '{uri}' --timeout 20", shell=True)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "CALL_DISPATCHED", "target": target, "uri": uri}).encode("utf-8"))
+                subprocess.Popen(["podman", "exec", "baresip-tx", "python3", "/cfg/baresip_dial.py",
+                                  "--uri", uri, "--timeout", "20"])
+                self._send_json(200, {"status": "CALL_DISPATCHED", "target": target, "uri": uri})
 
             elif self.path == "/api/action/send_sms":
                 # Interactive Custom SMS
-                length = int(self.headers.get("Content-Length", 0))
-                body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
-                try:
-                    sms_req = json.loads(body)
-                except Exception:
-                    sms_req = {}
-                caller = sms_req.get("caller", "15553332211")
-                callee = sms_req.get("callee", "15551234567")
-                text = sms_req.get("text", "Hello from MVNO Supervisor Cockpit!")
+                sms_req = self._read_body()
+                caller = str(sms_req.get("caller", "15553332211"))
+                callee = str(sms_req.get("callee", "15551234567"))
+                text = str(sms_req.get("text", "Hello from MVNO Supervisor Cockpit!"))
                 
                 api_payload = json.dumps({
                     "sender": caller,
@@ -1141,7 +1213,7 @@ class CockpitHandler(BaseHTTPRequestHandler):
                 req = urllib.request.Request(
                     "http://localhost:8080/api/v1/intercept/sms",
                     data=api_payload,
-                    headers={"Content-Type": "application/json", "X-API-Key": "mvno-demo-key-2026"}
+                    headers={"Content-Type": "application/json", "X-API-Key": API_KEY}
                 )
                 
                 try:
@@ -1150,59 +1222,73 @@ class CockpitHandler(BaseHTTPRequestHandler):
                         sms_script = os.path.join(REPO_ROOT, "scripts/testing/send_digest_sms.py")
                         if os.path.exists(sms_script):
                             subprocess.Popen([sys.executable, sms_script, caller, callee, text])
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"status": "DELIVERED", "code": 200, "message": f"Delivered to {callee}: '{text}'"}).encode("utf-8"))
+                        self._send_json(200, {"status": "DELIVERED", "code": 200,
+                                              "message": f"Delivered to {callee}: '{text}'"})
                 except urllib.error.HTTPError as e:
                     if e.code == 403:
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"status": "BLOCKED_SPAM", "code": 403, "message": f"AI Threat Intercepted & Blocked for {callee}"}).encode("utf-8"))
+                        self._send_json(200, {"status": "BLOCKED_SPAM", "code": 403,
+                                              "message": f"AI Threat Intercepted & Blocked for {callee}"})
                     else:
-                        self.send_response(500)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"status": "ERROR", "code": e.code, "message": str(e)}).encode("utf-8"))
+                        self._send_json(500, {"status": "ERROR", "code": e.code, "message": str(e)})
                 except Exception as ex:
-                    self.send_response(500)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "ERROR", "code": 500, "message": str(ex)}).encode("utf-8"))
+                    self._send_json(500, {"status": "ERROR", "code": 500, "message": str(ex)})
 
             elif self.path == "/api/action/whisper":
-                cmd = "podman exec mvno-asterisk asterisk -rx 'channel originate Local/whisper-audio@mvno application Wait 2'"
-                subprocess.run(cmd, shell=True, capture_output=True)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(b'{"status":"WHISPER_INJECTED_SUCCESS"}')
-                
+                # In-call ChanSpy whisper to the CALLEE (victim) channel. Query the
+                # live ConfBridge participants, find the PJSIP/mvno-trunk channel
+                # whose CallerID is the callee MSISDN, then inject the whisper into
+                # THAT channel so the victim hears the warning in their ear while
+                # the scammer's call media continues uninterrupted.
+                whisper_req = self._read_body()
+                callee_msisdn = str(whisper_req.get("callee", "15559998888"))
+                cb = subprocess.run(
+                    ["podman", "exec", "mvno-asterisk", "asterisk", "-rx",
+                     "confbridge list 001"],
+                    capture_output=True, timeout=5, text=True).stdout
+                target_chan = None
+                for line in cb.splitlines():
+                    if "PJSIP/mvno-trunk-" not in line:
+                        continue
+                    fields = line.split()
+                    if fields and fields[-1] == callee_msisdn:
+                        target_chan = fields[0]
+                        break
+                if not target_chan:
+                    self._send_json(404, {"status": "WHISPER_NO_CALLEE",
+                                          "message": f"No active callee channel with CallerID {callee_msisdn} in ConfBridge 001"})
+                    return
+                # Set the global target for the whisper-audio dialplan, then
+                # originate the Local channel to that extension (which Answers
+                # and runs ChanSpy(${WHISPER_TARGET},qwB)). The plain extension
+                # originate form is used because the dialplan drives ChanSpy
+                # itself from the WHISPER_TARGET global.
+                subprocess.run(
+                    ["podman", "exec", "mvno-asterisk", "asterisk", "-rx",
+                     f"dialplan set global WHISPER_TARGET {target_chan}"],
+                    capture_output=True, timeout=5, text=True)
+                res = subprocess.run(
+                    ["podman", "exec", "mvno-asterisk", "asterisk", "-rx",
+                     "channel originate Local/whisper-audio@mvno extension whisper-audio@mvno"],
+                    capture_output=True, timeout=5, text=True)
+                self._send_json(200, {"status": "WHISPER_INJECTED_SUCCESS",
+                                      "target": target_chan,
+                                      "callee": callee_msisdn,
+                                      "detail": res.stdout.strip() or res.stderr.strip()})
+
             elif self.path == "/api/action/bridge":
-                cmd = "podman exec mvno-asterisk asterisk -rx 'confbridge list 001'"
-                res = subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "BRIDGE_JOINED_SUCCESS", "rooms": res.strip()}).encode("utf-8"))
+                res = subprocess.run(["podman", "exec", "mvno-asterisk", "asterisk", "-rx",
+                                      "confbridge list 001"],
+                                     capture_output=True, timeout=5, text=True).stdout
+                self._send_json(200, {"status": "BRIDGE_JOINED_SUCCESS", "rooms": res.strip()})
 
             elif self.path == "/api/action/group_merge":
-                length = int(self.headers.get("Content-Length", 0))
-                body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
-                try:
-                    req_data = json.loads(body)
-                except Exception:
-                    req_data = {}
-                decision = req_data.get("decision", "accept")
+                req_data = self._read_body()
+                decision = str(req_data.get("decision", "accept"))
                 duration = req_data.get("duration", 30)
                 merge_script = os.path.join(REPO_ROOT, "scripts/demo/group_call_merge.py")
                 if os.path.exists(merge_script):
                     subprocess.Popen([sys.executable, merge_script, "--decision", str(decision), "--duration", str(duration)])
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "GROUP_CALL_INITIATED", "decision": decision}).encode("utf-8"))
+                self._send_json(200, {"status": "GROUP_CALL_INITIATED", "decision": decision})
             else:
                 self.send_response(404)
                 self.end_headers()
