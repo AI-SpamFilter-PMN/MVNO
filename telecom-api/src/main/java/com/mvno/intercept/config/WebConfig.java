@@ -19,14 +19,20 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
 
     private final String apiKey;
+    private final boolean authEnabled;
 
-    public WebConfig(@Value("${intercept.api-key}") final String apiKey) {
+    public WebConfig(
+            @Value("${intercept.api-key}") final String apiKey,
+            @Value("${intercept.api-key-enabled:true}") final boolean authEnabled) {
         this.apiKey = apiKey;
+        this.authEnabled = authEnabled;
     }
 
     @Override
     public void addInterceptors(final InterceptorRegistry registry) {
-        registry.addInterceptor(new ApiKeyInterceptor(apiKey))
-                .addPathPatterns("/api/v1/intercept/**");
+        if (authEnabled) {
+            registry.addInterceptor(new ApiKeyInterceptor(apiKey))
+                    .addPathPatterns("/api/v1/intercept/**");
+        }
     }
 }

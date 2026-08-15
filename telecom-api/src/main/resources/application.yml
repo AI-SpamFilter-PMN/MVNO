@@ -55,6 +55,7 @@ filteration:
 # ------------------------------------------------------------------------------
 intercept:
   api-key: ${X_API_KEY:mvno-demo-key-2026}
+  api-key-enabled: ${API_KEY_ENABLED:true}
 
 # ------------------------------------------------------------------------------
 # Native Vosk Speech-to-Text ASR Engine (JVM JNI)
