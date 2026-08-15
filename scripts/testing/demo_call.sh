@@ -145,7 +145,7 @@ audio_player aufile,/dev/null
 EOF
   fi
   cat > state/baresip/tx/accounts <<EOF
-<sip:${CALLER}@${SIP_HOST}:5060>;auth_user=${CALLER};auth_pass=testpass
+<sip:${CALLER}@${SIP_HOST}:5060>;auth_user=${CALLER};auth_pass=testpass;answermode=auto
 EOF
   cp -f scripts/testing/baresip_dial.py state/baresip/tx/baresip_dial.py 2>/dev/null || true
 

@@ -848,21 +848,49 @@ def get_real_dsp_analysis():
     except Exception:
         return None
 
+def send_baresip_command(container, command_dict):
+    """Send JSON netstring command to baresip ctrl_tcp port 4444 via non-blocking python socket."""
+    import json
+    cmd_bytes = json.dumps(command_dict).encode("utf-8")
+    code = f"""
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(0.3)
+try:
+    s.connect(('127.0.0.1', 4444))
+    cmd = {repr(cmd_bytes)}
+    s.sendall(f'{{len(cmd)}}:{{cmd.decode()}},'.encode())
+    s.recv(1024)
+except Exception:
+    pass
+finally:
+    s.close()
+"""
+    try:
+        subprocess.run(["podman", "exec", container, "python3", "-c", code], timeout=0.8, capture_output=True)
+    except Exception:
+        pass
+
 def discover_active_call_participants():
-    """Discover real-time caller and callee MSISDNs from live Kamailio and Asterisk channels."""
+    """Discover real-time caller and callee MSISDNs from live Kamailio, RTPEngine, and Asterisk channels."""
     import re
     caller = None
     callee = None
     
     # 1. Check Kamailio real-time container logs for most recent active call
     try:
-        res_kam = subprocess.run("podman logs --tail 25 mvno-kamailio", shell=True, capture_output=True, text=True, timeout=1.0)
+        res_kam = subprocess.run("podman logs --tail 40 mvno-kamailio", shell=True, capture_output=True, text=True, timeout=0.8)
         log_lines = res_kam.stdout.split("\n") + res_kam.stderr.split("\n")
         for line in reversed(log_lines):
             m = re.search(r"INCOMING CALL INITIATED: caller=(\S+) -> callee=(\S+)", line)
             if m:
                 caller = m.group(1)
                 callee = m.group(2)
+                break
+            m_int = re.search(r"INTERCEPT QUERY: caller=(\S+) callee=(\S+)", line)
+            if m_int:
+                caller = m_int.group(1)
+                callee = m_int.group(2)
                 break
             m2 = re.search(r"STIR/SHAKEN ATTESTATION: Authenticated subscriber caller=(\S+)", line)
             if m2:
@@ -875,7 +903,7 @@ def discover_active_call_participants():
     # 2. Check Asterisk channels
     if not caller or not callee:
         try:
-            res_ast = subprocess.run("podman exec mvno-asterisk asterisk -rx 'core show channels concise'", shell=True, capture_output=True, text=True, timeout=1.0)
+            res_ast = subprocess.run("podman exec mvno-asterisk asterisk -rx 'core show channels concise'", shell=True, capture_output=True, text=True, timeout=0.8)
             lines = [l.strip() for l in res_ast.stdout.strip().split("\n") if l.strip()]
             for l in lines:
                 parts = l.split("!")
@@ -1018,8 +1046,9 @@ class CockpitHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             if self.path == "/api/action/accept":
-                # Answer via Baresip rx rig & ADB handset
-                subprocess.run("podman exec baresip-rx bash -c \"exec 3<>/dev/tcp/127.0.0.1/4444; printf '13:{\\\"command\\\":\\\"accept\\\"},' >&3; timeout 1 cat <&3\" 2>/dev/null || true", shell=True)
+                # Answer across all softphone and physical handset endpoints
+                send_baresip_command("baresip-rx", {"command": "accept"})
+                send_baresip_command("baresip-tx", {"command": "accept"})
                 subprocess.run("adb -s dc76f546 shell 'input keyevent 5' 2>/dev/null || true", shell=True)
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -1027,6 +1056,9 @@ class CockpitHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b'{"status":"CALL_ACCEPTED_SUCCESS"}')
 
             elif self.path == "/api/action/hangup":
+                send_baresip_command("baresip-rx", {"command": "hangup"})
+                send_baresip_command("baresip-tx", {"command": "hangup"})
+                subprocess.run("podman exec mvno-asterisk asterisk -rx 'channel request hangup all' 2>/dev/null || true", shell=True)
                 subprocess.run("make hangup 2>/dev/null || true", shell=True)
                 subprocess.run("adb -s dc76f546 shell 'input keyevent 6' 2>/dev/null || true", shell=True)
                 self.send_response(200)
