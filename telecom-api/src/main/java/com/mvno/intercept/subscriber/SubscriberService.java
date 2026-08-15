@@ -33,6 +33,16 @@ public class SubscriberService {
     }
 
     /**
+     * Checks if target MSISDN belongs to a registered local subscriber in the HLR/SQLite DB.
+     * 
+     * @param msisdn E.164 phone number string.
+     * @return true if registered local subscriber; false for external/inter-carrier numbers.
+     */
+    public boolean isLocalSubscriber(final String msisdn) {
+        return subscriberRepository.findByMsisdn(msisdn).isPresent();
+    }
+
+    /**
      * Delegates hardware IMEI device verification to EIR tracker.
      * 
      * @param imei 15-digit IMEI serial number string.

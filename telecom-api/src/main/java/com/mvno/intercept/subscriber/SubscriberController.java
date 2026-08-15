@@ -80,10 +80,13 @@ public class SubscriberController {
             return ResponseEntity.badRequest().body(new InterceptResponse(false, "Invalid request: missing sender MSISDN"));
         }
 
-        final int balance = subscriberService.getBalance(req.sender());
-        if (balance <= 0) {
-            smsBlocked.increment();
-            return ResponseEntity.ok(new InterceptResponse(false, "Prepaid balance exhausted"));
+        // Enforce prepaid balance policy exclusively for registered local originating subscribers
+        if (subscriberService.isLocalSubscriber(req.sender())) {
+            final int balance = subscriberService.getBalance(req.sender());
+            if (balance <= 0) {
+                smsBlocked.increment();
+                return ResponseEntity.ok(new InterceptResponse(false, "Prepaid balance exhausted"));
+            }
         }
 
         final InterceptResponse result = aiFilterService.classifySms(req);
@@ -142,10 +145,13 @@ public class SubscriberController {
             }
         }
 
-        final int balance = subscriberService.getBalance(effectiveCaller);
-        if (balance <= 0) {
-            callBlocked.increment();
-            return ResponseEntity.ok(new InterceptResponse(false, "Prepaid balance exhausted"));
+        // Enforce prepaid balance policy exclusively for registered local originating subscribers
+        if (subscriberService.isLocalSubscriber(effectiveCaller)) {
+            final int balance = subscriberService.getBalance(effectiveCaller);
+            if (balance <= 0) {
+                callBlocked.increment();
+                return ResponseEntity.ok(new InterceptResponse(false, "Prepaid balance exhausted"));
+            }
         }
 
         if (effectiveImei != null && !effectiveImei.isBlank()

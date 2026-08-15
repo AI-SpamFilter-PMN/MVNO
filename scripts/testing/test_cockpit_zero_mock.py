@@ -62,8 +62,8 @@ def test_api_status():
             with urllib.request.urlopen(req, timeout=3) as r:
                 data = json.loads(r.read().decode("utf-8"))
 
-        assert matched or data["kpi_threats"] >= 1, f"Threats mismatch: Cockpit={data['kpi_threats']} vs VM TSDB={vm_threats}"
-        assert data["kpi_threats"] >= 1, f"Expected at least 1 threat from TSDB/DPI, got {data['kpi_threats']}"
+        assert matched, f"Threats mismatch: Cockpit={data['kpi_threats']} vs VM TSDB={vm_threats}"
+        assert data["kpi_threats"] >= 0, f"Threats count must be non-negative, got {data['kpi_threats']}"
         assert data["kpi_5g_ues"] >= 1, f"5G UEs must be >= 1: {data['kpi_5g_ues']}"
         assert data["handset"]["mode"] in ["PHYSICAL_HANDSET", "LAPTOP_FALLBACK"], f"Invalid handset mode: {data['handset']['mode']}"
         

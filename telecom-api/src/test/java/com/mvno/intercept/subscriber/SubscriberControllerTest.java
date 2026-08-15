@@ -40,6 +40,7 @@ class SubscriberControllerTest {
 
     @Test
     void testInterceptSms_ExhaustedBalance() {
+        Mockito.when(subscriberService.isLocalSubscriber("15550000000")).thenReturn(true);
         Mockito.when(subscriberService.getBalance("15550000000")).thenReturn(0);
 
         SMSInterceptRequest req = new SMSInterceptRequest("15550000000", "15559999999", "Hello world");
@@ -52,7 +53,23 @@ class SubscriberControllerTest {
     }
 
     @Test
+    void testInterceptSms_ExternalSenderBypassesBalanceCheck() {
+        // External sender not registered in local subscriber database
+        Mockito.when(subscriberService.isLocalSubscriber("19998887777")).thenReturn(false);
+        Mockito.when(aiFilterService.classifySms(any())).thenReturn(new InterceptResponse(true, "Clean SMS"));
+
+        SMSInterceptRequest req = new SMSInterceptRequest("19998887777", "15551234567", "Inbound A2P / Inter-Carrier SMS");
+        ResponseEntity<InterceptResponse> response = controller.interceptSms(req);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().allow());
+        assertEquals("Clean SMS", response.getBody().reason());
+    }
+
+    @Test
     void testInterceptSms_AllowedSms() {
+        Mockito.when(subscriberService.isLocalSubscriber("15551234567")).thenReturn(true);
         Mockito.when(subscriberService.getBalance("15551234567")).thenReturn(10);
         Mockito.when(aiFilterService.classifySms(any())).thenReturn(new InterceptResponse(true, "Clean SMS"));
 
@@ -77,6 +94,7 @@ class SubscriberControllerTest {
 
     @Test
     void testInterceptCall_EirSimSwapBlocked() {
+        Mockito.when(subscriberService.isLocalSubscriber("15551234567")).thenReturn(true);
         Mockito.when(subscriberService.getBalance("15551234567")).thenReturn(20);
         Mockito.when(subscriberService.checkEirBinding("867530900000001", "15551234567")).thenReturn(false);
 
@@ -91,6 +109,7 @@ class SubscriberControllerTest {
 
     @Test
     void testInterceptCall_ZeroBalance() {
+        Mockito.when(subscriberService.isLocalSubscriber("15550000000")).thenReturn(true);
         Mockito.when(subscriberService.getBalance("15550000000")).thenReturn(0);
 
         CallInterceptRequest req = new CallInterceptRequest("15550000000", "15558888888", "call-id-zero", "356938035643809");
