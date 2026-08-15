@@ -466,6 +466,9 @@ HTML_DASHBOARD = """<!DOCTYPE html>
                 <div class="btn-group">
                     <button class="btn btn-success" onclick="acceptCall()">🟢 Answer Call</button>
                     <button class="btn btn-danger" onclick="hangupCall()">🔴 Hangup Call</button>
+                    <input id="whisper-callee" type="text" value="15559998888"
+                           placeholder="callee MSISDN" class="callee-input"
+                           style="width:110px; padding:6px 8px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#e2e8f0; font-size:11px;"/>
                     <button class="btn btn-warn" onclick="triggerWhisper()">⚠️ Whisper</button>
                     <button class="btn btn-purple" onclick="joinBridge()">👥 ConfBridge</button>
                 </div>
@@ -718,10 +721,23 @@ HTML_DASHBOARD = """<!DOCTYPE html>
         }
 
         function triggerWhisper() {
-            fetch('/api/action/whisper', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => alert("Audio Whisper Injected via Asterisk ChanSpy: " + data.status))
-                .catch(e => alert("Whisper triggered: " + e));
+            const callee = (document.getElementById('whisper-callee').value || '15559998888').trim();
+            fetch('/api/action/whisper', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callee: callee })
+            })
+                .then(async r => {
+                    const data = await r.json().catch(() => ({}));
+                    if (r.ok && data.status === 'WHISPER_INJECTED_SUCCESS') {
+                        alert(`✅ Audio Whisper Injected via Asterisk ChanSpy into ${data.target} (callee ${callee})`);
+                    } else if (!r.ok && data.status === 'WHISPER_NO_CALLEE') {
+                        alert(`⚠️ No active ${callee} channel found to whisper into — start a two-leg call (ConfBridge 7001 or a direct call) first.`);
+                    } else {
+                        alert(`❌ Whisper failed: ${data.status || r.status} — ${data.message || data.detail || 'unknown error'}`);
+                    }
+                })
+                .catch(e => alert("❌ Whisper request error: " + e));
         }
 
         function joinBridge() {
@@ -1234,28 +1250,29 @@ class CockpitHandler(BaseHTTPRequestHandler):
                     self._send_json(500, {"status": "ERROR", "code": 500, "message": str(ex)})
 
             elif self.path == "/api/action/whisper":
-                # In-call ChanSpy whisper to the CALLEE (victim) channel. Query the
-                # live ConfBridge participants, find the PJSIP/mvno-trunk channel
-                # whose CallerID is the callee MSISDN, then inject the whisper into
-                # THAT channel so the victim hears the warning in their ear while
-                # the scammer's call media continues uninterrupted.
+                # In-call ChanSpy whisper to the CALLEE (victim) channel. Query
+                # ALL active channels via `core show channels verbose` (works for
+                # both ConfBridge calls and direct caller->callee calls), find the
+                # PJSIP/mvno-trunk channel whose CallerID is the callee MSISDN,
+                # then inject the whisper into THAT channel so the victim hears
+                # the warning in their ear while the scammer's media continues.
                 whisper_req = self._read_body()
                 callee_msisdn = str(whisper_req.get("callee", "15559998888"))
-                cb = subprocess.run(
+                cv = subprocess.run(
                     ["podman", "exec", "mvno-asterisk", "asterisk", "-rx",
-                     "confbridge list 001"],
+                     "core show channels verbose"],
                     capture_output=True, timeout=5, text=True).stdout
                 target_chan = None
-                for line in cb.splitlines():
+                for line in cv.splitlines():
                     if "PJSIP/mvno-trunk-" not in line:
                         continue
                     fields = line.split()
-                    if fields and fields[-1] == callee_msisdn:
+                    if len(fields) >= 8 and fields[7] == callee_msisdn:
                         target_chan = fields[0]
                         break
                 if not target_chan:
                     self._send_json(404, {"status": "WHISPER_NO_CALLEE",
-                                          "message": f"No active callee channel with CallerID {callee_msisdn} in ConfBridge 001"})
+                                          "message": f"No active {callee_msisdn} channel found to whisper into. Start a two-leg call (ConfBridge 7001 or a direct call) first."})
                     return
                 # Set the global target for the whisper-audio dialplan, then
                 # originate the Local channel to that extension (which Answers
