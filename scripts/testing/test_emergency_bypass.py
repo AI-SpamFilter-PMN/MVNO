@@ -61,7 +61,7 @@ def main():
         raise RuntimeError("Fatal: Kamailio Layer 0 route did not log emergency preemption!")
     
     # 4. Verify Asterisk PSAP Gateway Log & Audio Playback
-    ast_logs = run_cmd("podman logs --tail 30 mvno-asterisk")
+    ast_logs = run_cmd("podman logs --tail 150 mvno-asterisk")
     print(f"\n[*] Asterisk PSAP Gateway Inbound Trunk & Audio Playback Log:")
     ast_found = False
     playback_found = False
